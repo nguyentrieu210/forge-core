@@ -2,13 +2,16 @@
  * Bảng màu dùng chung cho mọi app MetaForge — **Graphite + Enterprise Blue**.
  *
  * TRƯỚC ĐÂY có 13 bảng màu (zinc/blue/warm + sakura/emerald/ocean/violet/indigo/teal/amber/rose/
- * aurora/sunset). Đã thu về 2 vì mục tiêu diện mạo là ERP/B2B: một hệ thống nghiệp vụ cần MỘT
- * ngôn ngữ thị giác để người dùng đọc dữ liệu, không phải 13 chủ đề trang trí — và 11 bảng màu
- * rực (hồng, cam, tím…) không thể vừa giữ tinh thần enterprise vừa giữ tương phản AA trên bảng
- * và biểu mẫu dày đặc.
+ * aurora/sunset). Đã thu về một bộ nhỏ có chủ đích: hệ thống nghiệp vụ cần MỘT ngôn ngữ thị giác
+ * để người dùng đọc dữ liệu, không phải 13 chủ đề trang trí — và các bảng màu rực (hồng, cam,
+ * tím…) không thể vừa giữ tinh thần enterprise vừa giữ tương phản AA trên bảng và biểu mẫu dày đặc.
+ *
+ * Cả ba brand DÙNG CHUNG nền graphite, viền, mật độ và bóng; chỉ khác họ màu nhấn. Đó là thứ giữ
+ * chúng là một hệ thống thay vì ba giao diện.
  *
  *   enterprise — graphite + navy doanh nghiệp (mặc định)
  *   graphite   — trung tính hoàn toàn, primary không màu
+ *   red        — graphite + đỏ doanh nghiệp
  *
  * `enterprise` KHÔNG stamp `data-brand` (nó chính là khối `:root` trong `packages/ui/src/
  * styles.css`), đúng cách `zinc` từng là mặc định — nên hợp đồng "không có attribute = brand
@@ -16,7 +19,8 @@
  */
 import { useCallback, useEffect, useState } from "react";
 
-export type BrandMode = "enterprise" | "graphite";
+export type BrandMode = "enterprise" | "graphite" | "red";
+
 
 const KEY = "metaforge-brand";
 const CHANGE_EVENT = "metaforge-brand-change";
@@ -24,6 +28,7 @@ const CHANGE_EVENT = "metaforge-brand-change";
 export const BRANDS: { id: BrandMode; label: string; swatch: string }[] = [
   { id: "enterprise", label: "Doanh nghiệp", swatch: "#1e40af" },
   { id: "graphite", label: "Than chì", swatch: "#374151" },
+  { id: "red", label: "Đỏ doanh nghiệp", swatch: "#991b1b" },
 ];
 
 export const BRAND_COLOR_COUNT = BRANDS.length;

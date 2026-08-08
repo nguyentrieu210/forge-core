@@ -313,6 +313,126 @@
   --sidebar-rail: #d1d5db;
 }
 
+/* ── ĐỎ DOANH NGHIỆP ─────────────────────────────────────────────────────────
+ * Nền graphite giữ nguyên như hai brand kia — chỉ đổi họ màu nhấn. Đây là điểm khiến bộ ba brand
+ * vẫn là MỘT hệ thống chứ không phải ba giao diện: bề mặt, viền, mật độ, bóng đều chung.
+ *
+ * VA CHẠM PHẢI XỬ LÝ: đỏ đã là `--destructive` (Xoá, lỗi, số âm). Brand đỏ làm nút "Lưu" và nút
+ * "Xoá" cùng họ màu. Ba việc để chúng vẫn phân biệt được:
+ *
+ *   1. Tách theo ĐỘ SÁNG, không theo sắc. Nút chính là đỏ TRẦM (#991b1b, L35%); nút xoá giữ đỏ
+ *      TƯƠI tiêu chuẩn (#dc2626, L51%). Chênh 16 điểm độ sáng — khác biệt đọc được ngay cả với
+ *      người mù màu đỏ-lục, vì họ vẫn phân biệt được sáng/tối.
+ *   2. `--destructive` KHÔNG đổi so với brand khác. Tín hiệu nguy hiểm phải giống nhau ở mọi bảng
+ *      màu; nếu mỗi brand một sắc "nguy hiểm" thì người dùng chuyển brand là mất phản xạ.
+ *   3. `--mf-brand` ở brand này KHÔNG đẩy sáng (xem ghi đè ở cuối khối). Công thức chung
+ *      `hsl(from --primary h s 48%)` sẽ cho ra ~#d02525 — gần như trùng khít `--destructive`
+ *      #dc2626, khiến badge mặc định trông y hệt badge cảnh báo.
+ *
+ * `--info` vẫn XANH, không đổi theo brand: "thông tin" là trạng thái, không phải màu thương hiệu.
+ */
+[data-brand="red"] {
+  color-scheme: light;
+  --background: #f5f6f8;
+  --foreground: #111827;
+  --card: #ffffff;
+  --card-foreground: #111827;
+  --popover: #ffffff;
+  --popover-foreground: #111827;
+  --primary: #991b1b;
+  --primary-foreground: #ffffff;
+  --primary-hover: #7f1d1d;
+  --primary-active: #641414;
+  --secondary: #f1f3f5;
+  --secondary-foreground: #111827;
+  --muted: #f8f9fb;
+  --muted-foreground: #4b5563;
+  --accent: #fbeaea;
+  --accent-foreground: #991b1b;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --success: #16a34a;
+  --warning: #d97706;
+  --success-text: #15803d;
+  --warning-text: #a16207;
+  --destructive-text: #b91c1c;
+  --border: #e1e5ea;
+  --input: #cdd3da;
+  --ring: #991b1b;
+  --subtle: #5b6472;
+  --info: #1e40af;
+  --info-text: #1e3a8a;
+  /* Vị trí 5 đổi từ đỏ sang navy: chart-1 đã là đỏ thương hiệu, để đỏ ở cả hai đầu dải thì hai
+     series xa nhau lại trông cùng một nhóm. */
+  --chart-1: var(--primary);
+  --chart-2: #0f766e;
+  --chart-3: #b45309;
+  --chart-4: #6d28d9;
+  --chart-5: #1e40af;
+  --header-foreground: #991b1b;
+  /* Sidebar graphite ám ấm — cùng độ tối với hai brand kia, chỉ lệch sắc để không chỏi với đỏ. */
+  --sidebar: #201819;
+  --sidebar-foreground: #ece2e2;
+  --sidebar-item: #d9c8c8;
+  --sidebar-muted: #a89696;
+  --sidebar-border: #362727;
+  --sidebar-hover: #2a1f20;
+  --sidebar-accent: #4a2222;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-rail: #ef4444;
+  /* Ghi đè công thức đẩy sáng chung — xem lý do 3 ở đầu khối. */
+  --mf-brand: var(--primary);
+}
+[data-brand="red"][data-theme="dark"] {
+  color-scheme: dark;
+  --background: #111318;
+  --foreground: #f3f4f6;
+  --card: #171a21;
+  --card-foreground: #f3f4f6;
+  --popover: #1d212a;
+  --popover-foreground: #f3f4f6;
+  /* Nền tối: nút chính là đỏ TƯƠI, nút xoá là đỏ NHẠT hơn hẳn — vẫn tách bằng độ sáng, nhưng đảo
+     chiều so với bản sáng vì trên nền tối thứ sáng hơn mới là thứ nổi hơn. */
+  --primary: #ef4444;
+  --primary-foreground: #1a0505;
+  --primary-hover: #f87171;
+  --primary-active: #fca5a5;
+  --secondary: #252a34;
+  --secondary-foreground: #f3f4f6;
+  --muted: #1d212a;
+  --muted-foreground: #9ca3af;
+  --accent: #3a1c1c;
+  --accent-foreground: #fca5a5;
+  --destructive: #fca5a5;
+  --destructive-foreground: #1a0f0f;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --success-text: #4ade80;
+  --warning-text: #fbbf24;
+  --destructive-text: #fecaca;
+  --border: #303641;
+  --input: #3d4552;
+  --ring: #ef4444;
+  --subtle: #7d8592;
+  --info: #5b82ff;
+  --info-text: #a8c0ff;
+  --chart-1: var(--primary);
+  --chart-2: #2dd4bf;
+  --chart-3: #fbbf24;
+  --chart-4: #a78bfa;
+  --chart-5: #7da0ff;
+  --header-foreground: #fca5a5;
+  --sidebar: #171415;
+  --sidebar-foreground: #ece2e2;
+  --sidebar-item: #d3c4c4;
+  --sidebar-muted: #9d8d8d;
+  --sidebar-border: #2b2224;
+  --sidebar-hover: #211b1c;
+  --sidebar-accent: #3d2122;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-rail: #ef4444;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

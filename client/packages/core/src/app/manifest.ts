@@ -8,7 +8,7 @@
 /**
  * Brand khai trong manifest của app.
  *
- * Hệ thống chỉ còn HAI bảng màu thật (`enterprise` | `graphite` — xem `packages/shell/src/
+ * Hệ thống chỉ còn BA bảng màu thật (`enterprise` | `graphite` | `red` — xem `packages/shell/src/
  * brand.ts`), nhưng union này vẫn giữ đủ 13 tên cũ vì manifest là HỢP ĐỒNG DỮ LIỆU: các app đã
  * cài, bản ghi App Registry và manifest do App Factory sinh ra đang mang những giá trị đó, và làm
  * chúng không hợp lệ sẽ biến một thay đổi thuần diện mạo thành một cuộc migration dữ liệu.
@@ -17,7 +17,7 @@
  * `zinc` → `graphite`, còn lại → `enterprise`.
  */
 export type AppBrand =
-  | "enterprise" | "graphite"
+  | "enterprise" | "graphite" | "red"
   | "zinc" | "blue" | "warm" | "sakura" | "emerald" | "ocean" | "violet"
   | "indigo" | "teal" | "amber" | "rose" | "aurora" | "sunset";
 export type NavKind = "doctype" | "route" | "workspace" | "system" | "experience" | "overview" | "process";
@@ -184,7 +184,7 @@ export interface ManifestResult {
 
 const ID_RE = /^[a-z][a-z0-9-]*$/;
 const BRANDS: ReadonlySet<string> = new Set([
-  "enterprise", "graphite",
+  "enterprise", "graphite", "red",
   // Tên cũ — giữ hợp lệ để manifest đã phát hành không hỏng. Xem `AppBrand`.
   "zinc", "blue", "warm", "sakura", "emerald", "ocean", "violet",
   "indigo", "teal", "amber", "rose", "aurora", "sunset",

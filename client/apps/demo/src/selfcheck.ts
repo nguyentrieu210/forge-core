@@ -65,10 +65,11 @@ console.log("selfcheck — logic thuần (no network):");
 // 1. Fieldtype đúng 43 authorable (verified live docfield.json).
 // Hệ thống thu từ 13 bảng màu trang trí về 2 bảng màu enterprise (2026-08-08). Khẳng định ở đây
 // đổi theo hợp đồng mới, và kiểm luôn đường quy đổi tên cũ — đó mới là phần dễ vỡ khi nâng cấp.
-check("theme: 2 bảng màu enterprise + quy đổi tên cũ", () => {
-  assert.equal(BRANDS.length, 2);
+check("theme: 3 bảng màu enterprise + quy đổi tên cũ", () => {
+  assert.equal(BRANDS.length, 3);
   assert.equal(isBrandMode("enterprise"), true);
   assert.equal(isBrandMode("graphite"), true);
+  assert.equal(isBrandMode("red"), true);
   assert.equal(isBrandMode("sakura"), false);
   assert.equal(isBrandMode("unknown"), false);
   // Ô chọn màu phải là màu đặc áp thật, không phải gradient quảng cáo.
