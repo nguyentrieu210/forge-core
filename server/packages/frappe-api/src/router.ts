@@ -3132,21 +3132,32 @@ async function businessContext(args: FrappeArgs, context: FrappeRouterContext): 
     if (wanted && !wanted.has(dimension.key)) continue;
     const restrictions = permissions.filter((record) => record.allow_doctype === dimension.recordType);
     let options = await context.documents.listMasterRecords(context.tenantId, dimension.recordType, 200);
-    // Kho nhóm chỉ là nút cấu trúc trong cây (ví dụ "Kho Alumdoor"), không phải
-    // địa điểm vật lý có thể nhập/xuất. Không đưa nó vào bộ chọn phạm vi toàn hệ
-    // thống, nếu không người dùng chọn một kho vốn không bao giờ có tồn.
+    // Warehouse is managed through the Warehouse DocType. Historical app fixtures
+    // also live in master_records, but they are not rows in the Warehouse screen
+    // and can survive after that screen has been cleared. Reading the generic union
+    // here exposed those stale fixtures as ghost warehouses in the global selector.
+    // Keep this selector on the same document source as the CRUD screen.
     if (dimension.recordType === "Warehouse") {
-      const warehouseData = new Map(
-        (await context.documents.listMasterRecordData(context.tenantId, "Warehouse"))
-          .map((record) => [record.name, record.data]),
-      );
-      options = options.filter((option) => Number(warehouseData.get(option.name)?.is_group ?? 0) !== 1);
+      const warehouseDocuments = await context.documents.listDocumentsByDoctype<JsonObject>(context.tenantId, "Warehouse");
+      options = warehouseDocuments
+        .filter((document) => document.docstatus !== 2
+          && document.data.disabled !== true
+          && Number(document.data.disabled ?? 0) !== 1
+          && Number(document.data.is_group ?? 0) !== 1)
+        .map((document) => ({
+          name: document.name,
+          label: typeof document.data.warehouse_name === "string" && document.data.warehouse_name.trim()
+            ? document.data.warehouse_name.trim()
+            : document.name,
+        }))
+        .sort((left, right) => left.name.localeCompare(right.name))
+        .slice(0, 200);
     }
     const permitted = restrictions.length
       ? options.filter((option) => restrictions.some((record) => record.allow_name === option.name))
       : options;
     const permissionDefault = restrictions.find((record) => record.is_default)?.allow_name;
-    const locked = restrictions.length === 1;
+    const locked = restrictions.length === 1 && permitted.length === 1;
     const defaultValue = dimension.required
       ? permissionDefault ?? permitted[0]?.name
       : locked
