@@ -899,15 +899,30 @@ describe("frappe facade over real workerd, D1 and Durable Objects", () => {
     expect((await unwrap(await method("frappe.desk.doctype.notification_log.notification_log.mark_all_as_read", {}))).marked).toBeGreaterThanOrEqual(1);
   });
 
-  it("offers business-context dimensions from master data, disabling ones with none", async () => {
+  it("keeps the warehouse context aligned with user-managed Warehouse documents", async () => {
+    expect((await switchSession("sales@example.com")).status).toBe(200);
+    const before = await unwrap(await method("metaforge.api.get_business_context", { app_id: "demo" }, "GET"));
+    const beforeByKey = Object.fromEntries(before.dimensions.map((dimension: any) => [dimension.key, dimension]));
+    // Company is platform master data. The legacy Stores fixture must not leak into
+    // Warehouse context while the user-facing Warehouse list is empty.
+    expect(beforeByKey.company.enabled).toBe(true);
+    expect(beforeByKey.company.options.map((option: any) => option.value)).toContain("Demo");
+    expect(beforeByKey.warehouse.enabled).toBe(false);
+    expect(beforeByKey.warehouse.options).toEqual([]);
+    expect(beforeByKey.territory.enabled).toBe(false);
+    expect(beforeByKey.company.required).toBe(true);
+
+    await env.DB.prepare(
+      `INSERT INTO documents(
+         tenant_id,doc_key,doctype,name,owner,docstatus,status,version,created_at,modified_at,payload_json
+       ) VALUES('demo','Warehouse:WAREHOUSE-REAL','Warehouse','WAREHOUSE-REAL','sales@example.com',0,'Draft',1,?1,?1,?2)`,
+    ).bind(NOW, JSON.stringify({ warehouse_name: "Kho thật", company: "Demo", is_group: 0, disabled: 0 })).run();
+
     const context = await unwrap(await method("metaforge.api.get_business_context", { app_id: "demo" }, "GET"));
     const byKey = Object.fromEntries(context.dimensions.map((dimension: any) => [dimension.key, dimension]));
-    // Company and Warehouse were seeded; Territory was not.
-    expect(byKey.company.enabled).toBe(true);
-    expect(byKey.company.options.map((option: any) => option.value)).toContain("Demo");
     expect(byKey.warehouse.enabled).toBe(true);
-    expect(byKey.territory.enabled).toBe(false);
-    expect(byKey.company.required).toBe(true);
+    expect(byKey.warehouse.options).toContainEqual({ value: "WAREHOUSE-REAL", label: "Kho thật" });
+    expect(byKey.warehouse.options.map((option: any) => option.value)).not.toContain("Stores");
   });
 
   it("applies a context selection only to dimensions the doctype actually has", async () => {
