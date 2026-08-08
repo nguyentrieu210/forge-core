@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased — Alumdoor UI
+
+- Sidebar Alumdoor dùng nền đen ở cả giao diện sáng và tối; chữ/icon trắng xám, hover tương phản và mục đang chọn giữ màu cam thương hiệu.
+
 ## Unreleased — Price List matrix
 
 - Alumdoor metadata `2.2.1` bổ sung ngày áp dụng cho Bảng giá và định danh Item Price theo đúng ĐVT.
