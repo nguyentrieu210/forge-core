@@ -17,7 +17,14 @@
     <script>
       (() => {
         const params = new URLSearchParams(location.search);
-        const alumdoor = location.hostname.toLowerCase() === "alu.kairo.vn" || params.get("alumdoor") === "1";
+        // App id đã NHỚ của lần đăng nhập trước. Script này chạy trước mọi module nên không có
+        // manifest; dò theo tên miền thì chỉ đúng ở đúng một domain, và favicon là thứ người dùng
+        // nhìn để tìm đúng tab giữa hàng chục tab khác.
+        let remembered = null;
+        try { remembered = localStorage.getItem("metaforge-app"); } catch { /* chế độ riêng tư */ }
+        const alumdoor = remembered === "alumdoor"
+          || location.hostname.toLowerCase() === "alu.kairo.vn"
+          || params.get("alumdoor") === "1";
         if (!alumdoor) return;
         const logo = "/alumdoor/app-icon-192.png";
         // Có HAI thẻ theme-color (light/dark) kể từ khi bảng màu chuyển sang graphite — đặt cả hai
@@ -26,6 +33,8 @@
         document.querySelectorAll('meta[name="theme-color"]').forEach((tag) => tag.setAttribute("content", "#f45b24"));
         document.getElementById("app-icon")?.setAttribute("href", logo);
         document.getElementById("app-touch-icon")?.setAttribute("href", logo);
+        // Tên tab cũng là thương hiệu: người dùng tìm tab bằng CHỮ khi biểu tượng quá nhỏ.
+        document.title = "Alumdoor";
       })();
     </script>
   </head>
