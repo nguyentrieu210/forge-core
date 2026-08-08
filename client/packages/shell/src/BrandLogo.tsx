@@ -19,6 +19,9 @@ export function isAlumdoorSurface() {
   // chỉ đúng ở đúng một domain — chạy local, staging, domain khách khác đều ra logo Forge dù tên
   // app hiển thị đã là Alumdoor. Thương hiệu phải đi theo app đang chạy, không theo URL.
   if (document.documentElement.dataset.app === "alumdoor") return true;
+  // Màn ĐĂNG NHẬP chạy trước khi có phiên nên chưa có manifest. Dùng app id đã nhớ của lần vào
+  // trước — hết phiên mà thương hiệu đổi thành Forge sẽ khiến người dùng tưởng vào nhầm hệ thống.
+  try { if (localStorage.getItem("metaforge-app") === "alumdoor") return true; } catch { /* riêng tư */ }
   const host = window.location.hostname.toLowerCase();
   const params = new URLSearchParams(window.location.search);
   // Giữ ba đường cũ làm dự phòng: trang công khai/landing render TRƯỚC khi manifest kịp tải.

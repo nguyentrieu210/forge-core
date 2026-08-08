@@ -321,6 +321,10 @@ function ManifestBoundary({ boot, logout }: { boot: MetaForgeBootDTO; logout: ()
         // render lại khi thuộc tính đổi sau. Đặt trong useEffect (chạy SAU render đầu) là logo
         // Alumdoor không bao giờ kịp xuất hiện.
         document.documentElement.dataset.app = value.id;
+        // NHỚ lại app id. Màn đăng nhập render khi CHƯA có phiên nên không thể tải manifest —
+        // không nhớ thì mỗi lần hết phiên, người dùng Alumdoor lại thấy thương hiệu Forge, đúng
+        // lúc họ cần chắc mình đang đăng nhập vào đúng hệ thống.
+        try { localStorage.setItem("metaforge-app", value.id); } catch { /* chế độ riêng tư */ }
         setManifest(value);
       })
       .catch((caught) => { if (alive) setError(adapter.mapError(caught).message); });
