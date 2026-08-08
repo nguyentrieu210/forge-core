@@ -15,8 +15,13 @@ export interface ForgeBrandLogoProps {
 
 export function isAlumdoorSurface() {
   if (typeof window === "undefined") return false;
+  // MANIFEST trước tiên: runtime đóng dấu `data-app` lên <html> từ `manifest.id`. Dò theo tên miền
+  // chỉ đúng ở đúng một domain — chạy local, staging, domain khách khác đều ra logo Forge dù tên
+  // app hiển thị đã là Alumdoor. Thương hiệu phải đi theo app đang chạy, không theo URL.
+  if (document.documentElement.dataset.app === "alumdoor") return true;
   const host = window.location.hostname.toLowerCase();
   const params = new URLSearchParams(window.location.search);
+  // Giữ ba đường cũ làm dự phòng: trang công khai/landing render TRƯỚC khi manifest kịp tải.
   return host === "alu.kairo.vn" || params.get("alumdoor") === "1" || window.location.pathname.startsWith("/mobile/warehouse/");
 }
 
