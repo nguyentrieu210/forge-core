@@ -22,6 +22,7 @@
     "types": "npm run types:tenant && npm run types:gateway && npm run types:query",
     "types:check": "npm run types && git diff -- apps/tenant-worker/worker-configuration.d.ts apps/gateway-worker/worker-configuration.d.ts apps/query-worker/worker-configuration.d.ts && git diff --exit-code -- apps/tenant-worker/worker-configuration.d.ts apps/gateway-worker/worker-configuration.d.ts apps/query-worker/worker-configuration.d.ts",
     "dev:tenant": "npx wrangler dev --config apps/tenant-worker/wrangler.jsonc",
+    "dev:alumdoor-local": "node scripts/ensure-alumdoor-local-vars.mjs && wrangler dev --config apps/tenant-worker/wrangler.alumdoor-local.jsonc --config apps-src/alumdoor-worker/wrangler.purchase-qa.jsonc --config apps/purchase-qa-callback/wrangler.jsonc --port 8799 --local",
     "dev:gateway": "npx wrangler dev --config apps/gateway-worker/wrangler.jsonc",
     "deploy:tenant": "node scripts/deploy-tenant.mjs",
     "deploy:gateway": "npx wrangler deploy --config apps/gateway-worker/wrangler.jsonc",
