@@ -3,7 +3,7 @@ export { cn } from "./lib/cn.js";
 
 export { Button, buttonVariants, SplitButton, SplitButtonCaret, type ButtonProps } from "./components/ui/button.js";
 /** Style dùng chung cho control tự dựng ngoài kit (giữ focus/kích thước đồng bộ với Input/Select). */
-export { focusRing, controlBase, chromeFill, chromeText } from "./components/ui/control-styles.js";
+export { focusRing, controlBase, chromeFill, chromeText, brandFill, brandText } from "./components/ui/control-styles.js";
 export { FileButton, type FileButtonProps } from "./components/ui/file-button.js";
 export { Input } from "./components/ui/input.js";
 export { Textarea } from "./components/ui/textarea.js";

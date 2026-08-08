@@ -96,6 +96,10 @@
   /* Sidebar graphite tối ngay cả ở theme sáng — quy ước ERP: thanh điều hướng là "khung", vùng
      làm việc là "giấy". Tối nhưng KHÔNG đen tuyệt đối (#18202d, có sắc navy) để không bị cảm giác
      terminal/gaming. Khai token riêng thay vì lấy theo --background vì nó không đổi theo light/dark. */
+  /* Chữ tiêu đề cột/khối trên bề mặt `--secondary`. Token RIÊNG chứ không dùng thẳng `--primary`:
+     ở dark, `--primary` (#5b82ff) trên `--secondary` (#252a34) chỉ đạt 4.17:1 — trượt AA. Mỗi
+     theme cần một sắc riêng để cùng vượt ngưỡng đọc. */
+  --header-foreground: #1e40af;
   --sidebar: #18202d;
   --sidebar-foreground: #dde3ec;
   /* Chữ mục menu lúc nghỉ: 10.2:1 trên nền sidebar — menu là thứ để ĐỌC KHI TÌM, không phải chú
@@ -120,18 +124,31 @@
  * cascade tại chính element đó — nên `--mf-brand` tự trỏ đúng `--primary` của brand/theme đang
  * active mà không cần khai lại cho từng bảng màu.
  *
- * TRƯỚC ĐÂY công thức là `hsl(from var(--primary) h s 58%)` — cố ý ĐẨY SÁNG primary lên 58% để
- * có mảng màu "rực". Với hướng enterprise thì đó chính là thứ phải bỏ: nâng L lên 58% biến navy
- * #1e40af thành xanh chói ~#3b6fe0, và vì nền sáng lên nên chữ trắng trên đó tụt xuống ~3.4:1 —
- * trượt AA. Giữ nguyên `--primary`: đã là màu được chọn cho đúng cả sắc lẫn tương phản, không có
- * lý do gì để một token thứ hai đi chệch khỏi nó.
+ * Đẩy sáng primary một bậc (L 48%) để mảng brand — brand mark, badge nhấn mạnh — có sức sống hơn
+ * `--primary` trầm dùng cho nút. Navy #1e40af (L≈40%) thành ~#244dd1, chữ trắng trên đó vẫn đạt
+ * ~6.9:1, dư AA.
  *
- * Giữ lại tên token (không xoá) vì header hộp thoại, header lưới, brand mark, badge nhấn mạnh và
- * mục menu đang chọn đều đã trỏ vào đây — đổi ở một chỗ là đổi khắp hệ thống.
+ * KHÔNG đẩy tới 58% như bản trước: ở 58% navy thành ~#3b6fe0 và chữ trắng tụt còn ~3.4:1 —
+ * trượt AA cho chữ nhỏ, đúng chỗ badge hay dùng nhất.
+ *
+ * CHỈ đẩy ở theme SÁNG. Ở dark, `--primary` (#5b82ff) đã nằm ở L≈68%; kéo NGƯỢC xuống 48% làm nó
+ * tối đi thành ~#003af5, mà chữ trên nút chính ở dark là chữ TỐI ⇒ tương phản rơi xuống ~2.7:1.
+ * Nên dark giữ nguyên `--primary`.
+ *
+ * Cú pháp chỉ thay bare `h`/`s`/`l` — KHÔNG `calc()`, KHÔNG `min()`. `calc()` lồng trong kênh màu
+ * của relative-color không phải trình duyệt nào cũng nhận; khi không hiểu thì TOÀN BỘ `--mf-brand`
+ * thành giá trị không hợp lệ và mọi nơi dùng nó rơi về `transparent` — mất màu hoàn toàn, không
+ * phải "còn nhạt".
+ *
+ * Header hộp thoại/lưới KHÔNG còn dùng token này (đã chuyển sang bề mặt graphite + vạch navy —
+ * xem `chromeFill` trong `control-styles.ts`).
  */
 :root {
-  --mf-brand: var(--primary);
+  --mf-brand: hsl(from var(--primary) h s 48%);
   --mf-brand-foreground: var(--primary-foreground);
+}
+[data-theme="dark"] {
+  --mf-brand: var(--primary);
 }
 
 /* ── ENTERPRISE — dark (graphite, KHÔNG đen tuyệt đối) ───────────────────── */
@@ -174,6 +191,7 @@
   --info-text: #a8c0ff;
   /* Sidebar chỉ tách nhẹ khỏi workspace (#14181f vs #111318) — ở theme tối, tách mạnh sẽ thành
      hai khối đen cạnh nhau và mất luôn cảm giác cùng một ứng dụng. */
+  --header-foreground: #a8c0ff;
   --sidebar: #14181f;
   --sidebar-foreground: #e5e9f0;
   --sidebar-item: #c3cddb;
@@ -236,6 +254,7 @@
   --chart-3: #b45309;
   --chart-4: #6d28d9;
   --chart-5: #b91c1c;
+  --header-foreground: #374151;
   --sidebar: #1c1f26;
   --sidebar-foreground: #dfe2e8;
   --sidebar-item: #c6cad3;
@@ -282,6 +301,7 @@
   --chart-3: #fbbf24;
   --chart-4: #a78bfa;
   --chart-5: #f87171;
+  --header-foreground: #d1d5db;
   --sidebar: #14181f;
   --sidebar-foreground: #e5e9f0;
   --sidebar-item: #c3cddb;
@@ -328,6 +348,7 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent: var(--sidebar-accent);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-header-foreground: var(--header-foreground);
   --color-primary-hover: var(--primary-hover);
   --color-primary-active: var(--primary-active);
   --color-subtle: var(--subtle);
@@ -736,7 +757,15 @@
      TableHeader) sẽ để các dòng dữ liệu trôi qua bên dưới hiện xuyên lên khi cuộn. */
   .mf-list-view thead,
   .mf-report thead { background: var(--secondary); }
-  .mf-list-view thead th { background: var(--secondary); box-shadow: var(--mf-sticky-edge); }
+  /* Bản cho ngữ cảnh KHÔNG nằm trong `.mf-shell` (bảng nhúng, xem trước, app tự dựng shell riêng).
+     Phải khớp với bản `.mf-shell .mf-list-view thead th` ở cuối file — cùng vạch navy 2px trên
+     đỉnh và cùng `--header-foreground` — nếu không thì cùng một bảng đổi diện mạo tuỳ chỗ nhúng. */
+  .mf-list-view thead th {
+    background: var(--secondary);
+    color: var(--header-foreground);
+    font-weight: 600;
+    box-shadow: inset 0 2px 0 var(--primary), var(--mf-sticky-edge);
+  }
   .mf-list-view th,
   .mf-report th {
     height: 2.35rem;
@@ -1349,15 +1378,18 @@
   color: currentColor;
   opacity: 1;
 }
-/* Header bảng: bề mặt graphite nhạt + chữ tối, phân biệt bằng độ đậm chữ và viền dưới rõ — không
-   phải mảng đen đảo màu. Vạch primary 2px phía trên giữ lại vì nó cũng là mép "dính" khi cuộn. */
+/* Header bảng: bề mặt graphite nhạt + VẠCH navy 2px trên đỉnh + chữ tiêu đề navy — không phải
+   mảng đen đảo màu (#111827 cũ) biến mỗi bảng thành một khối nặng.
+   Vạch vẽ bằng `inset box-shadow` chứ không phải `border-top`: hàng tiêu đề ở đây là sticky, mà
+   border của `<th>` KHÔNG dính theo khi cuộn (thân bảng trôi đè lên) — đúng lý do
+   `--mf-sticky-edge` tồn tại cho mép dưới. */
 .mf-shell .mf-list-view thead th {
   background: var(--secondary);
-  color: var(--foreground);
+  color: var(--header-foreground);
   border-bottom-color: var(--input);
   font-weight: 600;
   letter-spacing: 0.01em;
-  box-shadow: var(--mf-sticky-edge);
+  box-shadow: inset 0 2px 0 var(--primary), var(--mf-sticky-edge);
 }
 .mf-shell .mf-list-view tbody tr[data-state="selected"] {
   background: color-mix(in srgb, var(--primary) 8%, var(--card));

@@ -1,6 +1,7 @@
 import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "../../lib/cn.js";
+import { brandFill, brandText } from "./control-styles.js";
 
 export const badgeVariants = cva(
   // Bỏ `focus:outline-none`: Badge là <span> không nhận focus nên nó vô tác dụng, và nếu ai đó
@@ -9,9 +10,10 @@ export const badgeVariants = cva(
   {
     variants: {
       variant: {
-        // Không đi qua `chromeFill` nữa: chromeFill giờ là bề mặt HEADER (graphite nhạt). Badge
-        // mặc định vẫn cần là mảng nhấn mang màu chính, nên trỏ thẳng vào `--primary`.
-        default: "border-transparent bg-primary font-semibold text-primary-foreground",
+        // KHÔNG dùng `chromeFill` — token đó giờ là bề mặt HEADER (graphite + vạch navy). Badge
+        // mặc định là mảng nhấn thật sự nên dùng `brandFill`/`brandText` (primary đã đẩy sáng
+        // một bậc ở `styles.css`).
+        default: `border-transparent font-semibold ${brandFill} ${brandText}`,
         secondary: "border-transparent bg-muted text-muted-foreground",
         // Chữ dùng biến *-text. Với success, nền 15% đẩy contrast xuống sát/dưới 4.5:1 ở
         // Chromium thực; giảm tint còn 5% giữ semantic hue nhưng bảo toàn AA cho chữ 11px.

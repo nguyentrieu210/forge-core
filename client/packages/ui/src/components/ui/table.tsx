@@ -19,9 +19,10 @@ Table.displayName = "Table";
 export const TableHeader = React.forwardRef<HTMLTableSectionElement, React.HTMLAttributes<HTMLTableSectionElement>>(
   // ĐỤC chứ không phải bán trong suốt: khi thead dính (sticky) thì nền mờ để các dòng dữ liệu
   // trôi bên dưới hiện xuyên qua chữ tiêu đề. Nền là `--secondary` (graphite nhạt) chứ KHÔNG phải
-  // mảng primary đảo màu: header đảo màu biến mỗi bảng thành một khối nặng, và ở màn nhiều bảng
-  // thì các dải đậm chia vụn màn hình. Thứ bậc do độ đậm chữ + viền dưới đảm nhiệm.
-  ({ className, ...props }, ref) => <thead ref={ref} className={cn("[&_tr]:border-b bg-secondary text-foreground", className)} {...props} />,
+  // mảng primary đảo màu — header đảo màu biến mỗi bảng thành một khối nặng, và ở màn nhiều bảng
+  // thì các dải đậm chia vụn màn hình. Màu do VẠCH navy 2px trên đỉnh + chữ tiêu đề navy đảm
+  // nhiệm (đặt ở `TableHead`, vì viền phải nằm trên từng `<th>` mới liền mạch khi cuộn ngang).
+  ({ className, ...props }, ref) => <thead ref={ref} className={cn("[&_tr]:border-b bg-secondary", className)} {...props} />,
 );
 TableHeader.displayName = "TableHeader";
 
@@ -49,7 +50,7 @@ export const TableHead = React.forwardRef<HTMLTableCellElement, React.ThHTMLAttr
       tìm cột cần gõ, chứ không đọc từng chữ. `text-xs` + `text-muted-foreground` làm hàng tiêu đề
       nhạt gần bằng dữ liệu bên dưới, mất luôn ranh giới giữa "tên cột" và "nội dung".
     */
-    <th ref={ref} className={cn("h-9 whitespace-nowrap border-b border-input bg-secondary px-3 text-left align-middle text-[13px] font-semibold text-foreground", className)} {...props} />
+    <th ref={ref} className={cn("h-9 whitespace-nowrap border-t-2 border-b border-t-primary border-b-input bg-secondary px-3 text-left align-middle text-[13px] font-semibold text-header-foreground", className)} {...props} />
   ),
 );
 TableHead.displayName = "TableHead";

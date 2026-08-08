@@ -23,11 +23,23 @@ export const focusRing =
  *   2. Ở mật độ ERP, một biểu mẫu có thể chứa 3–4 lưới con; bốn dải navy đặc trong một màn hình
  *      hút hết sự chú ý khỏi chính dữ liệu.
  *
- * `--secondary` + `--foreground` cho đúng bậc bề mặt "cao hơn card một nấc" mà vẫn giữ chữ tối,
- * và tự đảo đúng chiều ở dark mode.
+ * `--secondary` cho đúng bậc bề mặt "cao hơn card một nấc", CỘNG một vạch `--primary` 2px ở mép
+ * trên và chữ tiêu đề mang màu primary. Vạch + chữ màu là thứ trả lại "chất" cho header sau khi
+ * bỏ mảng đặc: đủ để mắt bắt được ranh giới tiêu đề/dữ liệu, nhưng không đổ một khối màu nặng
+ * lên mỗi lưới con. Chữ dùng `--header-foreground` — sắc navy được chỉnh riêng cho từng theme để cùng đạt AA trên
+ * `--secondary` (7.8:1 ở light, 8.0:1 ở dark); dùng thẳng `--primary` thì bản dark chỉ được 4.2:1.
  */
-export const chromeFill = "bg-secondary";
-export const chromeText = "text-foreground";
+export const chromeFill = "bg-secondary border-t-2 border-t-primary";
+export const chromeText = "text-header-foreground";
+
+/**
+ * Mảng mang MÀU THƯƠNG HIỆU đặc — brand mark, badge nhấn mạnh.
+ *
+ * Khác `chromeFill` (bề mặt header, graphite): đây là chỗ thực sự cần một mảng màu. Đọc
+ * `--mf-brand` — primary đã đẩy sáng một bậc, khai đúng một lần ở `styles.css`.
+ */
+export const brandFill = "bg-[var(--mf-brand)]";
+export const brandText = "text-[color:var(--mf-brand-foreground)]";
 
 /**
  * Nền control = `--card` (gần trắng), KHÔNG phải `--accent`.
