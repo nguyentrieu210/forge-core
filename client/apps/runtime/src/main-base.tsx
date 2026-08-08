@@ -317,6 +317,10 @@ function ManifestBoundary({ boot, logout }: { boot: MetaForgeBootDTO; logout: ()
           setError(check.issues.filter((issue) => issue.severity === "error").map((issue) => `${issue.code}: ${issue.message}`).join("\n"));
           return;
         }
+        // Đóng dấu TRƯỚC setState: logo đọc `data-app` trong lúc render và không có gì khiến nó
+        // render lại khi thuộc tính đổi sau. Đặt trong useEffect (chạy SAU render đầu) là logo
+        // Alumdoor không bao giờ kịp xuất hiện.
+        document.documentElement.dataset.app = value.id;
         setManifest(value);
       })
       .catch((caught) => { if (alive) setError(adapter.mapError(caught).message); });
@@ -325,6 +329,8 @@ function ManifestBoundary({ boot, logout }: { boot: MetaForgeBootDTO; logout: ()
 
   useEffect(() => {
     if (!manifest) return;
+    // Dấu định danh app đã được đặt ngay lúc nhận manifest (xem chỗ setManifest) — phải TRƯỚC
+    // render đầu tiên thì logo mới đọc kịp.
     applyBrand(normalizeBrand(manifest.brand) ?? "enterprise");
     applyDesign(manifest.design);
   }, [manifest]);
