@@ -193,7 +193,7 @@ function QuickCreateDialog({ doctype, onDone }: { doctype: string; onDone: (name
         data-quick-create-depth="nested"
       >
         {/* Cùng `chromeFill`/`chromeText` với header của form tạo mới ở tầng ngoài — hộp tạo lồng
-            (vd tạo Khách hàng ngay trong đơn) mang đúng sắc thương hiệu như phần còn lại. */}
+            (vd tạo Khách hàng ngay trong đơn) mang đúng mảng navy/đỏ/than chì đặc như hộp tạo cha. */}
         <DialogHeader className={cn("shrink-0 border-b px-5 py-3", chromeFill, chromeText)}>
           <DialogTitle>{t("form.create_title_prefix")} {title.toLocaleLowerCase("vi")}</DialogTitle>
         </DialogHeader>

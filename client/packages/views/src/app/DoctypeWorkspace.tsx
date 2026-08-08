@@ -220,8 +220,9 @@ export function DoctypeWorkspace(props: DoctypeWorkspaceProps) {
           }}
           onEscapeKeyDown={(event) => { event.preventDefault(); setCloseRequest((value) => value + 1); }}
         >
-          {/* `chromeFill`/`chromeText` (từ `@metaforge/ui`) — cùng công thức với header lưới dòng
-              hàng bên dưới. Xem lý do chọn ở `control-styles.ts`. */}
+          {/* `chromeFill`/`chromeText` (từ `@metaforge/ui`) — mảng navy/đỏ/than chì ĐẶC theo brand
+              đang chọn. Chỉ hộp thoại tạo mới dùng mảng đặc; header lưới dòng hàng bên dưới dùng
+              bề mặt nhạt khác hẳn (xem `control-styles.ts`). */}
           <DialogHeader className={cn("shrink-0 border-b border-border/70 px-5 py-4", chromeFill, chromeText)}>
             <DialogTitle className="text-[15px] font-semibold tracking-tight">{t("form.create_title_prefix")} {displayTitle.toLocaleLowerCase("vi")}</DialogTitle>
           </DialogHeader>
