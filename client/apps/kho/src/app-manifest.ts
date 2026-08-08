@@ -10,7 +10,7 @@ export const APP_MANIFEST: AppManifest = {
   id: "kho",
   name: "Kho",
   version: "1.0.0",
-  brand: "blue",
+  brand: "enterprise",
   home: { doctype: "Stock Entry" },
   nav: [
     // Vật tư (khớp card "Items Catalogue" thật của ERPNext Stock workspace)

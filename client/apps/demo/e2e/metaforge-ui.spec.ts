@@ -130,9 +130,10 @@ test.describe("MetaForge MISA-style workspace", () => {
     await page.screenshot({ path: testInfo.outputPath("builder-print-v3.png"), fullPage: true });
   });
 
-  test("exposes exactly 13 color palettes", async () => {
-    expect(BRAND_COLOR_COUNT).toBe(13);
-    expect(BRANDS).toHaveLength(13);
-    expect(new Set(BRANDS.map((brand) => brand.id)).size).toBe(13);
+  test("exposes exactly 2 enterprise color palettes", async () => {
+    expect(BRAND_COLOR_COUNT).toBe(2);
+    expect(BRANDS).toHaveLength(2);
+    expect(new Set(BRANDS.map((brand) => brand.id)).size).toBe(2);
+    expect(BRANDS.map((brand) => brand.id)).toEqual(["enterprise", "graphite"]);
   });
 });

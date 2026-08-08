@@ -9,7 +9,7 @@ import { AssistantBubble, buildPrintPath, loadRecentDocs, PrintContainer, setAss
 import type { UrlStateBridge } from "@metaforge/views/url-state";
 import {
   AppShell, AuthBoundary, BusinessContextBar, BusinessContextProvider, I18nProvider,
-  CommandPalette, LoginForm, applyBrand, applyDesign, resolveIcon, useBusinessContext, useTheme,
+  CommandPalette, LoginForm, applyBrand, normalizeBrand, applyDesign, resolveIcon, useBusinessContext, useTheme,
   type AwesomeRecord, type NavItem,
 } from "@metaforge/shell";
 import { Button, Toaster } from "@metaforge/ui";
@@ -325,7 +325,7 @@ function ManifestBoundary({ boot, logout }: { boot: MetaForgeBootDTO; logout: ()
 
   useEffect(() => {
     if (!manifest) return;
-    applyBrand(manifest.brand ?? "blue");
+    applyBrand(normalizeBrand(manifest.brand) ?? "enterprise");
     applyDesign(manifest.design);
   }, [manifest]);
 
@@ -440,11 +440,16 @@ function Shell({ manifest, boot, logout, nav, active, breadcrumbs = [], children
     },
   }), [nav, navigate, paletteOpen]);
 
+  // `manifest.brand` là `AppBrand` — union còn giữ đủ 13 tên cũ để manifest đã phát hành không bị
+  // coi là không hợp lệ. Shell thì nhận `BrandMode` (chỉ 2 giá trị). Quy đổi đúng tại BIÊN HIỂN
+  // THỊ, không đẩy ngược tên mới xuống tầng dữ liệu.
+  const brandMode = normalizeBrand(manifest.brand) ?? undefined;
+
   return (
     <>
       <AppShell
         brand={manifest.name}
-        brandMode={manifest.brand}
+        brandMode={brandMode}
         allowBrandChange
         nav={nav}
         activeKey={active}

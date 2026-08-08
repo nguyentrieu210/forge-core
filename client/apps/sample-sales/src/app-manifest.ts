@@ -4,7 +4,7 @@ export const APP_MANIFEST: AppManifest = {
   id: "sample-sales",
   name: "Sample Sales",
   version: "1.0.0",
-  brand: "warm",
+  brand: "enterprise",
   domain: "selling",
   catalogMode: "hybrid",
   home: { route: "/overview/selling", doctype: "Sales Order" },

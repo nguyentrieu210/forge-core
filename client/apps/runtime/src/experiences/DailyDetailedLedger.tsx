@@ -173,7 +173,7 @@ export function DailyDetailedLedger() {
         </section>
 
         {error ? <div role="alert" className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"><ShieldAlert className="mt-0.5 size-4 shrink-0" />{error}</div> : null}
-        {reconciliation ? <div className={`flex items-center gap-2 rounded-lg border p-3 text-sm ${reconciliation.ok ? "border-emerald-300 bg-emerald-50 text-emerald-800" : "border-amber-300 bg-amber-50 text-amber-900"}`}><CheckCircle2 className="size-4" />{reconciliation.ok ? "Dữ liệu nguồn và ảnh chụp đang khớp." : `${reconciliation.mismatches.length} dòng chênh lệch; hãy cập nhật ảnh chụp mới trước khi khóa.`}</div> : null}
+        {reconciliation ? <div className={`flex items-center gap-2 rounded-lg border p-3 text-sm ${reconciliation.ok ? "border-success/30 bg-success/10 text-success-text" : "border-warning/30 bg-warning/10 text-warning-text"}`}><CheckCircle2 className="size-4" />{reconciliation.ok ? "Dữ liệu nguồn và ảnh chụp đang khớp." : `${reconciliation.mismatches.length} dòng chênh lệch; hãy cập nhật ảnh chụp mới trước khi khóa.`}</div> : null}
 
         {busy === "generate" && rows === null ? <div className="space-y-2 rounded-xl border p-4">{Array.from({ length: 6 }, (_, index) => <Skeleton key={index} className="h-10 w-full" />)}</div> : rows === null ? (
           <div className="rounded-xl border border-dashed bg-card p-10 text-center"><FileLock2 className="mx-auto size-9 text-muted-foreground" /><h2 className="mt-3 font-medium">Chưa có ảnh chụp cho ngày này</h2><p className="mt-1 text-sm text-muted-foreground">Chọn phạm vi rồi bấm “Cập nhật sổ”.</p></div>

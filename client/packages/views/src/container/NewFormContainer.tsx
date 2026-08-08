@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { applyContextPolicy, resolveFormRenderPolicy, serializeCreateDocument, type Doc, type DocField, type DocTypeMeta } from "@metaforge/core";
-import { Button, ConfirmDialog, toast, useT } from "@metaforge/ui";
+import { Button, toast, useT } from "@metaforge/ui";
 import { FormView } from "../form/FormView.js";
 import { useMetaForge } from "./provider.js";
 import { useFormMeta, useCapabilities, NO_CAPS } from "./hooks.js";
@@ -42,6 +42,8 @@ export interface NewFormContainerProps {
   closeRequest?: number;
   /** Page = biểu mẫu Desk đầy đủ; dialog = quick-create gọn. */
   presentation?: "page" | "dialog";
+  /** Khung chứa đã chiếm trọn màn hình ⇒ form bỏ trần bề ngang, không chừa dải trống hai bên. */
+  fullWidth?: boolean;
 }
 
 function blankDoc(meta: DocTypeMeta, contextDefaults: Record<string, string> = {}): Doc {
@@ -83,7 +85,6 @@ export function NewFormContainer(props: NewFormContainerProps) {
   const [saving, setSaving] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string> | undefined>();
   const [dirty, setDirty] = useState(false);
-  const [confirmCancel, setConfirmCancel] = useState(false);
   // "Lưu & Tạo tiếp" — nhập liệu hàng loạt (vd 20 Item liên tiếp) không cần đóng/mở lại modal mỗi lần.
   // resetSeq đổi ⇒ doc mới (blankDoc lại) + key FormView đổi ⇒ remount sạch (RHF defaultValues chỉ
   // chụp 1 lần lúc mount nên PHẢI remount, không thể chỉ đổi prop `doc` mà form tự nhận ra).
@@ -115,7 +116,16 @@ export function NewFormContainer(props: NewFormContainerProps) {
   }, [metaQ.data, contextDefaults, resetSeq, doctype]);
 
   // Chỉ hỏi xác nhận khi thật sự có dữ liệu chưa lưu (form dirty) — không hỏi vô cớ.
-  const requestCancel = () => { if (dirty) setConfirmCancel(true); else props.onCancel?.(); };
+  /**
+   * Huỷ là huỷ ngay, không hỏi lại.
+   *
+   * Trước đây khi form đang có dữ liệu chưa lưu thì mỗi lần bấm Huỷ / Esc / bấm ra ngoài đều dựng
+   * một hộp xác nhận "Huỷ tạo mới?". Bỏ theo yêu cầu.
+   *
+   * Đánh đổi cần biết: bấm nhầm ra ngoài khung là mất trắng những gì vừa gõ, không có bước chặn
+   * nào nữa và cũng không hoàn tác được. `dirty` vẫn được theo dõi cho các mục đích khác.
+   */
+  const requestCancel = () => { props.onCancel?.(); };
 
   // ⚠️ MỌI HOOK PHẢI NẰM TRÊN các `return` sớm bên dưới. Đặt dưới chúng thì lần render đầu (meta
   // chưa tải xong → return sớm) sẽ chạy ÍT hook hơn lần sau, React ném lỗi #310 "rendered more
@@ -205,21 +215,12 @@ export function NewFormContainer(props: NewFormContainerProps) {
         hideDefaultActions
         // Modal cha (vd DoctypeWorkspace) đã tự hiện tiêu đề "Tạo {doctype}" — ẩn header trùng của FormView.
         hideHeader={props.presentation !== "page"}
+        fullWidth={props.fullWidth}
         footerActions={<>
           <Button type="button" variant="outline" disabled={saving} onClick={requestCancel}>{t("common.cancel")}</Button>
           <Button type="submit" variant="outline" disabled={!caps.create || saving} onClick={() => { saveIntentRef.current = "continue"; }}>{t("form.save_and_new")}</Button>
           <Button type="submit" disabled={!caps.create || saving} onClick={() => { saveIntentRef.current = "close"; }}>{saving ? t("form.saving") : t("form.save_and_open")}</Button>
         </>}
-      />
-      <ConfirmDialog
-        open={confirmCancel}
-        onOpenChange={setConfirmCancel}
-        title={t("form.cancel_new_title")}
-        description={t("form.cancel_new_desc")}
-        confirmLabel={t("form.cancel_new_confirm")}
-        cancelLabel={t("form.cancel_new_keep_editing")}
-        destructive
-        onConfirm={() => props.onCancel?.()}
       />
     </>
   );

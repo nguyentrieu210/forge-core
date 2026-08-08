@@ -1543,7 +1543,10 @@ export function ChildGrid(props: ChildGridProps) {
                       role="presentation"
                       onPointerDown={(event) => startResize(c.fieldname, event)}
                       onDragStart={(event) => event.preventDefault()}
-                      className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize opacity-0 transition group-hover:opacity-100 hover:bg-primary/60"
+                      // Header dùng `chromeFill`/`chromeText` (`--foreground` trên nền pha
+                      // primary+card) — tay kéo theo `--foreground` để luôn tương phản với chữ
+                      // tiêu đề, bất kể `chromeFill` đang sáng hay tối ở bảng màu nào.
+                      className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize opacity-0 transition group-hover:opacity-100 hover:bg-foreground/30"
                     />
                   ) : null}
                 </TableHead>
@@ -1865,7 +1868,7 @@ export function ChildGrid(props: ChildGridProps) {
             </DialogHeader>
             <div className="shrink-0 border-b px-4 py-2">{toolbar}</div>
             {readError ? (
-              <div className="shrink-0 border-b bg-amber-500/10 px-4 py-2 text-sm text-amber-700 dark:text-amber-400" role="status">
+              <div className="shrink-0 border-b bg-warning/10 px-4 py-2 text-sm text-warning-text" role="status">
                 {readError}
                 <Button type="button" variant="link" className="ml-2 h-auto p-0" onClick={() => setReadError(null)}>bỏ qua</Button>
               </div>

@@ -681,7 +681,15 @@ export function LinkCombobox({
           aria-required={required || undefined}
           aria-label={label}
           title={pickedDesc && pickedDesc !== value ? pickedDesc : undefined}
-          className={cn("mf-control mf-link w-full justify-between font-normal", !value && "text-muted-foreground", error && "border-destructive")}
+          className={cn(
+            // KHÔNG đặt `bg-accent` ở đây: `--accent` là mảng navy pha loãng dành cho trạng thái
+            // ĐANG CHỌN. Ô Link tô sẵn accent thì một biểu mẫu chục ô Link trông như chục ô đang
+            // được chọn, và mất luôn khả năng thể hiện trạng thái chọn thật. Nền để nguyên theo
+            // `controlBase` (bề mặt `--card`), ranh giới ô do viền `--input` đảm nhiệm.
+            "mf-control mf-link w-full justify-between font-normal",
+            !value && "text-muted-foreground",
+            error && "border-destructive",
+          )}
         >
           <span className="min-w-0 truncate text-left">
             {value ? (pickedDesc || value) : t("control.link_placeholder")}

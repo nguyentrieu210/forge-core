@@ -534,7 +534,7 @@ function ActionResult({ value, table, committed, format, onOpen }: {
     <div className="flex flex-col gap-4" data-action-result>
       <section className="rounded-xl border bg-card">
         <div className="flex flex-wrap items-center gap-2 border-b px-4 py-3">
-          <span className={`h-2 w-2 rounded-full ${committed ? "bg-emerald-500" : "bg-amber-500"}`} />
+          <span className={`h-2 w-2 rounded-full ${committed ? "bg-success" : "bg-warning"}`} />
           <h2 className="text-sm font-semibold">{committed ? "Đã chạy" : "Xem trước — chưa ghi gì"}</h2>
           {openable && onOpen
             ? <Button size="sm" className="ml-auto" onClick={() => onOpen(openable.doctype, openable.name)}>

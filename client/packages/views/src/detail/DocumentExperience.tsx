@@ -35,10 +35,10 @@ const ARCHETYPE_ICON: Record<DocumentArchetype, typeof Package> = {
 };
 
 const STATUS_DOT_CLASS: Record<PresentationStatusTone, string> = {
-  success: "bg-emerald-500",
-  warning: "bg-amber-500",
-  danger: "bg-red-500",
-  info: "bg-blue-500",
+  success: "bg-success",
+  warning: "bg-warning",
+  danger: "bg-destructive",
+  info: "bg-info",
   neutral: "bg-muted-foreground",
 };
 

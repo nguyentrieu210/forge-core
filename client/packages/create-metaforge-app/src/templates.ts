@@ -119,7 +119,7 @@ export const APP_MANIFEST: AppManifest = {
   id: "{{ID}}",
   name: "{{NAME}}",
   version: "1.0.0",
-  brand: "blue",
+  brand: "enterprise",
   domain: "{{DOMAIN}}",
   catalogMode: "hybrid",
   home: { route: "/overview/{{DOMAIN}}", doctype: "{{HOME}}" },
@@ -148,7 +148,7 @@ import {
 } from "@metaforge/views";
 import {
   AppShell, AuthBoundary, BusinessContextBar, BusinessContextProvider, I18nProvider,
-  LoginForm, applyBrand, resolveIcon, useBusinessContext, useTheme, type NavItem,
+  LoginForm, applyBrand, normalizeBrand, resolveIcon, useBusinessContext, useTheme, type NavItem,
 } from "@metaforge/shell";
 import { Button } from "@metaforge/ui";
 import { APP_MANIFEST } from "./app-manifest.js";
@@ -212,7 +212,7 @@ function buildNavigation(catalog: ApplicationCatalog | undefined, roles: string[
 }
 
 function RootApp() {
-  useEffect(() => { applyBrand(APP_MANIFEST.brand ?? "blue"); }, []);
+  useEffect(() => { applyBrand(normalizeBrand(APP_MANIFEST.brand) ?? "enterprise"); }, []);
   return <I18nProvider><AuthBoundary
     adapter={adapter}
     renderLoading={() => <div className="grid h-screen place-items-center text-muted-foreground">Đang kết nối Frappe…</div>}

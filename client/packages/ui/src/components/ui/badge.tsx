@@ -9,7 +9,9 @@ export const badgeVariants = cva(
   {
     variants: {
       variant: {
-        default: "border-transparent bg-primary text-primary-foreground font-semibold",
+        // Không đi qua `chromeFill` nữa: chromeFill giờ là bề mặt HEADER (graphite nhạt). Badge
+        // mặc định vẫn cần là mảng nhấn mang màu chính, nên trỏ thẳng vào `--primary`.
+        default: "border-transparent bg-primary font-semibold text-primary-foreground",
         secondary: "border-transparent bg-muted text-muted-foreground",
         // Chữ dùng biến *-text. Với success, nền 15% đẩy contrast xuống sát/dưới 4.5:1 ở
         // Chromium thực; giảm tint còn 5% giữ semantic hue nhưng bảo toàn AA cho chữ 11px.

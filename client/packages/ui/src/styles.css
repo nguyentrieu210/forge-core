@@ -2,11 +2,19 @@
  * @metaforge/ui — base layer (Tailwind v4 + design tokens).
  * App consumer: `import "@metaforge/ui/styles.css"`. @source quét toàn kit.
  *
- * DIỆN MẠO IMPORT TỪ "MetaForge Prototype" (Claude Design): 3 brand direction
- *   zinc (mặc định) · blue (electric) · warm (terracotta) — mỗi cái × light/dark.
- * Chọn brand: attribute `data-brand="blue|warm|zinc"` trên root (useBrand); mặc định = zinc.
+ * DIỆN MẠO: **Graphite + Enterprise Blue** — 2 brand direction, mỗi cái × light/dark:
+ *   enterprise (mặc định, graphite + navy) · graphite (trung tính hoàn toàn, không sắc màu).
+ * Chọn brand: attribute `data-brand="graphite"` trên root (useBrand); mặc định (enterprise) KHÔNG
+ * stamp attribute nào — nó chính là khối `:root` dưới đây.
  * Dark: `data-theme="dark"` (useTheme). Token = HEX; @theme map thẳng var() (không hsl()).
  * Font: Geist / Geist Mono.
+ *
+ * NGUYÊN TẮC diện mạo (đừng phá khi thêm màn mới):
+ *   - Nền workspace là graphite (#f5f6f8), KHÔNG phải trắng — card trắng mới nổi lên được.
+ *   - Primary là navy doanh nghiệp (#1e40af), không phải electric blue kiểu SaaS demo.
+ *   - Không gradient trang trí, không glassmorphism, không neon, không glow quanh card/nút.
+ *   - Bóng chỉ để phân TẦNG (popover/dialog nổi trên panel), không để trang trí.
+ *   - Ưu tiên đọc dữ liệu: bảng/biểu mẫu/số tiền phải dễ quét mắt hơn là đẹp mắt.
  */
 /* Font KHÔNG nạp bằng @import ở đây nữa: app nào `@import "tailwindcss"` TRƯỚC file này (kho,
  * sample-wms, sample-sales) sẽ đẩy @import url() xuống sau các rule khác ⇒ CSS không hợp lệ, trình
@@ -20,41 +28,57 @@
 @source "../../*/src/**/*.{ts,tsx}";
 @source "../../../apps/*/src/**/*.{ts,tsx}";
 
-/* ── ZINC (mặc định) — light ─────────────────────────────────────────────── */
+/* ── ENTERPRISE (mặc định) — light ───────────────────────────────────────── */
 :root {
   color-scheme: light; /* thanh cuộn, date picker, autofill native theo đúng theme */
-  --background: #f4f4f5;
-  --foreground: #18181b;
+  /* Nền workspace graphite, KHÔNG trắng: card/bảng trắng phải nổi lên khỏi nền thì mắt mới tách
+     được "vùng làm việc" với "dữ liệu". Trắng-trên-trắng buộc phải bù bằng viền dày hoặc bóng
+     đậm — đúng thứ làm giao diện ERP trông như bảng tính Excel cũ. */
+  --background: #f5f6f8;
+  --foreground: #111827;
   --card: #ffffff;
-  --card-foreground: #18181b;
+  --card-foreground: #111827;
   --popover: #ffffff;
-  --popover-foreground: #18181b;
-  --primary: #18181b;
-  --primary-foreground: #fafafa;
+  --popover-foreground: #111827;
+  /* Navy doanh nghiệp. Điểm khác biệt so với electric blue (#1b4dff) cũ: đủ tối để chữ trắng đạt
+     8.7:1, nên nút chính đọc được ở mọi cỡ chữ mà không cần đổ bóng hay viền phụ. */
+  --primary: #1e40af;
+  --primary-foreground: #ffffff;
+  /* Hover/active của primary khai thành token: nút, mục menu, tab, link nhấn mạnh đều cần đúng
+     một bậc đậm hơn — trước đây mỗi chỗ tự chế bằng filter/brightness nên lệch nhau. */
+  --primary-hover: #1e3a8a;
+  --primary-active: #172554;
   /* secondary/muted TRƯỚC ĐÂY trùng nhau (#fafafa) ⇒ thead `bg-secondary` và nền `bg-muted/40`
      gần như vô hình trên card trắng. Tách 2 bậc để có thứ bậc bề mặt thật. */
-  --secondary: #f0f0f2;
-  --secondary-foreground: #18181b;
-  --muted: #f7f7f8;
-  --muted-foreground: #5f5f68;
-  --accent: #e9e9ec;
-  --accent-foreground: #18181b;
+  --secondary: #f1f3f5;
+  --secondary-foreground: #111827;
+  --muted: #f8f9fb;
+  /* Chữ phụ (nhãn ô, tiêu đề cột, chú thích) — 7.6:1 trên trắng, 7.0:1 trên nền workspace. */
+  --muted-foreground: #4b5563;
+  /* Mảng nhấn = navy pha rất loãng, KHÔNG phải xám. Đây là nền của mục đang chọn/hàng được chọn,
+     nên phải cùng họ với primary thì cảm giác "đang ở đây" mới liền mạch. */
+  --accent: #e8edf7;
+  --accent-foreground: #1e3a8a;
   --destructive: #dc2626;
   --destructive-foreground: #ffffff;
   --success: #16a34a;
-  --warning: #ca8a04;
-  /* Bản DÙNG LÀM CHỮ của success/warning: #16a34a và #ca8a04 trên nền sáng chỉ đạt ~3.0:1 và
+  --warning: #d97706;
+  /* Bản DÙNG LÀM CHỮ của success/warning: #16a34a và #d97706 trên nền sáng chỉ đạt ~3.0:1 và
      ~3.2:1 — trượt WCAG AA cho chữ nhỏ (cần 4.5:1). Nền/viền vẫn dùng --success/--warning. */
   --success-text: #15803d;
   --warning-text: #a16207;
   --destructive-text: #b91c1c;
-  --border: #e4e4e7;
-  --input: #e4e4e7;
-  --ring: #71717a;
-  --subtle: #66666f;
-  --info: #2563eb;
-  --info-text: #1d4ed8;
-  --radius: 0.625rem;
+  /* Viền thường vs viền MẠNH. `--input` tách khỏi `--border` (trước đây bằng nhau): ô nhập cần
+     viền rõ hơn đường kẻ chia panel, nếu không form trông như một mảng trắng không có ô. */
+  --border: #e1e5ea;
+  --input: #cdd3da;
+  --ring: #1e40af;
+  /* Chữ mờ nhất còn đạt AA (5.5:1) trên nền workspace — dưới mức này là không đọc được. */
+  --subtle: #5b6472;
+  --info: #1e40af;
+  --info-text: #1e3a8a;
+  /* 6–8px: đủ mềm để không thô, đủ vuông để không giống app tiêu dùng. */
+  --radius: 0.5rem;
   /* Bảng màu biểu đồ. Trước đây KHÔNG được khai ở bất kỳ đâu, trong khi cả biểu đồ cột lẫn
      donut đều tham chiếu `--chart-1..5` — nên MỌI biểu đồ ở MỌI app đều vẽ ra màu đen, và
      không có lỗi nào được báo. Token là HEX theo đúng quy ước ở đầu file (dùng `var()`
@@ -62,389 +86,211 @@
   /* Series ĐẦU bám theo màu thương hiệu: `--primary` được định nghĩa lại trong từng khối
      [data-brand] và [data-theme], nên biểu đồ tự đổi theo theme mà không cần bảng màu
      riêng cho mỗi brand. 2..5 là dải bổ trợ, chọn để phân biệt được cạnh mọi brand. */
+  /* Thứ tự enterprise: navy → teal → hổ phách → tím → đỏ. Không cầu vồng; hai series cạnh nhau
+     luôn khác nhau cả về sắc LẪN độ sáng, nên phân biệt được cả khi in đen trắng. */
   --chart-1: var(--primary);
-  --chart-2: #16a34a;
-  --chart-3: #f59e0b;
-  --chart-4: #dc2626;
-  --chart-5: #7c3aed;
-  --sidebar: #fafafa;
-  --sidebar-foreground: #18181b;
-}
-[data-theme="dark"] {
-  color-scheme: dark;
-  --background: #09090b;
-  --foreground: #fafafa;
-  --card: #131316;
-  --card-foreground: #fafafa;
-  --popover: #131316;
-  --popover-foreground: #fafafa;
-  --primary: #fafafa;
-  --primary-foreground: #18181b;
-  --secondary: #1f1f23;
-  --secondary-foreground: #fafafa;
-  --muted: #191a1d;
-  --muted-foreground: #a1a1aa;
-  --accent: #2c2c31;
-  --accent-foreground: #fafafa;
-  --destructive: #f87171;
-  --destructive-foreground: #18181b;
-  --success: #22c55e;
-  --warning: #eab308;
-  /* Nền tối: bản gốc đã đủ tương phản, không cần làm đậm thêm (làm đậm sẽ tối hơn nền). */
-  --success-text: #4ade80;
-  --warning-text: #facc15;
-  --destructive-text: #fca5a5;
-  --border: #2a2a2e;
-  --input: #2a2a2e;
-  --ring: #a1a1aa;
-  --subtle: #71717a;
-  --info: #60a5fa;
-  --info-text: #93c5fd;
-  --sidebar: #0c0c0e;
-  --sidebar-foreground: #fafafa;
-  /* Sáng hơn bản light: nền tối nuốt màu bão hoà thấp. */
-  --chart-1: var(--primary);
-  --chart-2: #4ade80;
-  --chart-3: #fbbf24;
-  --chart-4: #f87171;
-  --chart-5: #a78bfa;
+  --chart-2: #0f766e;
+  --chart-3: #b45309;
+  --chart-4: #6d28d9;
+  --chart-5: #b91c1c;
+  /* Sidebar graphite tối ngay cả ở theme sáng — quy ước ERP: thanh điều hướng là "khung", vùng
+     làm việc là "giấy". Tối nhưng KHÔNG đen tuyệt đối (#18202d, có sắc navy) để không bị cảm giác
+     terminal/gaming. Khai token riêng thay vì lấy theo --background vì nó không đổi theo light/dark. */
+  --sidebar: #18202d;
+  --sidebar-foreground: #dde3ec;
+  /* Chữ mục menu lúc nghỉ: 10.2:1 trên nền sidebar — menu là thứ để ĐỌC KHI TÌM, không phải chú
+     thích phụ; xám mờ buộc người dùng rà từng dòng. */
+  --sidebar-item: #c3cddb;
+  /* Nhãn nhóm + mục bị làm mờ: 6.2:1 — vẫn AA. */
+  --sidebar-muted: #93a0b2;
+  --sidebar-border: #263042;
+  --sidebar-hover: #212c3d;
+  /* Mục đang chọn: mảng navy trầm, KHÔNG phải gradient + glow. Vạch trái mới là thứ báo "đang ở
+     đây"; nền chỉ để khoanh vùng. */
+  --sidebar-accent: #24304a;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-rail: #4c7df0;
 }
 
-/* ── BLUE (electric) ──────────────────────────────────────────────────────── */
-[data-brand="blue"] {
+/*
+ * Bề mặt "chrome" mang màu thương hiệu — MỘT định nghĩa cho TOÀN HỆ THỐNG.
+ *
+ * Khai đúng MỘT LẦN ở đây, tại `:root`, không lặp lại trong từng khối `[data-brand]`/
+ * `[data-theme]`. CSS custom property phân giải `var()` ở THỜI ĐIỂM DÙNG theo giá trị đã qua
+ * cascade tại chính element đó — nên `--mf-brand` tự trỏ đúng `--primary` của brand/theme đang
+ * active mà không cần khai lại cho từng bảng màu.
+ *
+ * TRƯỚC ĐÂY công thức là `hsl(from var(--primary) h s 58%)` — cố ý ĐẨY SÁNG primary lên 58% để
+ * có mảng màu "rực". Với hướng enterprise thì đó chính là thứ phải bỏ: nâng L lên 58% biến navy
+ * #1e40af thành xanh chói ~#3b6fe0, và vì nền sáng lên nên chữ trắng trên đó tụt xuống ~3.4:1 —
+ * trượt AA. Giữ nguyên `--primary`: đã là màu được chọn cho đúng cả sắc lẫn tương phản, không có
+ * lý do gì để một token thứ hai đi chệch khỏi nó.
+ *
+ * Giữ lại tên token (không xoá) vì header hộp thoại, header lưới, brand mark, badge nhấn mạnh và
+ * mục menu đang chọn đều đã trỏ vào đây — đổi ở một chỗ là đổi khắp hệ thống.
+ */
+:root {
+  --mf-brand: var(--primary);
+  --mf-brand-foreground: var(--primary-foreground);
+}
+
+/* ── ENTERPRISE — dark (graphite, KHÔNG đen tuyệt đối) ───────────────────── */
+[data-theme="dark"] {
+  color-scheme: dark;
+  /* Đen tuyệt đối (#09090b cũ) làm mọi bề mặt phía trên phải tự sáng lên để tách khỏi nền, kết
+     quả là card sáng chói giữa một nền hút hết ánh sáng. Graphite #111318 giữ được 4 bậc bề mặt
+     mà không bậc nào phải chói. */
+  --background: #111318;
+  --foreground: #f3f4f6;
+  --card: #171a21;
+  --card-foreground: #f3f4f6;
+  --popover: #1d212a;
+  --popover-foreground: #f3f4f6;
+  /* Navy sáng vừa đủ cho nền tối. Chữ trên nút chính là chữ TỐI (5.6:1) chứ không phải trắng
+     (chỉ 3.4:1 — trượt AA): #5b82ff đã nằm ở khoảng sáng mà trắng không còn bám được. */
+  --primary: #5b82ff;
+  --primary-foreground: #0d1017;
+  --primary-hover: #7c9bff;
+  --primary-active: #9db4ff;
+  --secondary: #252a34;
+  --secondary-foreground: #f3f4f6;
+  --muted: #1d212a;
+  --muted-foreground: #9ca3af;
+  --accent: #1e2740;
+  --accent-foreground: #a8c0ff;
+  --destructive: #f87171;
+  --destructive-foreground: #1a0f0f;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  /* Nền tối: bản gốc đã đủ tương phản, không cần làm đậm thêm (làm đậm sẽ tối hơn nền). */
+  --success-text: #4ade80;
+  --warning-text: #fbbf24;
+  --destructive-text: #fca5a5;
+  --border: #303641;
+  --input: #3d4552;
+  --ring: #5b82ff;
+  --subtle: #7d8592;
+  --info: #5b82ff;
+  --info-text: #a8c0ff;
+  /* Sidebar chỉ tách nhẹ khỏi workspace (#14181f vs #111318) — ở theme tối, tách mạnh sẽ thành
+     hai khối đen cạnh nhau và mất luôn cảm giác cùng một ứng dụng. */
+  --sidebar: #14181f;
+  --sidebar-foreground: #e5e9f0;
+  --sidebar-item: #c3cddb;
+  --sidebar-muted: #8d97a8;
+  --sidebar-border: #262c38;
+  --sidebar-hover: #1e232d;
+  --sidebar-accent: #232d45;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-rail: #5b82ff;
+  /* Sáng hơn bản light: nền tối nuốt màu bão hoà thấp. Giữ nguyên THỨ TỰ sắc của bản light để
+     một biểu đồ không đổi ý nghĩa màu khi người dùng chuyển theme. */
+  --chart-1: var(--primary);
+  --chart-2: #2dd4bf;
+  --chart-3: #fbbf24;
+  --chart-4: #a78bfa;
+  --chart-5: #f87171;
+}
+
+/* ── GRAPHITE — trung tính hoàn toàn, không sắc màu ──────────────────────────
+ * Dành cho môi trường muốn giao diện hoàn toàn không màu thương hiệu (màn hình vận hành chiếu
+ * lên TV, phòng điều độ, người dùng nhạy với màu). Cùng HỆ bề mặt/viền/độ tương phản với
+ * enterprise, chỉ khác: primary là graphite thay vì navy. Trạng thái (success/warning/danger)
+ * VẪN giữ màu — đó là thông tin nghiệp vụ, không phải trang trí.
+ */
+[data-brand="graphite"] {
   color-scheme: light;
-  --success-text: #15803d;
-  --warning-text: #b45309;
-  --destructive-text: #b91c1c;
-  --info-text: #1740cc;
-  --background: #eef2f6;
-  --foreground: #0f172a;
+  --background: #f5f6f8;
+  --foreground: #111827;
   --card: #ffffff;
-  --card-foreground: #0f172a;
+  --card-foreground: #111827;
   --popover: #ffffff;
-  --popover-foreground: #0f172a;
-  --primary: #1b4dff;
+  --popover-foreground: #111827;
+  --primary: #374151;
   --primary-foreground: #ffffff;
-  --secondary: #eef2f8;
-  --secondary-foreground: #0f172a;
-  --muted: #f6f8fb;
-  --muted-foreground: #536276;
-  --accent: #edf1ff;
-  --accent-foreground: #1740cc;
+  --primary-hover: #1f2937;
+  --primary-active: #111827;
+  --secondary: #f1f3f5;
+  --secondary-foreground: #111827;
+  --muted: #f8f9fb;
+  --muted-foreground: #4b5563;
+  --accent: #e8eaee;
+  --accent-foreground: #1f2937;
   --destructive: #dc2626;
   --destructive-foreground: #ffffff;
   --success: #16a34a;
   --warning: #d97706;
-  --border: #e2e8f0;
-  --input: #e2e8f0;
-  --ring: #1b4dff;
-  --subtle: #5b6b7e;
-  --info: #1b4dff;
-  --sidebar: #ffffff;
-  --sidebar-foreground: #0f172a;
+  --success-text: #15803d;
+  --warning-text: #a16207;
+  --destructive-text: #b91c1c;
+  --border: #e1e5ea;
+  --input: #cdd3da;
+  --ring: #374151;
+  --subtle: #5b6472;
+  /* `--info` là TRẠNG THÁI (thông báo, chú dẫn), không phải màu thương hiệu — giữ xanh kể cả ở
+     brand trung tính, nếu không "thông tin" và "trung lập" trông giống hệt nhau. */
+  --info: #1e40af;
+  --info-text: #1e3a8a;
+  --chart-1: #4b5563;
+  --chart-2: #0f766e;
+  --chart-3: #b45309;
+  --chart-4: #6d28d9;
+  --chart-5: #b91c1c;
+  --sidebar: #1c1f26;
+  --sidebar-foreground: #dfe2e8;
+  --sidebar-item: #c6cad3;
+  --sidebar-muted: #969ba7;
+  --sidebar-border: #2b2f38;
+  --sidebar-hover: #242832;
+  --sidebar-accent: #2e333e;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-rail: #9ca3af;
 }
-[data-brand="blue"][data-theme="dark"] {
+[data-brand="graphite"][data-theme="dark"] {
   color-scheme: dark;
+  --background: #111318;
+  --foreground: #f3f4f6;
+  --card: #171a21;
+  --card-foreground: #f3f4f6;
+  --popover: #1d212a;
+  --popover-foreground: #f3f4f6;
+  --primary: #d1d5db;
+  --primary-foreground: #111827;
+  --primary-hover: #e5e7eb;
+  --primary-active: #f3f4f6;
+  --secondary: #252a34;
+  --secondary-foreground: #f3f4f6;
+  --muted: #1d212a;
+  --muted-foreground: #9ca3af;
+  --accent: #2a2f3a;
+  --accent-foreground: #e5e7eb;
+  --destructive: #f87171;
+  --destructive-foreground: #1a0f0f;
+  --success: #22c55e;
+  --warning: #f59e0b;
   --success-text: #4ade80;
   --warning-text: #fbbf24;
   --destructive-text: #fca5a5;
-  --info-text: #93b4ff;
-  --background: #0a0f1c;
-  --foreground: #e2e8f0;
-  --card: #0f1729;
-  --card-foreground: #e2e8f0;
-  --popover: #0f1729;
-  --popover-foreground: #e2e8f0;
-  --primary: #4d7cff;
-  --primary-foreground: #0a0f1c;
-  --secondary: #182742;
-  --secondary-foreground: #e2e8f0;
-  --muted: #131e33;
-  --muted-foreground: #93a3bb;
-  --accent: #182352;
-  --accent-foreground: #adc0ff;
-  --destructive: #f87171;
-  --destructive-foreground: #0a0f1c;
-  --success: #22c55e;
-  --warning: #f59e0b;
-  --border: #1e2a44;
-  --input: #1e2a44;
-  --ring: #4d7cff;
-  --subtle: #64748b;
-  --info: #4d7cff;
-  --sidebar: #0c1424;
-  --sidebar-foreground: #e2e8f0;
-}
-
-/* ── WARM (terracotta) ────────────────────────────────────────────────────── */
-[data-brand="warm"] {
-  color-scheme: light;
-  --success-text: #3f6212;
-  --warning-text: #9a3412;
-  --destructive-text: #991b1b;
-  --info-text: #1d4ed8;
-  --background: #f5f2ec;
-  --foreground: #292524;
-  --card: #ffffff;
-  --card-foreground: #292524;
-  --popover: #ffffff;
-  --popover-foreground: #292524;
-  --primary: #b15b2e;
-  --primary-foreground: #ffffff;
-  --secondary: #f2ede4;
-  --secondary-foreground: #292524;
-  --muted: #faf7f1;
-  --muted-foreground: #675f5a;
-  --accent: #f6ece0;
-  --accent-foreground: #9a4f24;
-  --destructive: #b91c1c;
-  --destructive-foreground: #ffffff;
-  --success: #4d7c0f;
-  --warning: #b45309;
-  --border: #e8e0d3;
-  --input: #e8e0d3;
-  --ring: #b15b2e;
-  --subtle: #675f5a;
-  --info: #2563eb;
-  --sidebar: #faf7f1;
-  --sidebar-foreground: #292524;
-}
-[data-brand="warm"][data-theme="dark"] {
-  color-scheme: dark;
-  --success-text: #a3e635;
-  --warning-text: #fbbf24;
-  --destructive-text: #fca5a5;
-  --info-text: #93c5fd;
-  --background: #1a1613;
-  --foreground: #faf6f0;
-  --card: #241f1b;
-  --card-foreground: #faf6f0;
-  --popover: #241f1b;
-  --popover-foreground: #faf6f0;
-  --primary: #e08442;
-  --primary-foreground: #1a1613;
-  --secondary: #332c26;
-  --secondary-foreground: #faf6f0;
-  --muted: #27221e;
-  --muted-foreground: #a8a29e;
-  --accent: #382a1e;
-  --accent-foreground: #f0b483;
-  --destructive: #f87171;
-  --destructive-foreground: #1a1613;
-  --success: #84cc16;
-  --warning: #f59e0b;
-  --border: #443c34;
-  --input: #443c34;
-  --ring: #e08442;
-  --subtle: #78716c;
-  --info: #60a5fa;
-  --sidebar: #1f1a16;
-  --sidebar-foreground: #faf6f0;
-}
-
-/* ── EXTENDED PALETTES — 10 theme phổ biến, cùng dùng một hợp đồng token ── */
-:is(
-  [data-brand="sakura"], [data-brand="emerald"], [data-brand="ocean"],
-  [data-brand="violet"], [data-brand="indigo"], [data-brand="teal"],
-  [data-brand="amber"], [data-brand="rose"], [data-brand="aurora"],
-  [data-brand="sunset"]
-) {
-  color-scheme: light;
-  --background: var(--theme-bg);
-  --foreground: var(--theme-fg);
-  --card: var(--theme-card);
-  --card-foreground: var(--theme-fg);
-  --popover: var(--theme-card);
-  --popover-foreground: var(--theme-fg);
-  --primary: var(--theme-primary);
-  --primary-foreground: var(--theme-primary-fg);
-  --secondary: var(--theme-secondary);
-  --secondary-foreground: var(--theme-fg);
-  --muted: var(--theme-muted);
-  --muted-foreground: var(--theme-muted-fg);
-  --accent: var(--theme-accent);
-  --accent-foreground: var(--theme-accent-fg);
-  --border: var(--theme-border);
-  --input: var(--theme-border);
-  --ring: var(--theme-ring);
-  --info: var(--theme-primary);
-  --info-text: var(--theme-accent-fg);
-  --sidebar: var(--theme-sidebar);
-  --sidebar-foreground: var(--theme-fg);
-}
-:is(
-  [data-brand="sakura"], [data-brand="emerald"], [data-brand="ocean"],
-  [data-brand="violet"], [data-brand="indigo"], [data-brand="teal"],
-  [data-brand="amber"], [data-brand="rose"], [data-brand="aurora"],
-  [data-brand="sunset"]
-)[data-theme="dark"] {
-  color-scheme: dark;
-}
-
-[data-brand="sakura"] {
-  --theme-bg: #fff5fa; --theme-fg: #3f1028; --theme-card: #ffffff;
-  --theme-primary: #d41467; --theme-primary-fg: #ffffff;
-  --theme-secondary: #fce0ed; --theme-muted: #fdf0f6; --theme-muted-fg: #75445c;
-  --theme-accent: #f9bad7; --theme-accent-fg: #9d174d;
-  --theme-border: #efc0d6; --theme-ring: #ec1972; --theme-sidebar: #fff7fb;
-  --mf-shell-background-image: radial-gradient(circle at 86% 8%, rgb(236 25 114 / 0.22), transparent 34%), linear-gradient(135deg, rgb(190 24 93 / 0.06), transparent 46%);
-  --mf-sidebar-background-image: linear-gradient(165deg, #fffafd 0%, #ffe5f1 58%, #ffc9e0 100%);
-}
-[data-brand="sakura"][data-theme="dark"] {
-  --theme-bg: #190811; --theme-fg: #fff0f7; --theme-card: #29101d;
-  --theme-primary: #ff4b9a; --theme-primary-fg: #3d061f;
-  --theme-secondary: #41162b; --theme-muted: #341221; --theme-muted-fg: #e0a4c0;
-  --theme-accent: #65183c; --theme-accent-fg: #ffacd1;
-  --theme-border: #642641; --theme-ring: #ff4b9a; --theme-sidebar: #210a16;
-  --mf-shell-background-image: radial-gradient(circle at 86% 8%, rgb(255 75 154 / 0.2), transparent 36%), linear-gradient(135deg, rgb(190 24 93 / 0.08), transparent 48%);
-  --mf-sidebar-background-image: linear-gradient(165deg, #351020 0%, #210a16 60%, #16060d 100%);
-}
-
-[data-brand="emerald"] {
-  --theme-bg: #f3faf7; --theme-fg: #102a22; --theme-card: #ffffff;
-  --theme-primary: #047857; --theme-primary-fg: #ffffff;
-  --theme-secondary: #e5f5ee; --theme-muted: #f0f8f4; --theme-muted-fg: #506d63;
-  --theme-accent: #d1fae5; --theme-accent-fg: #065f46;
-  --theme-border: #d5e9df; --theme-ring: #059669; --theme-sidebar: #f8fcfa;
-}
-[data-brand="emerald"][data-theme="dark"] {
-  --theme-bg: #071712; --theme-fg: #ecfdf5; --theme-card: #0d211a;
-  --theme-primary: #34d399; --theme-primary-fg: #052e24;
-  --theme-secondary: #153229; --theme-muted: #10281f; --theme-muted-fg: #9cc6b5;
-  --theme-accent: #124534; --theme-accent-fg: #6ee7b7;
-  --theme-border: #21473a; --theme-ring: #34d399; --theme-sidebar: #0a1c16;
-}
-
-[data-brand="ocean"] {
-  --theme-bg: #f2f9fc; --theme-fg: #0c2b3a; --theme-card: #ffffff;
-  --theme-primary: #0369a1; --theme-primary-fg: #ffffff;
-  --theme-secondary: #e0f2fe; --theme-muted: #eff8fc; --theme-muted-fg: #4f6d7a;
-  --theme-accent: #cffafe; --theme-accent-fg: #0e7490;
-  --theme-border: #cfe5ee; --theme-ring: #0284c7; --theme-sidebar: #f7fcfe;
-  --mf-shell-background-image: linear-gradient(135deg, rgb(14 165 233 / 0.08), transparent 45%, rgb(34 211 238 / 0.07));
-  --mf-sidebar-background-image: linear-gradient(180deg, #f7fcfe, #eaf8fc);
-}
-[data-brand="ocean"][data-theme="dark"] {
-  --theme-bg: #061722; --theme-fg: #ecfeff; --theme-card: #0b2432;
-  --theme-primary: #38bdf8; --theme-primary-fg: #062436;
-  --theme-secondary: #123548; --theme-muted: #0d2a3a; --theme-muted-fg: #9bc4d3;
-  --theme-accent: #10435a; --theme-accent-fg: #67e8f9;
-  --theme-border: #1e4659; --theme-ring: #38bdf8; --theme-sidebar: #081e2b;
-  --mf-shell-background-image: linear-gradient(135deg, rgb(14 165 233 / 0.1), transparent 48%, rgb(34 211 238 / 0.07));
-  --mf-sidebar-background-image: linear-gradient(180deg, #0b2635, #061722);
-}
-
-[data-brand="violet"] {
-  --theme-bg: #f8f6fc; --theme-fg: #261a3a; --theme-card: #ffffff;
-  --theme-primary: #7c3aed; --theme-primary-fg: #ffffff;
-  --theme-secondary: #ede9fe; --theme-muted: #f5f3ff; --theme-muted-fg: #665b78;
-  --theme-accent: #e9d5ff; --theme-accent-fg: #6d28d9;
-  --theme-border: #e2dcef; --theme-ring: #7c3aed; --theme-sidebar: #fbfaff;
-}
-[data-brand="violet"][data-theme="dark"] {
-  --theme-bg: #140d20; --theme-fg: #f5f3ff; --theme-card: #20142f;
-  --theme-primary: #a78bfa; --theme-primary-fg: #251047;
-  --theme-secondary: #302044; --theme-muted: #281a39; --theme-muted-fg: #c2b3d7;
-  --theme-accent: #3e235d; --theme-accent-fg: #c4b5fd;
-  --theme-border: #49345e; --theme-ring: #a78bfa; --theme-sidebar: #190f27;
-}
-
-[data-brand="indigo"] {
-  --theme-bg: #f5f6fc; --theme-fg: #18203d; --theme-card: #ffffff;
-  --theme-primary: #4f46e5; --theme-primary-fg: #ffffff;
-  --theme-secondary: #e8eafc; --theme-muted: #f1f2fa; --theme-muted-fg: #59617a;
-  --theme-accent: #e0e7ff; --theme-accent-fg: #4338ca;
-  --theme-border: #dce0f0; --theme-ring: #4f46e5; --theme-sidebar: #f9f9fe;
-}
-[data-brand="indigo"][data-theme="dark"] {
-  --theme-bg: #0b1024; --theme-fg: #eef2ff; --theme-card: #121a33;
-  --theme-primary: #818cf8; --theme-primary-fg: #11143d;
-  --theme-secondary: #20294a; --theme-muted: #19213d; --theme-muted-fg: #a9b2d0;
-  --theme-accent: #282d66; --theme-accent-fg: #a5b4fc;
-  --theme-border: #303a60; --theme-ring: #818cf8; --theme-sidebar: #0e152b;
-}
-
-[data-brand="teal"] {
-  --theme-bg: #f2f9f8; --theme-fg: #122d2b; --theme-card: #ffffff;
-  --theme-primary: #0f766e; --theme-primary-fg: #ffffff;
-  --theme-secondary: #dff3f0; --theme-muted: #edf7f5; --theme-muted-fg: #526d69;
-  --theme-accent: #ccfbf1; --theme-accent-fg: #0f766e;
-  --theme-border: #d1e8e4; --theme-ring: #0d9488; --theme-sidebar: #f8fcfb;
-}
-[data-brand="teal"][data-theme="dark"] {
-  --theme-bg: #071817; --theme-fg: #f0fdfa; --theme-card: #0d2422;
-  --theme-primary: #2dd4bf; --theme-primary-fg: #042f2e;
-  --theme-secondary: #163431; --theme-muted: #112b29; --theme-muted-fg: #9bc7c1;
-  --theme-accent: #154942; --theme-accent-fg: #5eead4;
-  --theme-border: #23504a; --theme-ring: #2dd4bf; --theme-sidebar: #0a1e1c;
-}
-
-[data-brand="amber"] {
-  --theme-bg: #fbf8f1; --theme-fg: #34230c; --theme-card: #ffffff;
-  --theme-primary: #b45309; --theme-primary-fg: #ffffff;
-  --theme-secondary: #f8edd5; --theme-muted: #faf4e8; --theme-muted-fg: #746147;
-  --theme-accent: #fef3c7; --theme-accent-fg: #92400e;
-  --theme-border: #eadfc8; --theme-ring: #d97706; --theme-sidebar: #fdfaf5;
-}
-[data-brand="amber"][data-theme="dark"] {
-  --theme-bg: #1b1408; --theme-fg: #fffbeb; --theme-card: #281d0c;
-  --theme-primary: #fbbf24; --theme-primary-fg: #422006;
-  --theme-secondary: #3a2b13; --theme-muted: #30230f; --theme-muted-fg: #d4bd91;
-  --theme-accent: #4a3510; --theme-accent-fg: #fcd34d;
-  --theme-border: #51401f; --theme-ring: #fbbf24; --theme-sidebar: #211809;
-}
-
-[data-brand="rose"] {
-  --theme-bg: #fff6f7; --theme-fg: #3b1720; --theme-card: #ffffff;
-  --theme-primary: #be123c; --theme-primary-fg: #ffffff;
-  --theme-secondary: #ffe4e6; --theme-muted: #fff1f2; --theme-muted-fg: #76525a;
-  --theme-accent: #fecdd3; --theme-accent-fg: #9f1239;
-  --theme-border: #f3d1d7; --theme-ring: #e11d48; --theme-sidebar: #fffafb;
-}
-[data-brand="rose"][data-theme="dark"] {
-  --theme-bg: #1b0d11; --theme-fg: #fff1f2; --theme-card: #29151b;
-  --theme-primary: #fb7185; --theme-primary-fg: #3b0714;
-  --theme-secondary: #3b2027; --theme-muted: #311a20; --theme-muted-fg: #d8a7b1;
-  --theme-accent: #4c1d2b; --theme-accent-fg: #fda4af;
-  --theme-border: #512b34; --theme-ring: #fb7185; --theme-sidebar: #210f15;
-}
-
-[data-brand="aurora"] {
-  --theme-bg: #f5f8fb; --theme-fg: #17263a; --theme-card: #ffffff;
-  --theme-primary: #0f766e; --theme-primary-fg: #ffffff;
-  --theme-secondary: #e7eef6; --theme-muted: #f1f5f9; --theme-muted-fg: #5a697d;
-  --theme-accent: #ede9fe; --theme-accent-fg: #6d28d9;
-  --theme-border: #dce5ee; --theme-ring: #14b8a6; --theme-sidebar: #f8fbfd;
-  --mf-shell-background-image: radial-gradient(circle at 15% 10%, rgb(45 212 191 / 0.12), transparent 30%), radial-gradient(circle at 88% 8%, rgb(139 92 246 / 0.12), transparent 34%);
-  --mf-sidebar-background-image: linear-gradient(180deg, #f5fffd, #f8f7ff);
-}
-[data-brand="aurora"][data-theme="dark"] {
-  --theme-bg: #09141b; --theme-fg: #f0fdfa; --theme-card: #101f2a;
-  --theme-primary: #2dd4bf; --theme-primary-fg: #042f2e;
-  --theme-secondary: #192d38; --theme-muted: #142630; --theme-muted-fg: #a9bdc7;
-  --theme-accent: #302653; --theme-accent-fg: #c4b5fd;
-  --theme-border: #29404b; --theme-ring: #2dd4bf; --theme-sidebar: #0c1922;
-  --mf-shell-background-image: radial-gradient(circle at 15% 10%, rgb(45 212 191 / 0.1), transparent 32%), radial-gradient(circle at 88% 8%, rgb(139 92 246 / 0.12), transparent 36%);
-  --mf-sidebar-background-image: linear-gradient(180deg, #0d2627, #18142a);
-}
-
-[data-brand="sunset"] {
-  --theme-bg: #fff8f4; --theme-fg: #3b1f18; --theme-card: #ffffff;
-  --theme-primary: #c2410c; --theme-primary-fg: #ffffff;
-  --theme-secondary: #ffeadc; --theme-muted: #fff3eb; --theme-muted-fg: #765d54;
-  --theme-accent: #fce7f3; --theme-accent-fg: #be185d;
-  --theme-border: #f0dbd0; --theme-ring: #ea580c; --theme-sidebar: #fffbf8;
-  --mf-shell-background-image: linear-gradient(135deg, rgb(249 115 22 / 0.09), transparent 48%, rgb(236 72 153 / 0.08));
-  --mf-sidebar-background-image: linear-gradient(180deg, #fff8f1, #fff4fa);
-}
-[data-brand="sunset"][data-theme="dark"] {
-  --theme-bg: #1c100d; --theme-fg: #fff7ed; --theme-card: #291813;
-  --theme-primary: #fb923c; --theme-primary-fg: #431407;
-  --theme-secondary: #3a241d; --theme-muted: #302019; --theme-muted-fg: #d2b0a3;
-  --theme-accent: #482035; --theme-accent-fg: #f9a8d4;
-  --theme-border: #503127; --theme-ring: #fb923c; --theme-sidebar: #22130f;
-  --mf-shell-background-image: linear-gradient(135deg, rgb(249 115 22 / 0.1), transparent 50%, rgb(236 72 153 / 0.09));
-  --mf-sidebar-background-image: linear-gradient(180deg, #2a1710, #27121f);
+  --border: #303641;
+  --input: #3d4552;
+  --ring: #9ca3af;
+  --subtle: #7d8592;
+  --info: #5b82ff;
+  --info-text: #a8c0ff;
+  --chart-1: #d1d5db;
+  --chart-2: #2dd4bf;
+  --chart-3: #fbbf24;
+  --chart-4: #a78bfa;
+  --chart-5: #f87171;
+  --sidebar: #14181f;
+  --sidebar-foreground: #e5e9f0;
+  --sidebar-item: #c3cddb;
+  --sidebar-muted: #8d97a8;
+  --sidebar-border: #262c38;
+  --sidebar-hover: #1e232d;
+  --sidebar-accent: #2a2f3a;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-rail: #d1d5db;
 }
 
 @theme inline {
@@ -477,13 +323,31 @@
   --color-ring: var(--ring);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-item: var(--sidebar-item);
+  --color-sidebar-muted: var(--sidebar-muted);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-active: var(--primary-active);
   --color-subtle: var(--subtle);
   --color-info: var(--info);
-  /* Radius SCALE theo prototype (không dùng 10px cố định): sm6 / md8 / lg12 / xl14 */
-  --radius-sm: 0.375rem;
-  --radius-md: 0.5rem;
-  --radius-lg: 0.75rem;
-  --radius-xl: 0.875rem;
+  /* Dải biểu đồ phải là utility hạng nhất (`bg-chart-2`, `text-chart-3/70`, `ring-chart-4/30`).
+     Trước đây chỉ tồn tại dưới dạng biến CSS, nên nơi nào cần "một sắc phân loại" đều phải bịa ra
+     màu Tailwind thô (violet-500, cyan-500…) nằm ngoài hệ token — xem `document-experience-profile.ts`.
+     Lưu ý: KHÔNG dựng tên class bằng template literal; Tailwind chỉ quét được chuỗi nguyên văn. */
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  /* Radius SCALE enterprise: 4 / 6 / 8 / 10px. Trước đây là 6/8/12/14 — mức 12–14px làm panel và
+     card trông như thẻ ứng dụng tiêu dùng; ERP cần vuông vắn hơn để mật độ cao không bị "bo tròn
+     ăn mất" chiều ngang ở mỗi ô. */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.625rem;
   --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "Geist Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
 }
@@ -524,14 +388,17 @@
   --mf-topbar-height: 3rem;
   --mf-sidebar-width: 13.75rem;
   --mf-sidebar-collapsed: 3.5rem;
-  --mf-panel-radius: 0.75rem;
-  --mf-control-radius: 0.5rem;
-  --mf-card-shadow: 0 1px 2px rgb(15 23 42 / 0.035), 0 8px 24px rgb(15 23 42 / 0.025);
-  --mf-overlay-shadow: 0 20px 50px rgb(15 23 42 / 0.16), 0 4px 14px rgb(15 23 42 / 0.08);
+  --mf-panel-radius: 0.5rem;
+  --mf-control-radius: 0.375rem;
+  /* Bóng chỉ để PHÂN TẦNG, không trang trí: panel nằm phẳng trên nền (chỉ 1px hairline), chỉ
+     popover/dialog — thứ thực sự nổi lên trên nội dung — mới có bóng đọc được. Bóng lan rộng
+     quanh mọi card là thứ làm giao diện trông như landing page và làm mật độ ERP khó quét mắt. */
+  --mf-card-shadow: 0 1px 2px rgb(17 24 39 / 0.04);
+  --mf-overlay-shadow: 0 12px 32px rgb(17 24 39 / 0.14), 0 2px 8px rgb(17 24 39 / 0.07);
   /* Bóng "nhẹ" 1 bậc. Trước đây các mặt phẳng nhỏ (stat card, shortcut, kanban card) hardcode
      `rgb(15 23 42 / 0.025)` — sắc xanh slate, KHÔNG có bản dark ⇒ ở theme tối bóng gần như biến mất
      và mọi khối mất chiều sâu. Tách thành token để dark override được. */
-  --mf-soft-shadow: 0 1px 2px rgb(15 23 42 / 0.045);
+  --mf-soft-shadow: 0 1px 2px rgb(17 24 39 / 0.035);
   /* Viền dưới cho hàng tiêu đề bảng dính (sticky): border của <th> KHÔNG dính theo khi cuộn
      (thân bảng trôi đè lên), phải vẽ bằng box-shadow. */
   --mf-sticky-edge: inset 0 -1px 0 var(--border);
@@ -583,9 +450,11 @@
 [data-content-width="wide"] { --mf-content-max: 96rem; }
 [data-content-width="fluid"] { --mf-content-max: 100%; }
 [data-theme="dark"] {
-  --mf-card-shadow: 0 1px 2px rgb(0 0 0 / 0.28), 0 10px 30px rgb(0 0 0 / 0.14);
-  --mf-overlay-shadow: 0 20px 55px rgb(0 0 0 / 0.45), 0 4px 14px rgb(0 0 0 / 0.3);
-  --mf-soft-shadow: 0 1px 2px rgb(0 0 0 / 0.4);
+  /* Nền tối phân tầng chủ yếu bằng ĐỘ SÁNG bề mặt (background → card → popover), không bằng bóng:
+     bóng đen trên nền đen gần như vô hình, đổ dày chỉ làm bẩn viền. Chỉ overlay giữ bóng thật. */
+  --mf-card-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+  --mf-overlay-shadow: 0 12px 34px rgb(0 0 0 / 0.5), 0 2px 8px rgb(0 0 0 / 0.34);
+  --mf-soft-shadow: 0 1px 2px rgb(0 0 0 / 0.26);
 }
 
 @layer base {
@@ -650,28 +519,28 @@
   /* Product shell */
   .mf-shell {
     background-color: var(--background);
-    background-image: var(--mf-shell-background-image, none);
     color: var(--foreground);
   }
   .mf-shell-sidebar {
     width: var(--mf-sidebar-width);
     background-color: var(--sidebar);
-    background-image: var(--mf-sidebar-background-image, none);
-    border-color: var(--border);
+    border-color: var(--sidebar-border, var(--border));
   }
   .mf-shell-sidebar[data-collapsed="true"] { width: var(--mf-sidebar-collapsed); }
   .mf-shell-brand {
     height: var(--mf-topbar-height);
     padding-inline: 0.75rem;
   }
+  /* Cùng `--mf-brand` với header/lưới/badge/nút chính — logo là bề mặt brand đầu tiên người dùng
+     thấy, không thể lệch tông với phần còn lại của hệ thống. */
   .mf-brand-mark {
     display: grid;
     width: 1.75rem;
     height: 1.75rem;
     place-items: center;
     border-radius: 0.5rem;
-    background: var(--primary);
-    color: var(--primary-foreground);
+    background: var(--mf-brand);
+    color: var(--mf-brand-foreground);
     box-shadow: 0 1px 2px rgb(0 0 0 / 0.12);
     font-size: 0.82rem;
     font-weight: 700;
@@ -695,31 +564,47 @@
   .mf-shell-nav-group-label {
     padding: 0.35rem 0.625rem 0.3rem;
     color: var(--muted-foreground);
-    font-size: 0.65rem;
-    font-weight: 600;
-    letter-spacing: 0.08em;
+    font-size: 0.6875rem;
+    font-weight: 650;
+    letter-spacing: 0.075em;
     text-transform: uppercase;
   }
+  /*
+   * Menu là thứ người dùng đọc để ĐIỀU HƯỚNG, không phải chú thích phụ — nên mục ở trạng thái
+   * nghỉ vẫn dùng `--foreground`, không phải `--muted-foreground`: nếu mười mấy mục chìm gần bằng
+   * nền thì tìm một màn hình phải rà từng dòng.
+   *
+   * Đây là bản cho sidebar trên nền SÁNG (drawer di động, shell không phải `.mf-shell`). Bản cho
+   * sidebar graphite tối nằm ở tầng ENTERPRISE OPERATING SURFACE cuối file và dùng bộ token
+   * `--sidebar-*` riêng, vì nền tối không suy ra được từ `--background`.
+   */
   .mf-shell-nav-item {
     position: relative;
     min-height: 2rem;
-    border-radius: 0.45rem;
-    color: var(--muted-foreground);
+    border-radius: var(--mf-control-radius);
+    color: var(--foreground);
+    font-weight: 500;
     transition: background-color 120ms ease, color 120ms ease;
   }
+  .mf-shell-nav-item svg { color: var(--muted-foreground); }
   .mf-shell-nav-item:hover { background: var(--secondary); color: var(--foreground); }
+  /*
+   * Mục đang chọn = mảng `--accent` (navy pha loãng) + VẠCH TRÁI `--primary`, không phải mảng
+   * primary đặc. Trên sidebar sáng, một mảng navy đặc cho mỗi mục đang mở sẽ nặng hơn hẳn phần
+   * còn lại của màn hình và kéo mắt khỏi vùng dữ liệu — trong khi vạch trái đã đủ để trả lời
+   * "tôi đang ở đâu".
+   */
   .mf-shell-nav-item[data-active="true"] {
     background: var(--accent);
     color: var(--accent-foreground);
     box-shadow: inset 2px 0 0 var(--primary);
     font-weight: 600;
   }
-  .mf-shell-nav-item[data-active="true"] svg { color: var(--primary); }
+  .mf-shell-nav-item[data-active="true"] svg { color: currentColor; }
   .mf-shell-topbar {
     height: var(--mf-topbar-height);
-    background: color-mix(in srgb, var(--card) 94%, transparent);
+    background: var(--card);
     border-color: var(--border);
-    backdrop-filter: blur(12px);
   }
   .mf-shell-search {
     border-color: var(--border);
@@ -797,16 +682,17 @@
     box-shadow: var(--mf-soft-shadow);
   }
 
-  /* Login */
+  /* Login — nền phẳng như phần còn lại của hệ thống. Vệt radial 10% trước đây là thứ duy nhất
+     còn sót của hướng "trang giới thiệu": nó khiến màn đăng nhập là bề mặt DUY NHẤT trong toàn
+     hệ thống có nền chuyển sắc, tức người dùng gặp một ngôn ngữ thị giác ở cửa vào rồi một ngôn
+     ngữ khác ngay sau khi đăng nhập. */
   .mf-login-page {
-    background:
-      radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--primary) 10%, transparent), transparent 32rem),
-      var(--background);
+    background: var(--background);
   }
   .mf-login-card {
     overflow: hidden;
     border: 1px solid var(--border);
-    border-radius: 0.8rem;
+    border-radius: var(--mf-panel-radius);
     background: var(--card);
     box-shadow: var(--mf-overlay-shadow);
   }
@@ -881,12 +767,25 @@
     box-shadow: none;
   }
   .mf-form-header {
-    background: color-mix(in srgb, var(--card) 96%, transparent);
-    backdrop-filter: blur(12px);
+    background: var(--card);
   }
   .mf-form-body {
     container-type: inline-size;
     background: var(--card);
+  }
+  /*
+   * Chữ trong biểu mẫu đậm thêm một bậc.
+   *
+   * `--muted-foreground` được chọn cho ghi chú phụ, nhưng trên form nó đang gánh cả nhãn ô, tiêu
+   * đề cột, dòng đếm — tức gần như mọi chữ không phải dữ liệu. Hệ quả là toàn bộ form xám đều
+   * một mức, không còn thứ bậc nào để mắt bám vào.
+   *
+   * Chỉ nâng TRONG `.mf-form-view` nên các bề mặt khác giữ nguyên cân bằng đã tinh chỉnh của
+   * từng bảng màu; và dùng `color-mix` với `--foreground` nên nó đi theo sáng/tối, không phải một
+   * mã màu chết.
+   */
+  .mf-form-view .text-muted-foreground {
+    color: color-mix(in srgb, var(--foreground) 90%, var(--muted-foreground));
   }
   .mf-form-grid {
     grid-template-columns: repeat(6, minmax(0, 1fr));
@@ -903,11 +802,27 @@
     row-gap: 0.5rem;
     padding-block: 0.125rem;
   }
+  /*
+   * Lưới đều — mọi ô nhập cùng một bề rộng.
+   *
+   * Trước đây `half` chiếm 3/6 còn `third` chiếm 2/6, nên một hàng ghép "Khách hàng"(3) với
+   * "Ngày đặt"(2) chỉ lấp 5 trên 6 cột: dư một cột không đủ cho field kế tiếp, nó rớt xuống dòng
+   * và để lại một khoảng hụt. Mỗi hàng hụt một chỗ khác nhau nên cả khối trông so le, dù từng
+   * field đều đúng bề rộng "hợp lý" của riêng nó.
+   *
+   * Bề rộng riêng từng field chỉ đáng giá khi form là một cột chữ để ĐỌC. Form nhập liệu thì
+   * ngược lại: mắt chạy dọc theo mép trái các ô, nên các mép phải thẳng hàng. Vì vậy chỉ còn hai
+   * loại — chiếm trọn hàng, hoặc bằng nhau — và số ô mỗi hàng do bề rộng khung quyết định.
+   */
   @container (min-width: 26rem) {
     .mf-form-grid > .mf-field-width-full { grid-column: span 6; }
-    .mf-form-grid > .mf-field-width-half { grid-column: span 3; }
-    .mf-form-grid > .mf-field-width-third { grid-column: span 2; }
+    .mf-form-grid > .mf-field-width-half,
+    .mf-form-grid > .mf-field-width-third { grid-column: span 3; }
     .mf-check-group { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  }
+  @container (min-width: 64rem) {
+    .mf-form-grid > .mf-field-width-half,
+    .mf-form-grid > .mf-field-width-third { grid-column: span 2; }
   }
   .mf-form-section {
     border-radius: 0;
@@ -1183,184 +1098,190 @@
   .mf-skip-link { border: 2px solid ButtonText; }
 }
 
-/* ── METAFORGE PREMIUM OPERATING SURFACE (2026-08-03) ────────────────
- * Component-level visual system. Keeps theme/brand tokens authoritative and strengthens
- * authenticated navigation, forms, lists, tables, cards and tactile state feedback.
+/* ── METAFORGE ENTERPRISE OPERATING SURFACE (2026-08-08) ────────────────
+ * Tầng diện mạo cấp component. Token theme/brand vẫn là thẩm quyền duy nhất về màu; tầng này chỉ
+ * quyết định bề mặt nào dùng token nào.
+ *
+ * THAY THẾ tầng "PREMIUM OPERATING SURFACE" (2026-08-03). Những thứ đã bỏ và LÝ DO — đừng đưa lại:
+ *   - Gradient nền shell/content/form-body/page-header/toolbar: nền chuyển sắc làm nền của bảng
+ *     KHÔNG đồng nhất theo chiều dọc, nên cùng một ô dữ liệu đọc ra hai sắc khác nhau tuỳ vị trí
+ *     cuộn. Nền phẳng là điều kiện để quét mắt theo cột.
+ *   - Sidebar gradient #101827→#08101c: hardcode, không theo token, và tối dần tới gần đen ở đáy
+ *     khiến các mục menu cuối danh sách nằm trên nền khác hẳn mục đầu.
+ *   - thead nền #111827 chữ trắng: header đảo màu đen đặc biến mỗi bảng thành một khối nặng, và
+ *     ở màn nhiều bảng thì các dải đen chia vụn màn hình. Enterprise dùng header graphite nhạt,
+ *     chữ tối, phân biệt bằng ĐẬM CHỮ + viền dưới.
+ *   - Glow/box-shadow màu primary quanh nút, card, mục menu đang chọn: bóng có màu là hiệu ứng
+ *     trang trí; ở mật độ ERP nó gây nhiễu quanh mọi phần tử tương tác.
+ *   - transform translateY(-2px)/translateX(2px) khi hover: hàng bảng và mục menu nhảy chỗ khi rê
+ *     chuột làm mất điểm neo của mắt trong danh sách dài.
+ *   - `filter: brightness()/saturate()` trên nút và icon: đổi màu ngoài hệ token, không kiểm soát
+ *     được tương phản kết quả.
+ *   - `backdrop-filter: blur()` trên topbar/form-header: glassmorphism; chữ nội dung cuộn phía sau
+ *     nhoè xuyên qua thanh công cụ.
  */
 @layer components {
   .mf-shell {
-    --mf-card-shadow: 0 1px 2px rgb(15 23 42 / 0.07), 0 10px 26px rgb(15 23 42 / 0.07);
-    --mf-soft-shadow: 0 5px 16px rgb(15 23 42 / 0.08);
-    --mf-overlay-shadow: 0 26px 64px rgb(15 23 42 / 0.22), 0 8px 22px rgb(15 23 42 / 0.1);
     background-color: var(--background);
-    background-image:
-      radial-gradient(circle at 86% -12%, color-mix(in srgb, var(--primary) 9%, transparent), transparent 27rem),
-      linear-gradient(180deg, color-mix(in srgb, var(--background) 94%, #ffffff), var(--background));
   }
 
+  /* ── SIDEBAR ─────────────────────────────────────────────────────────────
+   * Toàn bộ màu lấy từ token `--sidebar-*`, không còn hex rời. Sidebar tối ở CẢ light lẫn dark
+   * (quy ước ERP: khung điều hướng vs giấy làm việc), nên các token này KHÔNG suy ra từ
+   * --background mà được khai riêng cho từng theme. */
   .mf-shell .mf-shell-sidebar {
-    background: linear-gradient(180deg, #101827 0%, #0b1321 56%, #08101c 100%);
-    border-right-color: #243249;
-    color: #f7f9fc;
-    box-shadow: 14px 0 34px -30px rgb(2 8 23 / 0.9);
+    background: var(--sidebar);
+    border-right-color: var(--sidebar-border);
+    color: var(--sidebar-foreground);
   }
   .mf-shell .mf-shell-sidebar .mf-shell-nav-item {
-    color: #d3dbe8;
-    border-radius: 0.65rem;
-    transition: transform 125ms cubic-bezier(.2,.8,.2,1), background-color 125ms ease, color 125ms ease, box-shadow 125ms ease;
+    color: var(--sidebar-item);
+    border-radius: var(--mf-control-radius);
+    transition: background-color 120ms ease, color 120ms ease;
   }
   .mf-shell .mf-shell-sidebar .mf-shell-nav-item:hover {
-    transform: translateX(2px);
-    background: rgb(255 255 255 / 0.075);
-    color: #ffffff;
+    background: var(--sidebar-hover);
+    color: var(--sidebar-foreground);
   }
+  /* Mục đang chọn: mảng nền trầm + VẠCH TRÁI. Vạch mới là tín hiệu chính — nó đọc được cả khi
+     sidebar thu gọn còn icon, và không phụ thuộc vào việc phân biệt hai sắc nền gần nhau. */
   .mf-shell .mf-shell-sidebar .mf-shell-nav-item[data-active="true"] {
-    background: linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 74%, #06101f));
-    border-color: color-mix(in srgb, var(--primary) 72%, #ffffff);
-    color: var(--primary-foreground);
-    font-weight: 720;
-    box-shadow: 0 10px 24px -14px color-mix(in srgb, var(--primary) 78%, transparent), inset 0 0 0 1px rgb(255 255 255 / 0.13);
+    background: var(--sidebar-accent);
+    border-color: transparent;
+    color: var(--sidebar-accent-foreground);
+    font-weight: 600;
+    box-shadow: inset 2px 0 0 var(--sidebar-rail);
   }
   .mf-shell .mf-shell-sidebar input[aria-label="Tìm menu"] {
-    border-color: #2d3b50;
-    background: #151f2f;
-    color: #f8fafc;
-    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.035);
+    border-color: var(--sidebar-border);
+    background: var(--sidebar-hover);
+    color: var(--sidebar-foreground);
   }
-  .mf-shell .mf-shell-sidebar input[aria-label="Tìm menu"]::placeholder { color: #8fa0b8; }
+  .mf-shell .mf-shell-sidebar input[aria-label="Tìm menu"]::placeholder { color: var(--sidebar-muted); }
 
+  /* ── TOPBAR / PAGE SHELL ─────────────────────────────────────────────── */
   .mf-shell .mf-shell-topbar {
-    border-bottom-color: color-mix(in srgb, var(--border) 80%, var(--foreground));
-    background: color-mix(in srgb, var(--card) 94%, transparent);
-    box-shadow: 0 10px 24px -24px rgb(15 23 42 / 0.9);
-    backdrop-filter: blur(18px) saturate(1.18);
+    border-bottom-color: var(--border);
+    background: var(--card);
   }
   .mf-shell .mf-shell-search {
-    border-color: color-mix(in srgb, var(--input) 78%, var(--foreground));
+    border-color: var(--input);
     background: var(--card);
-    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.68), 0 4px 13px rgb(15 23 42 / 0.045);
   }
   .mf-shell .mf-shell-search:focus-within {
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 15%, transparent), 0 8px 20px rgb(15 23 42 / 0.08);
+    border-color: var(--ring);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 18%, transparent);
   }
   .mf-shell .mf-shell-content {
-    background:
-      radial-gradient(circle at 91% 1%, color-mix(in srgb, var(--primary) 7%, transparent), transparent 25rem),
-      linear-gradient(180deg, color-mix(in srgb, var(--background) 93%, #ffffff), var(--background));
+    background: var(--background);
   }
   .mf-shell .mf-page-header {
-    min-height: 4rem;
-    border-bottom-color: color-mix(in srgb, var(--border) 82%, var(--foreground));
-    background: linear-gradient(90deg, var(--card), color-mix(in srgb, var(--primary) 4%, var(--card)));
-    box-shadow: 0 9px 22px -25px rgb(15 23 42 / 0.85);
+    min-height: 3.5rem;
+    border-bottom-color: var(--border);
+    background: var(--card);
   }
-  .mf-shell .mf-page-title { font-size: 1.16rem; font-weight: 760; letter-spacing: -0.03em; }
-  .mf-shell .mf-page-subtitle { color: color-mix(in srgb, var(--muted-foreground) 88%, var(--foreground)); font-weight: 520; }
+  .mf-shell .mf-page-title { font-size: 1.0625rem; font-weight: 650; letter-spacing: -0.011em; }
+  .mf-shell .mf-page-subtitle { color: var(--muted-foreground); font-weight: 450; }
 
-  /* Twenty-like data surface: toolbar has hierarchy; data stays dense and scannable. */
+  /* ── LIST / TABLE — khu vực quan trọng nhất của một ERP ───────────────── */
   .mf-shell .mf-list-view {
-    background: color-mix(in srgb, var(--background) 65%, var(--card));
+    background: var(--card);
   }
   .mf-shell .mf-list-toolbar {
-    border-bottom-color: color-mix(in srgb, var(--border) 84%, var(--foreground));
-    background: linear-gradient(180deg, var(--card), color-mix(in srgb, var(--card) 95%, var(--primary)));
-    box-shadow: 0 7px 20px -21px rgb(15 23 42 / 0.9);
+    border-bottom-color: var(--border);
+    background: var(--card);
   }
-  .mf-shell .mf-list-filterbar { min-height: 3.25rem; }
+  .mf-shell .mf-list-filterbar { min-height: 3rem; }
   .mf-shell .mf-list-toolbar :is(input, button[role="combobox"]) {
-    border-color: color-mix(in srgb, var(--input) 78%, var(--foreground));
+    border-color: var(--input);
     background: var(--card);
   }
   .mf-shell .mf-list-toolbar :is(input, button[role="combobox"]):focus-visible {
-    border-color: var(--primary);
+    border-color: var(--ring);
     outline: none;
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 14%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 18%, transparent);
   }
   .mf-shell .mf-list-scroll {
     background: var(--card);
-    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--border) 68%, transparent);
   }
   .mf-shell .mf-list-view tbody tr {
-    transition: background-color 100ms ease, box-shadow 100ms ease;
+    transition: background-color 90ms ease;
   }
-  .mf-shell .mf-list-view tbody tr:nth-child(even) {
-    background: color-mix(in srgb, var(--card) 97%, var(--primary));
-  }
+  /* KHÔNG kẻ sọc ngựa vằn. Sọc + hover + hàng chọn + badge trạng thái = bốn tầng nền chồng nhau
+     trên cùng một hàng; ở bảng có nhiều cột số, nền đổi liên tục làm mất khả năng dóng cột. Phân
+     tách hàng bằng đường kẻ dưới mảnh là đủ và rẻ hơn về thị giác. */
   .mf-shell .mf-list-view tbody tr:hover {
-    background: color-mix(in srgb, var(--primary) 6.5%, var(--card));
+    background: color-mix(in srgb, var(--primary) 4%, var(--card));
   }
   .mf-shell .mf-list-view tbody tr[data-state="selected"] {
-    background: color-mix(in srgb, var(--primary) 11%, var(--card));
-    box-shadow: inset 3px 0 0 var(--primary);
+    background: color-mix(in srgb, var(--primary) 8%, var(--card));
+    box-shadow: inset 2px 0 0 var(--primary);
   }
   .mf-shell .mf-list-view tbody td {
-    border-bottom-color: color-mix(in srgb, var(--border) 72%, transparent);
+    border-bottom-color: var(--border);
   }
   .mf-shell .mf-list-mobile {
-    gap: 0.55rem;
-    padding: 0.55rem;
+    gap: 0.5rem;
+    padding: 0.5rem;
     background: var(--background);
   }
   .mf-shell .mf-list-mobile > article {
-    border: 1px solid color-mix(in srgb, var(--border) 86%, var(--foreground));
-    border-radius: 0.9rem;
+    border: 1px solid var(--border);
+    border-radius: var(--mf-panel-radius);
     box-shadow: var(--mf-soft-shadow);
   }
   .mf-shell .mf-bulk-bar {
-    background: linear-gradient(90deg, color-mix(in srgb, var(--primary) 15%, var(--card)), color-mix(in srgb, var(--primary) 7%, var(--card)));
-    box-shadow: inset 3px 0 0 var(--primary), 0 7px 17px rgb(15 23 42 / 0.06);
+    background: var(--accent);
+    color: var(--accent-foreground);
+    box-shadow: inset 2px 0 0 var(--primary);
   }
 
-  /* Twenty/Cal-like form hierarchy: sections become real work surfaces instead of separators. */
+  /* ── FORM ────────────────────────────────────────────────────────────── */
   .mf-shell .mf-form-header {
-    border-bottom-color: color-mix(in srgb, var(--border) 80%, var(--foreground));
-    background: color-mix(in srgb, var(--card) 96%, transparent);
-    box-shadow: 0 9px 24px -25px rgb(15 23 42 / 0.9);
-    backdrop-filter: blur(18px) saturate(1.15);
+    border-bottom-color: var(--border);
+    background: var(--card);
   }
   .mf-shell .mf-form-body {
-    background:
-      radial-gradient(circle at 93% 0%, color-mix(in srgb, var(--primary) 5%, transparent), transparent 20rem),
-      var(--background);
+    background: var(--background);
   }
   .mf-shell .mf-form-section {
-    margin-block: 0.8rem;
+    margin-block: 0.75rem;
     padding: 1rem 1.05rem 1.1rem;
-    border: 1px solid color-mix(in srgb, var(--border) 86%, var(--foreground));
-    border-radius: 0.95rem;
+    border: 1px solid var(--border);
+    border-radius: var(--mf-panel-radius);
     background: var(--card);
     box-shadow: var(--mf-card-shadow);
   }
-  .mf-shell .mf-section-heading { margin-bottom: 0.9rem; }
+  .mf-shell .mf-section-heading { margin-bottom: 0.85rem; }
   .mf-shell .mf-section-heading h3 {
     color: var(--foreground);
-    font-size: 0.82rem;
-    font-weight: 760;
-    letter-spacing: -0.012em;
+    font-size: 0.8125rem;
+    font-weight: 650;
+    letter-spacing: -0.006em;
   }
   .mf-shell .mf-section-heading > span {
-    background: linear-gradient(90deg, color-mix(in srgb, var(--primary) 46%, var(--border)), color-mix(in srgb, var(--border) 45%, transparent));
+    background: var(--border);
   }
   .mf-shell .mf-field > label,
   .mf-shell .mf-field label {
-    color: color-mix(in srgb, var(--foreground) 84%, var(--muted-foreground));
-    font-weight: 650;
+    color: var(--muted-foreground);
+    font-weight: 550;
   }
+  /* Ô nhập: nền gần trắng (chính là `--card`), viền dùng `--input` (bậc viền MẠNH). Trước đây nền
+     ô được pha thêm primary và có inset-highlight trắng giả nổi — ở dark mode thành vệt sáng vô lý
+     trên đầu mỗi ô. */
   .mf-shell .mf-field :is(input, textarea, button[role="combobox"]) {
-    border-color: color-mix(in srgb, var(--input) 78%, var(--foreground));
-    background: color-mix(in srgb, var(--card) 97%, var(--primary));
-    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.62), 0 1px 2px rgb(15 23 42 / 0.035);
-    transition: border-color 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+    border-color: var(--input);
+    background: var(--card);
+    transition: border-color 110ms ease, box-shadow 110ms ease;
   }
   .mf-shell .mf-field :is(input, textarea, button[role="combobox"]):hover:not(:disabled) {
-    border-color: color-mix(in srgb, var(--primary) 34%, var(--input));
+    border-color: color-mix(in srgb, var(--ring) 45%, var(--input));
   }
   .mf-shell .mf-field :is(input, textarea, button[role="combobox"]):focus-visible {
-    border-color: var(--primary);
+    border-color: var(--ring);
     outline: none;
-    background: var(--card);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 15%, transparent), 0 5px 14px rgb(15 23 42 / 0.075);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 18%, transparent);
   }
   .mf-shell .mf-field-readonly :is(input, textarea, button[role="combobox"]) {
     background: var(--muted);
@@ -1368,80 +1289,84 @@
     box-shadow: none;
   }
   .mf-shell .mf-form-footer {
-    border-top-color: color-mix(in srgb, var(--border) 82%, var(--foreground));
-    background: color-mix(in srgb, var(--card) 96%, transparent);
-    box-shadow: 0 -10px 26px -25px rgb(15 23 42 / 0.8);
+    border-top-color: var(--border);
+    background: var(--card);
   }
 
-  /* Midday-style hierarchy for cards, without turning an ERP into a slot machine. */
+  /* ── PANEL / CARD ────────────────────────────────────────────────────── */
   .mf-shell :is(.mf-surface, .mf-view-card, .mf-section-card, .mf-stat-card, .mf-workspace-shortcut, .mf-kanban-card, .mf-number-card, .mf-dash-chart) {
-    border-color: color-mix(in srgb, var(--border) 86%, var(--foreground));
+    border-color: var(--border);
     box-shadow: var(--mf-card-shadow);
   }
   .mf-shell :is(.mf-workspace-shortcut, .mf-kanban-card, .mf-number-card) {
-    transition: transform 135ms cubic-bezier(.2,.8,.2,1), border-color 135ms ease, box-shadow 135ms ease, background-color 135ms ease;
+    transition: border-color 120ms ease, background-color 120ms ease;
   }
+  /* Hover đổi VIỀN + nền, không nhấc khối lên: ở lưới thẻ dày đặc, mỗi lần rê chuột mà khối nhảy
+     lên 2px thì các khối quanh nó trông như bị xô. */
   .mf-shell :is(.mf-workspace-shortcut, .mf-kanban-card, .mf-number-card):hover {
-    transform: translateY(-2px);
-    border-color: color-mix(in srgb, var(--primary) 42%, var(--border));
-    box-shadow: 0 15px 32px -18px color-mix(in srgb, var(--primary) 28%, rgb(15 23 42 / 0.18)), 0 7px 18px rgb(15 23 42 / 0.08);
+    border-color: color-mix(in srgb, var(--primary) 38%, var(--border));
+    background: color-mix(in srgb, var(--primary) 3%, var(--card));
   }
   .mf-shell .mf-number-card { position: relative; overflow: hidden; }
   .mf-shell .mf-number-card::before {
     position: absolute;
     inset: 0 auto 0 0;
     width: 3px;
-    background: linear-gradient(180deg, var(--primary), color-mix(in srgb, var(--primary) 38%, transparent));
+    background: var(--primary);
     content: "";
   }
-  .mf-shell button[class*="bg-primary"] {
-    box-shadow: 0 9px 21px -13px color-mix(in srgb, var(--primary) 74%, transparent);
-    transition: transform 105ms cubic-bezier(.2,.8,.2,1), box-shadow 105ms ease, filter 105ms ease;
-  }
-  .mf-shell button[class*="bg-primary"]:not(:disabled):hover {
-    transform: translateY(-1px);
-    filter: saturate(1.1) brightness(1.025);
-    box-shadow: 0 13px 26px -13px color-mix(in srgb, var(--primary) 76%, transparent);
-  }
-  .mf-shell button[class*="bg-primary"]:not(:disabled):active { transform: translateY(1px) scale(0.985); }
   .mf-shell .mf-workspace-tabs nav {
-    border-color: color-mix(in srgb, var(--border) 84%, var(--foreground));
-    background: color-mix(in srgb, var(--muted) 78%, var(--card));
-    box-shadow: 0 4px 13px rgb(15 23 42 / 0.055);
+    border-color: var(--border);
+    background: var(--secondary);
   }
 }
 
 /* Critical states stay unlayered so Tailwind utilities cannot wash them back out. */
 .mf-shell .mf-shell-sidebar .mf-shell-nav-group-label {
-  color: #91a4bd;
-  font-weight: 720;
-  letter-spacing: 0.095em;
+  color: var(--sidebar-muted);
+  font-weight: 650;
+  letter-spacing: 0.075em;
 }
-.mf-shell .mf-shell-sidebar .mf-shell-nav-group-label:hover { color: #ffffff; background: rgb(255 255 255 / 0.055); }
-.mf-shell .mf-shell-sidebar .mf-shell-nav-item:hover { background: rgb(255 255 255 / 0.075); color: #ffffff; }
+.mf-shell .mf-shell-sidebar .mf-shell-nav-group-label:hover {
+  color: var(--sidebar-foreground);
+  background: var(--sidebar-hover);
+}
+.mf-shell .mf-shell-sidebar .mf-shell-nav-item:hover {
+  background: var(--sidebar-hover);
+  color: var(--sidebar-foreground);
+}
 .mf-shell .mf-shell-sidebar .mf-shell-nav-item[data-active="true"],
 .mf-shell .mf-shell-sidebar .mf-shell-nav-item[data-active="true"]:hover,
-.mf-shell .mf-shell-sidebar .mf-shell-nav-item[data-active="true"] > span,
-.mf-shell .mf-shell-sidebar .mf-shell-nav-item[data-active="true"] svg { color: var(--primary-foreground); }
-.mf-shell .mf-list-view thead th {
-  background: #111827;
-  color: #f8fafc;
-  border-bottom-color: #111827;
-  font-weight: 720;
-  letter-spacing: 0.035em;
-  box-shadow: inset 0 2px 0 color-mix(in srgb, var(--primary) 78%, transparent), var(--mf-sticky-edge);
+.mf-shell .mf-shell-sidebar .mf-shell-nav-item[data-active="true"] > span { color: var(--sidebar-accent-foreground); }
+/* Icon menu đi theo màu chữ của chính mục đó (`currentColor`) thay vì bị ép trắng + glow. Ép
+   `#ffffff !important` làm icon của MỌI mục sáng bằng nhau, nên trạng thái đang chọn mất đi một
+   nửa tín hiệu; drop-shadow trắng thì nhoè nét ở cỡ 16px. */
+.mf-shell .mf-shell-sidebar .mf-shell-nav-item svg {
+  color: currentColor;
+  opacity: 0.85;
 }
-.mf-shell .mf-list-view tbody tr[data-state="selected"] { background: color-mix(in srgb, var(--primary) 11%, var(--card)); box-shadow: inset 3px 0 0 var(--primary); }
-
-[data-theme="dark"] .mf-shell .mf-form-section,
-.mf-shell[data-theme="dark"] .mf-form-section { box-shadow: 0 1px 0 rgb(255 255 255 / 0.035), 0 12px 28px rgb(0 0 0 / 0.18); }
-[data-theme="dark"] .mf-shell .mf-list-view thead th,
-.mf-shell[data-theme="dark"] .mf-list-view thead th { background: #050b14; color: #f1f5f9; border-bottom-color: #26364d; }
+.mf-shell .mf-shell-sidebar .mf-shell-nav-item[data-active="true"] svg {
+  color: currentColor;
+  opacity: 1;
+}
+/* Header bảng: bề mặt graphite nhạt + chữ tối, phân biệt bằng độ đậm chữ và viền dưới rõ — không
+   phải mảng đen đảo màu. Vạch primary 2px phía trên giữ lại vì nó cũng là mép "dính" khi cuộn. */
+.mf-shell .mf-list-view thead th {
+  background: var(--secondary);
+  color: var(--foreground);
+  border-bottom-color: var(--input);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  box-shadow: var(--mf-sticky-edge);
+}
+.mf-shell .mf-list-view tbody tr[data-state="selected"] {
+  background: color-mix(in srgb, var(--primary) 8%, var(--card));
+  box-shadow: inset 2px 0 0 var(--primary);
+}
 
 @media (prefers-reduced-motion: reduce) {
   .mf-shell .mf-shell-nav-item,
   .mf-shell :is(.mf-workspace-shortcut, .mf-kanban-card, .mf-number-card),
-  .mf-shell button[class*="bg-primary"],
   .mf-shell .mf-list-view tbody tr,
   .mf-shell .mf-field :is(input, textarea, button[role="combobox"]) { transition: none !important; transform: none !important; }
 }

@@ -120,7 +120,8 @@ export function Storefront({ page, adapter }: { page: StorefrontPage; adapter: F
   const cart = useCart();
 
   useEffect(() => {
-    document.documentElement.dataset.brand = "warm";
+    // Xem ghi chú cùng loại ở SocialCommerceLanding: brand "warm" không còn tồn tại.
+    delete document.documentElement.dataset.brand;
     document.title = "Cửa hàng";
   }, []);
 

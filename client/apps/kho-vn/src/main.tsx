@@ -5,7 +5,7 @@ import { resolveHomeRoute, resolveNavPath, mergeLocale, validateManifest } from 
 import { FrappeAdapterImpl, createScopeKey, type MetaForgeBootDTO } from "@metaforge/adapter-frappe";
 import { createFullRegistry, MetaForgeProvider, DoctypeWorkspace, ReportContainer, OverviewContainer, TreeContainer, PermissionCenter, PrintContainer, type UrlStateBridge } from "@metaforge/views";
 import {
-  AppShell, AuthBoundary, LoginForm, ChangePasswordDialog, applyBrand, useTheme, resolveIcon,
+  AppShell, AuthBoundary, LoginForm, ChangePasswordDialog, applyBrand, normalizeBrand, useTheme, resolveIcon,
   BusinessContextProvider, BusinessContextBar, useBusinessContext,
   createExperienceRegistry, ExperienceRoute,
   CommandPalette, type AwesomeRecord,
@@ -425,7 +425,7 @@ function DataProviders({ boot, children }: { boot: MetaForgeBootDTO; children: R
 }
 
 function App() {
-  useEffect(() => { applyBrand(APP_MANIFEST.brand ?? "blue"); }, []);
+  useEffect(() => { applyBrand(normalizeBrand(APP_MANIFEST.brand) ?? "enterprise"); }, []);
   return (
     <AuthBoundary
       adapter={adapter}

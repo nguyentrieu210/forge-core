@@ -6,7 +6,7 @@
 import { strict as assert } from "node:assert";
 import { createElement as h } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { BRANDS, isBrandMode, resolveIcon } from "@metaforge/shell";
+import { BRANDS, isBrandMode, normalizeBrand, resolveIcon } from "@metaforge/shell";
 import {
   mapError,
   AUTHORABLE_FIELDTYPES,
@@ -63,11 +63,20 @@ function check(name: string, fn: () => void) {
 console.log("selfcheck — logic thuần (no network):");
 
 // 1. Fieldtype đúng 43 authorable (verified live docfield.json).
-check("theme: 13 bảng màu, gồm Sakura và 4 gradient", () => {
-  assert.equal(BRANDS.length, 13);
-  assert.equal(isBrandMode("sakura"), true);
+// Hệ thống thu từ 13 bảng màu trang trí về 2 bảng màu enterprise (2026-08-08). Khẳng định ở đây
+// đổi theo hợp đồng mới, và kiểm luôn đường quy đổi tên cũ — đó mới là phần dễ vỡ khi nâng cấp.
+check("theme: 2 bảng màu enterprise + quy đổi tên cũ", () => {
+  assert.equal(BRANDS.length, 2);
+  assert.equal(isBrandMode("enterprise"), true);
+  assert.equal(isBrandMode("graphite"), true);
+  assert.equal(isBrandMode("sakura"), false);
   assert.equal(isBrandMode("unknown"), false);
-  assert.equal(BRANDS.filter((brand) => brand.swatch.includes("gradient")).length, 4);
+  // Ô chọn màu phải là màu đặc áp thật, không phải gradient quảng cáo.
+  assert.equal(BRANDS.filter((brand) => brand.swatch.includes("gradient")).length, 0);
+  // zinc là brand trung tính cũ ⇒ có bản kế nhiệm; các bảng màu trang trí thì không.
+  assert.equal(normalizeBrand("zinc"), "graphite");
+  assert.equal(normalizeBrand("blue"), null);
+  assert.equal(normalizeBrand("enterprise"), "enterprise");
 });
 
 check("43 authorable fieldtypes", () => {
@@ -440,7 +449,7 @@ check("makeLocaleFormat: config-driven number/currency/date/precision + fallback
 // 4m. Gate 7.1 — App manifest: validate + resolveHomeRoute + navGroups (bỏ hard-code home/nav).
 check("validateManifest + resolveHomeRoute + navGroups", () => {
   const ok: AppManifest = {
-    id: "wms", name: "Kho APH", brand: "blue",
+    id: "wms", name: "Kho APH", brand: "enterprise",
     home: { doctype: "Warehouse Transfer" },
     nav: [
       { key: "Warehouse Transfer", label: "Chuyển kho", group: "Kho", icon: "arrow-left-right" },

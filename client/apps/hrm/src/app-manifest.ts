@@ -14,7 +14,7 @@ export const APP_MANIFEST: AppManifest = {
   id: "hrm",
   name: "Kairo Nhân sự",
   version: "1.0.0",
-  brand: "blue",
+  brand: "enterprise",
   domain: "hr",
   catalogMode: "hybrid",
   home: { route: "/x/leave-approval", doctype: "Leave Application" },

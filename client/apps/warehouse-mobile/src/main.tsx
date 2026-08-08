@@ -261,7 +261,7 @@ function WarehouseMobileApp({ boot, logout }: { boot: MetaForgeBootDTO; logout: 
         right={(
           <Button variant="ghost" size="icon" className="relative size-10 rounded-full" onClick={() => changeTab("account")} aria-label="Tài khoản">
             <Avatar className="size-8"><AvatarFallback>{initials(boot.full_name)}</AvatarFallback></Avatar>
-            {queue.pending.length ? <span className="absolute right-0 top-0 size-2.5 rounded-full border-2 border-card bg-amber-500" /> : null}
+            {queue.pending.length ? <span className="absolute right-0 top-0 size-2.5 rounded-full border-2 border-card bg-warning" /> : null}
           </Button>
         )}
         bottomBar={<BottomNavigation active={tab} pending={queue.pending.length} onChange={changeTab} />}
@@ -411,7 +411,7 @@ function StockOperationForm({ operation, pending, onSubmit }: {
   return (
     <div className="space-y-4 pb-24">
       {pending ? (
-        <div className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700">
+        <div className="flex items-center gap-2 rounded-xl border border-warning/30 bg-warning/10 p-3 text-xs text-warning-text">
           <WifiOff className="size-4" /> {pending} thao tác trước đang chờ mạng.
         </div>
       ) : null}
@@ -632,7 +632,7 @@ function BottomNavigation({ active, pending, onChange }: { active: MobileTab; pe
       {items.map((item) => (
         <Button key={item.key} variant="ghost" className={`relative h-14 flex-col gap-1 rounded-xl px-1 text-[10px] ${active === item.key ? "bg-primary/10 text-primary" : "text-muted-foreground"}`} onClick={() => onChange(item.key)}>
           <span className="[&_svg]:size-5">{item.icon}</span><span>{item.label}</span>
-          {item.key === "account" && pending ? <span className="absolute right-3 top-1 size-2 rounded-full bg-amber-500" /> : null}
+          {item.key === "account" && pending ? <span className="absolute right-3 top-1 size-2 rounded-full bg-warning" /> : null}
         </Button>
       ))}
     </nav>

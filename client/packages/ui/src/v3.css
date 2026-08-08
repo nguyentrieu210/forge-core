@@ -53,15 +53,20 @@
   --forge-motion-ease-linear-flow: linear;
 }
 
-/* V2 sidebar search uses a dark rail. Keep this override unlayered so it wins over
- * Tailwind's bg-background utility carried by the shared Input primitive. */
+/* Sidebar là một dải graphite tối ở CẢ light lẫn dark, nên ô tìm kiếm trong đó không thể lấy
+ * `--card`/`--input` của vùng làm việc. Giữ rule này ngoài @layer để nó thắng utility
+ * `bg-background` mà primitive Input dùng chung mang theo.
+ *
+ * Màu lấy từ bộ token `--sidebar-*` (khai trong `styles.css`), không còn hex rời — trước đây ba
+ * giá trị này được chép cứng ở HAI nơi (đây và `styles.css`), nên đổi tông sidebar ở một chỗ là
+ * lệch ngay ở chỗ kia. */
 .mf-shell .mf-shell-sidebar input[aria-label="Tìm menu"] {
-  border-color: #2d3b50;
-  background-color: #151f2f;
-  color: #f8fafc;
+  border-color: var(--sidebar-border);
+  background-color: var(--sidebar-hover);
+  color: var(--sidebar-foreground);
 }
 
 .mf-shell .mf-shell-sidebar input[aria-label="Tìm menu"]::placeholder {
-  color: #8fa0b8;
+  color: var(--sidebar-muted);
   opacity: 1;
 }

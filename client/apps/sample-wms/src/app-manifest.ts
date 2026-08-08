@@ -4,7 +4,7 @@ export const APP_MANIFEST: AppManifest = {
   id: "sample-wms",
   name: "Sample WMS",
   version: "1.0.0",
-  brand: "blue",
+  brand: "enterprise",
   domain: "stock",
   catalogMode: "hybrid",
   home: { route: "/overview/stock", doctype: "Stock Entry" },

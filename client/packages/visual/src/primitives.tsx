@@ -45,7 +45,7 @@ export function MetricNumber({ label, value, suffix, hint, accent = false }: { l
 }
 
 export function StatusPulse({ label, active = false, tone = "neutral" }: { label: string; active?: boolean; tone?: "neutral" | "ok" | "warning" | "danger" }) {
-  const toneClass = tone === "ok" ? "bg-emerald-400" : tone === "warning" ? "bg-amber-400" : tone === "danger" ? "bg-[var(--forge-primary,#ef332d)]" : "bg-white/45";
+  const toneClass = tone === "ok" ? "bg-success" : tone === "warning" ? "bg-warning" : tone === "danger" ? "bg-destructive" : "bg-muted-foreground/45";
   return <span className="inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/52"><span className={`size-1.5 rounded-full ${toneClass} ${active ? "animate-pulse motion-reduce:animate-none" : ""}`} aria-hidden="true" />{label}</span>;
 }
 
@@ -81,7 +81,7 @@ export function CommandCenterGrid({ children, fullscreen = false, className = ""
 }
 
 export function AlertBeacon({ label, detail, active = false, severity = "warning" }: { label: string; detail?: string; active?: boolean; severity?: "info" | "warning" | "danger" }) {
-  const tone = severity === "danger" ? "border-[var(--forge-primary,#ef332d)]/45 bg-[var(--forge-primary,#ef332d)]/8" : severity === "warning" ? "border-amber-400/30 bg-amber-400/6" : "border-sky-400/30 bg-sky-400/6";
-  const dot = severity === "danger" ? "bg-[var(--forge-primary,#ef332d)]" : severity === "warning" ? "bg-amber-400" : "bg-sky-400";
+  const tone = severity === "danger" ? "border-destructive/45 bg-destructive/8" : severity === "warning" ? "border-warning/30 bg-warning/6" : "border-info/30 bg-info/6";
+  const dot = severity === "danger" ? "bg-destructive" : severity === "warning" ? "bg-warning" : "bg-info";
   return <div className={`flex min-w-0 items-start gap-3 rounded-md border px-3 py-2.5 ${tone}`}><span className={`mt-1 size-2 shrink-0 rounded-full ${dot} ${active ? "animate-pulse motion-reduce:animate-none" : ""}`} aria-hidden="true" /><div className="min-w-0"><div className="text-xs font-semibold text-white/88">{label}</div>{detail ? <div className="mt-0.5 text-[10px] leading-4 text-white/40">{detail}</div> : null}</div></div>;
 }

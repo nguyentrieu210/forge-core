@@ -22,9 +22,9 @@ export interface ForgeKpiCardProps {
 
 const toneClass: Record<ForgeKpiTone, string> = {
   neutral: "text-foreground",
-  info: "text-sky-600 dark:text-sky-400",
-  success: "text-emerald-600 dark:text-emerald-400",
-  warning: "text-amber-600 dark:text-amber-400",
+  info: "text-info-text",
+  success: "text-success-text",
+  warning: "text-warning-text",
   danger: "text-destructive",
 };
 
@@ -44,7 +44,7 @@ export function ForgeKpiCard({
   className = "",
 }: ForgeKpiCardProps) {
   const trendGood = typeof trend === "number" && trend !== 0 && ((trend > 0) === higherIsBetter);
-  const trendClass = trend === 0 ? "text-muted-foreground" : trendGood ? "text-emerald-600 dark:text-emerald-400" : "text-destructive";
+  const trendClass = trend === 0 ? "text-muted-foreground" : trendGood ? "text-success-text" : "text-destructive-text";
   const body = (
     <>
       <div className="flex min-w-0 items-start gap-3">

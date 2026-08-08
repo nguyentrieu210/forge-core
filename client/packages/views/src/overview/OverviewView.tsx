@@ -24,10 +24,10 @@ export interface OverviewViewProps {
 }
 const TONE: Record<OverviewTone, string> = {
   neutral: "bg-muted text-foreground",
-  info: "bg-blue-500/10 text-blue-700 dark:text-blue-300",
-  success: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
-  warning: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
-  danger: "bg-red-500/10 text-red-700 dark:text-red-300",
+  info: "bg-info/10 text-info-text",
+  success: "bg-success/10 text-success-text",
+  warning: "bg-warning/10 text-warning-text",
+  danger: "bg-destructive/10 text-destructive-text",
 };
 
 function MetricIcon({ name }: { name?: string }) {
@@ -110,7 +110,7 @@ export function OverviewView({ data, loading, error, onNavigate, onAction, busyA
           <div className="space-y-2">
             {data.tasks.length ? data.tasks.map((task) => (
               <Button type="button" key={task.key} variant="ghost" onClick={() => task.route && onNavigate(task.route)} disabled={!task.route} className="h-auto w-full justify-start gap-2 rounded-md border px-2.5 py-1.5 text-left font-normal transition hover:border-primary/30 hover:bg-accent disabled:pointer-events-none">
-                {task.count ? <AlertTriangle className="size-4 shrink-0 text-amber-500" /> : <CheckCircle2 className="size-4 shrink-0 text-emerald-500" />}
+                {task.count ? <AlertTriangle className="size-4 shrink-0 text-warning" /> : <CheckCircle2 className="size-4 shrink-0 text-success" />}
                 <span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{task.label}</span>{task.description ? <span className="block truncate text-xs text-muted-foreground">{task.description}</span> : null}</span>
                 <Badge variant={task.count ? "secondary" : "outline"}>{task.count}</Badge>
                 {task.overdue ? <Badge variant="destructive">{task.overdue} {t("overview.overdue_suffix")}</Badge> : null}

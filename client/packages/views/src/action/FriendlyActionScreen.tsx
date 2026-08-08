@@ -180,8 +180,8 @@ function formatDateTime(value: unknown): string {
 
 function statusClass(status: string): string {
   if (/quá hạn|vượt|đảo/i.test(status)) return "text-destructive";
-  if (/đã giao đủ|đã đối soát/i.test(status)) return "text-emerald-700 dark:text-emerald-400";
-  if (/đang giao|còn phải giao/i.test(status)) return "text-amber-700 dark:text-amber-400";
+  if (/đã giao đủ|đã đối soát/i.test(status)) return "text-success-text";
+  if (/đang giao|còn phải giao/i.test(status)) return "text-warning-text";
   return "text-muted-foreground";
 }
 
@@ -414,7 +414,7 @@ function PriceHistoryTable({ rows, onOpen, format, currency }: {
               </td>
               <td className="px-3 py-2.5 text-right tabular-nums">{currency(number(row.rate))}</td>
               <td className="px-3 py-2.5 text-right tabular-nums">{row.previous_rate == null ? "—" : currency(number(row.previous_rate))}</td>
-              <td className={`px-3 py-2.5 text-right font-medium tabular-nums ${number(row.change_pct) > 0 ? "text-destructive" : number(row.change_pct) < 0 ? "text-emerald-700 dark:text-emerald-400" : ""}`}>
+              <td className={`px-3 py-2.5 text-right font-medium tabular-nums ${number(row.change_pct) > 0 ? "text-destructive" : number(row.change_pct) < 0 ? "text-success-text" : ""}`}>
                 {row.change_pct == null ? "—" : `${number(row.change_pct) > 0 ? "+" : ""}${format(number(row.change_pct))}%`}
               </td>
               <td className="px-3 py-2.5 text-right tabular-nums">{format(number(row.qty_bar))}</td>
@@ -441,7 +441,7 @@ function BulkAllocationSummary({ value, committed, onOpen, format }: {
   return (
     <section className="overflow-hidden rounded-xl border bg-card">
       <div className="flex flex-wrap items-center gap-2 border-b px-4 py-3">
-        <div className={`size-2 rounded-full ${committed ? "bg-emerald-500" : "bg-amber-500"}`} />
+        <div className={`size-2 rounded-full ${committed ? "bg-success" : "bg-warning"}`} />
         <h2 className="text-sm font-semibold">{committed ? "Đã tạo phiếu nhập nháp" : "Kết quả kiểm tra cả chuyến"}</h2>
         {receipt && onOpen ? <Button size="sm" className="ml-auto" onClick={() => onOpen("Purchase Receipt", receipt)}>Mở {receipt}</Button> : null}
       </div>

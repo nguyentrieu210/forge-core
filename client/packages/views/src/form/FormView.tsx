@@ -52,6 +52,14 @@ export interface FormViewProps {
   isNew?: boolean;
   /** ẩn header tiêu đề/tab của FormView — dùng khi shell cha (vd modal Create) đã tự hiện tiêu đề riêng. */
   hideHeader?: boolean;
+  /**
+   * Bỏ trần bề ngang và canh giữa, cho form lấp đầy khung chứa.
+   *
+   * Trần `72rem` là hợp lý khi form nằm trong hộp thoại vừa phải: một dòng chữ quá dài thì mắt
+   * khó bắt được đầu dòng tiếp theo. Nhưng khi khung chứa đã chiếm trọn màn hình cho vừa bảng
+   * dòng hàng, chính cái trần đó chừa lại một mảng trắng bên phải đúng chỗ cần nhất.
+   */
+  fullWidth?: boolean;
   /** báo cho cha biết form có đang dirty không (vd để quyết định có cần hỏi xác nhận trước khi đóng). */
   onDirtyChange?: (dirty: boolean) => void;
   /** quyền hiệu lực (docinfo.permissions ở Live). Mặc định mock = full. */
@@ -381,8 +389,8 @@ export function FormView(props: FormViewProps) {
               <div className="flex items-center gap-2">
                 <span className="truncate text-lg font-semibold">{title}</span>
                 {actionCtx.dirty ? (
-                  <span className="mf-dirty inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-600 dark:text-amber-400" title={t("form.dirty_guard", DIRTY_GUARD_REASON)}>
-                    <span className="size-1.5 rounded-full bg-amber-500" aria-hidden="true" />{t("form.unsaved")}
+                  <span className="mf-dirty inline-flex shrink-0 items-center gap-1 rounded-full bg-warning/15 px-2 py-0.5 text-[11px] font-medium text-warning-text" title={t("form.dirty_guard", DIRTY_GUARD_REASON)}>
+                    <span className="size-1.5 rounded-full bg-warning" aria-hidden="true" />{t("form.unsaved")}
                   </span>
                 ) : null}
               </div>
@@ -476,7 +484,7 @@ export function FormView(props: FormViewProps) {
         {/* 96rem chứ không phải 72rem: khung chứa đã rộng 1400px cho vừa bảng dòng hàng, mà
             trần cũ 1152px thì form dừng lại giữa chừng và chừa một mảng trắng bên phải —
             trần an toàn cho màn siêu rộng biến thành trần cho màn làm việc bình thường. */}
-        <div className="mx-auto w-full max-w-[72rem] px-4 pb-6">
+        <div className={cn("w-full pb-6", props.fullWidth ? "max-w-none px-4" : "mx-auto max-w-[72rem] px-4")}>
           {/* Hướng dẫn nhập cho chứng từ này — chỉ hiện ở TAB ĐẦU để không lặp lại ở mọi tab. */}
           {activeIdx === 0 ? <FormGuide doctype={meta.name} guide={formGuides?.[meta.name]} className="mb-1" /> : null}
           {tab?.sections.map((section, si) => {
@@ -485,7 +493,7 @@ export function FormView(props: FormViewProps) {
             return (
               <section key={si} className="mf-form-section py-3">
                 <div className="mf-section-heading mb-3 flex items-center gap-3">
-                  <h3 className="shrink-0 text-[13px] font-semibold text-foreground">
+                  <h3 className="shrink-0 text-[15px] font-semibold tracking-[-0.01em] text-foreground">
                     {section.label || t("form.section_general", "Thông tin chung")}
                   </h3>
                   <span className="h-px min-w-8 flex-1 bg-border/40" aria-hidden="true" />
@@ -670,7 +678,13 @@ function Field({ id, rf, width, form, registry, services, docName, parentDoctype
 
         return (
           <div className={cn(wrapper, "flex flex-col gap-1")}>
-            <label htmlFor={id} className="text-xs font-medium leading-tight text-muted-foreground">{label}</label>
+            {/*
+              Nhãn ô nhập là thứ người nhập đọc nhiều nhất trên form, nên nó không thể là chữ mờ.
+              `text-muted-foreground` (#5f5f68 trên nền sáng) sinh ra để ghi chú phụ; dùng cho nhãn
+              thì cả form thành một mảng xám đều, không còn thứ bậc nào giữa nhãn và ghi chú.
+              Đưa về gần màu chữ chính và tăng một bậc cỡ chữ.
+            */}
+            <label htmlFor={id} className="text-[13px] font-medium leading-tight text-foreground">{label}</label>
             {description ? <div className="-mt-0.5">{description}</div> : null}
             {control}
             {fieldState.error ? <span id={`${id}-error`} className="text-xs text-destructive" role="alert">{fieldState.error.message}</span> : null}

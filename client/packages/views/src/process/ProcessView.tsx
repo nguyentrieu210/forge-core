@@ -36,7 +36,7 @@ function ProcessCanvas({ process, onNavigate }: { process: ProcessDefinition; on
   </section>;
 }
 function ProcessConnector({ warning }: { warning?: boolean }) {
-  return <div className="mx-2 flex w-14 items-center" aria-hidden="true"><div className={cn("h-0.5 flex-1", warning ? "bg-amber-400/70" : "bg-border")} /><ArrowRight className={cn("size-4", warning ? "text-amber-500" : "text-muted-foreground")} /></div>;
+  return <div className="mx-2 flex w-14 items-center" aria-hidden="true"><div className={cn("h-0.5 flex-1", warning ? "bg-warning/70" : "bg-border")} /><ArrowRight className={cn("size-4", warning ? "text-warning" : "text-muted-foreground")} /></div>;
 }
 function StageCard({ stage, index, onNavigate }: { stage: ProcessStage; index: number; onNavigate: (r: string) => void }) {
   const t = useT();
@@ -46,11 +46,11 @@ function StageCard({ stage, index, onNavigate }: { stage: ProcessStage; index: n
   const blocked = stage.status === "blocked";
   return <Button type="button" variant="ghost" disabled={blocked || !stage.route} onClick={() => onNavigate(stage.route)} className={cn(
     "group relative flex min-h-52 w-60 flex-col rounded-xl border bg-background p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md disabled:pointer-events-none disabled:opacity-60",
-    (stage.status === "warning" || overdue) && "border-amber-400/60",
+    (stage.status === "warning" || overdue) && "border-warning/60",
     blocked && "border-destructive/50 bg-destructive/5",
   )}>
     <span className="absolute -left-2 -top-2 grid size-7 place-items-center rounded-full border bg-card text-xs font-semibold shadow-sm">{index}</span>
-    <div className="flex items-start gap-3"><span className={cn("mt-0.5 grid size-9 place-items-center rounded-lg bg-muted", blocked ? "text-destructive" : errors ? "text-destructive" : count ? "text-amber-600" : "text-emerald-600")}>{blocked ? <ShieldAlert className="size-4" /> : count ? <CircleDot className="size-4" /> : <CheckCircle2 className="size-4" />}</span><span className="min-w-0 flex-1"><span className="block font-semibold">{stage.label}</span><span className="block truncate text-xs text-muted-foreground">{stage.source}</span></span></div>
+    <div className="flex items-start gap-3"><span className={cn("mt-0.5 grid size-9 place-items-center rounded-lg bg-muted", blocked ? "text-destructive" : errors ? "text-destructive" : count ? "text-warning-text" : "text-success-text")}>{blocked ? <ShieldAlert className="size-4" /> : count ? <CircleDot className="size-4" /> : <CheckCircle2 className="size-4" />}</span><span className="min-w-0 flex-1"><span className="block font-semibold">{stage.label}</span><span className="block truncate text-xs text-muted-foreground">{stage.source}</span></span></div>
     <div className="mt-4 flex flex-wrap gap-2"><Badge variant={count ? "secondary" : "outline"}>{count} {t("process.waiting_suffix")}</Badge>{overdue ? <Badge variant="destructive">{overdue} {t("process.overdue_suffix")}</Badge> : null}{errors ? <Badge variant="destructive">{errors} {t("process.errors_suffix")}</Badge> : null}</div>
     {stage.counter?.averageMinutes ? <div className="mt-3 flex items-center gap-1 text-xs text-muted-foreground"><Clock3 className="size-3.5" /> {t("process.avg_prefix")} {Math.round(stage.counter.averageMinutes)} {t("process.minutes_suffix")}</div> : null}
     {stage.description ? <p className="mt-3 line-clamp-3 text-xs text-muted-foreground">{stage.description}</p> : null}

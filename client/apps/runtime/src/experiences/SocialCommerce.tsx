@@ -191,7 +191,7 @@ function Overview({
           <div className="grid gap-2 p-3 sm:grid-cols-2 lg:grid-cols-3 md:p-4">
             {pages.map((page) => (
               <div key={page.page_id} className="flex items-center gap-3 rounded-lg border bg-background p-3">
-                <span className="grid size-9 shrink-0 place-items-center rounded-full bg-blue-600 text-white">
+                <span className="grid size-9 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground">
                   <Facebook className="size-4" />
                 </span>
                 <div className="min-w-0 flex-1">

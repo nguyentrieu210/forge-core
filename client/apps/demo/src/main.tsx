@@ -1,13 +1,13 @@
 import "./index.css";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { applyBrand, isBrandMode } from "@metaforge/shell";
+import { applyBrand, normalizeBrand } from "@metaforge/shell";
 import { App } from "./App.js";
 import { LiveApp } from "./LiveApp.js";
 
 // Áp brand (data-brand) + theme trước render để không nháy màu. Default = Blue (design default).
 const savedBrand = localStorage.getItem("metaforge-brand");
-applyBrand(isBrandMode(savedBrand) ? savedBrand : "blue");
+applyBrand(normalizeBrand(savedBrand) ?? "enterprise");
 
 const el = document.getElementById("root");
 if (!el) throw new Error("#root not found");

@@ -4,7 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate, useParams, useSear
 import { resolveHomeRoute, resolveNavPath, mergeLocale, validateManifest, type AppNavItem } from "@metaforge/core";
 import { FrappeAdapterImpl, createScopeKey, type MetaForgeBootDTO } from "@metaforge/adapter-frappe";
 import { createFullRegistry, MetaForgeProvider, DoctypeWorkspace, WorkspaceContainer, PrintContainer, type UrlStateBridge } from "@metaforge/views";
-import { AppShell, AuthBoundary, LoginForm, ChangePasswordDialog, applyBrand, useTheme, resolveIcon, type NavItem } from "@metaforge/shell";
+import { AppShell, AuthBoundary, LoginForm, ChangePasswordDialog, applyBrand, normalizeBrand, useTheme, resolveIcon, type NavItem } from "@metaforge/shell";
 import { toast } from "@metaforge/ui";
 import { APP_MANIFEST } from "./app-manifest.js";
 import "./styles.css";
@@ -121,7 +121,7 @@ function PrintScreen() {
 }
 
 function App() {
-  useEffect(() => { applyBrand(APP_MANIFEST.brand ?? "blue"); }, []);
+  useEffect(() => { applyBrand(normalizeBrand(APP_MANIFEST.brand) ?? "enterprise"); }, []);
   return (
     <AuthBoundary
       adapter={adapter}

@@ -286,7 +286,7 @@ function ContextNavigation({
                     aria-current={active ? "page" : undefined}
                     onClick={() => onNavigate(item)}
                   >
-                    <span className={cn("shrink-0 text-muted-foreground [&_svg]:size-4", active && "text-primary")}>{item.icon}</span>
+                    <span className={cn("shrink-0 text-white/90 brightness-110 [&_svg]:size-4", active && "text-white brightness-150 filter drop-shadow-[0_0_3px_rgba(255,255,255,0.8)]")}>{item.icon}</span>
                     {!collapsed ? <span className="min-w-0 flex-1 truncate text-left">{item.label}</span> : null}
                     {!collapsed && item.badge != null ? <Badge variant={active ? "default" : "secondary"} className="ml-auto max-w-14 truncate">{item.badge}</Badge> : null}
                   </Button>
@@ -405,7 +405,7 @@ function WorkspaceTabsBar({
                 <Button variant="ghost" size="sm" className="h-7 max-w-56 gap-1.5 rounded-md px-2 text-xs font-medium hover:bg-transparent" onClick={() => onNavigate?.(tab.key)} aria-current={active ? "page" : undefined}>
                   {tab.pinned ? <Pin className="size-3 fill-current text-primary" /> : tab.icon ? <span className="[&_svg]:size-3.5">{tab.icon}</span> : null}
                   <span className="truncate">{tab.label}</span>
-                  {tab.dirty ? <span className="size-1.5 shrink-0 rounded-full bg-amber-500" title="Có thay đổi chưa lưu" /> : null}
+                  {tab.dirty ? <span className="size-1.5 shrink-0 rounded-full bg-warning" title="Có thay đổi chưa lưu" /> : null}
                 </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild><Button variant="ghost" size="icon-sm" className="mr-0.5 size-6 opacity-60 hover:opacity-100" aria-label={`Tùy chọn tab ${tab.label}`}><MoreHorizontal className="size-3.5" /></Button></DropdownMenuTrigger>
@@ -693,7 +693,7 @@ export function ShellV3Chrome(props: AppShellProps) {
             </DropdownMenu>
           </header> : null}
 
-          {!online ? <div className="shrink-0 border-b border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-center text-xs text-amber-700 dark:text-amber-400" role="status">Đang ngoại tuyến. Dữ liệu chưa tải và thao tác lưu cần kết nối mạng.</div> : null}
+          {!online ? <div className="shrink-0 border-b border-warning/30 bg-warning/10 px-3 py-1.5 text-center text-xs text-warning-text" role="status">Đang ngoại tuyến. Dữ liệu chưa tải và thao tác lưu cần kết nối mạng.</div> : null}
           {props.businessContext && !workspaceMaximized ? <div className="shrink-0 overflow-x-auto border-b bg-muted/20 px-3 py-1.5 lg:hidden">{props.businessContext}</div> : null}
 
           {preferences.workspaceTabs && props.workspaceTabs?.length ? <WorkspaceTabsBar tabs={props.workspaceTabs} activeKey={props.workspaceActiveKey ?? props.activeKey} onNavigate={props.onWorkspaceTabNavigate} onClose={props.onWorkspaceTabClose} onPin={props.onWorkspaceTabPin} onCloseOthers={props.onWorkspaceTabCloseOthers} onCloseRight={props.onWorkspaceTabCloseRight} onRefresh={props.onWorkspaceTabRefresh} onReorder={props.onWorkspaceTabReorder} onDuplicate={props.onWorkspaceTabDuplicate} maximized={workspaceMaximized} onToggleMaximized={() => setWorkspaceMaximized((value) => !value)} /> : workspaceMaximized ? <div className="flex h-10 shrink-0 items-center justify-end border-b bg-card px-2"><Button variant="ghost" size="icon-sm" onClick={() => setWorkspaceMaximized(false)} aria-label="Khôi phục workspace"><Minimize2 className="size-4" /></Button></div> : null}

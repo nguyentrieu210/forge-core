@@ -46,10 +46,10 @@ export function KanbanView(props: KanbanViewProps) {
         const cards = byColumn.get(col) ?? [];
         const unexpected = !columns.includes(col);
         return (
-          <section key={col || "__blank__"} className={cn("mf-kanban-column flex w-64 shrink-0 flex-col rounded-lg border bg-muted/40", unexpected && "border-amber-500/40")} aria-label={col || "Chưa phân loại"}>
+          <section key={col || "__blank__"} className={cn("mf-kanban-column flex w-64 shrink-0 flex-col rounded-lg border bg-muted/40", unexpected && "border-warning/40")} aria-label={col || "Chưa phân loại"}>
             <div className="flex items-center gap-2 border-b px-3 py-2 text-sm font-medium">
               <span className="truncate">{col || "Chưa phân loại"}</span>
-              {unexpected ? <Badge variant="outline" className="border-amber-500/40 text-[10px]">Ngoài cấu hình</Badge> : null}
+              {unexpected ? <Badge variant="outline" className="border-warning/40 text-[10px]">Ngoài cấu hình</Badge> : null}
               <Badge variant="secondary" className="ml-auto">{cards.length}</Badge>
             </div>
             <div className="flex flex-col gap-2 p-2">

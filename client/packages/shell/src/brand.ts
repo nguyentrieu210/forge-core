@@ -1,46 +1,65 @@
-/** 13 bảng màu dùng chung cho mọi app MetaForge. */
+/**
+ * Bảng màu dùng chung cho mọi app MetaForge — **Graphite + Enterprise Blue**.
+ *
+ * TRƯỚC ĐÂY có 13 bảng màu (zinc/blue/warm + sakura/emerald/ocean/violet/indigo/teal/amber/rose/
+ * aurora/sunset). Đã thu về 2 vì mục tiêu diện mạo là ERP/B2B: một hệ thống nghiệp vụ cần MỘT
+ * ngôn ngữ thị giác để người dùng đọc dữ liệu, không phải 13 chủ đề trang trí — và 11 bảng màu
+ * rực (hồng, cam, tím…) không thể vừa giữ tinh thần enterprise vừa giữ tương phản AA trên bảng
+ * và biểu mẫu dày đặc.
+ *
+ *   enterprise — graphite + navy doanh nghiệp (mặc định)
+ *   graphite   — trung tính hoàn toàn, primary không màu
+ *
+ * `enterprise` KHÔNG stamp `data-brand` (nó chính là khối `:root` trong `packages/ui/src/
+ * styles.css`), đúng cách `zinc` từng là mặc định — nên hợp đồng "không có attribute = brand
+ * mặc định" giữ nguyên, phía app không phải sửa gì.
+ */
 import { useCallback, useEffect, useState } from "react";
 
-export type BrandMode =
-  | "zinc" | "blue" | "warm"
-  | "sakura" | "emerald" | "ocean" | "violet" | "indigo"
-  | "teal" | "amber" | "rose" | "aurora" | "sunset";
+export type BrandMode = "enterprise" | "graphite";
 
 const KEY = "metaforge-brand";
 const CHANGE_EVENT = "metaforge-brand-change";
+/** Ô màu = đúng `--primary` mà brand đó áp thật lên hệ thống, không phải một swatch quảng cáo. */
 export const BRANDS: { id: BrandMode; label: string; swatch: string }[] = [
-  { id: "zinc", label: "Than chì", swatch: "#18181b" },
-  { id: "blue", label: "Xanh điện", swatch: "#1b4dff" },
-  { id: "warm", label: "Đất nung", swatch: "#b15b2e" },
-  { id: "sakura", label: "Hồng cánh sen", swatch: "linear-gradient(135deg,#be185d,#ec4899 55%,#f472b6)" },
-  { id: "emerald", label: "Ngọc lục bảo", swatch: "#059669" },
-  { id: "ocean", label: "Đại dương", swatch: "linear-gradient(135deg,#0284c7,#22d3ee)" },
-  { id: "violet", label: "Tím hoàng gia", swatch: "#7c3aed" },
-  { id: "indigo", label: "Chàm đêm", swatch: "#4f46e5" },
-  { id: "teal", label: "Xanh ngọc", swatch: "#0f766e" },
-  { id: "amber", label: "Hổ phách", swatch: "#d97706" },
-  { id: "rose", label: "Thạch anh hồng", swatch: "#e11d48" },
-  { id: "aurora", label: "Cực quang", swatch: "linear-gradient(135deg,#14b8a6,#8b5cf6)" },
-  { id: "sunset", label: "Hoàng hôn", swatch: "linear-gradient(135deg,#f97316,#ec4899)" },
+  { id: "enterprise", label: "Doanh nghiệp", swatch: "#1e40af" },
+  { id: "graphite", label: "Than chì", swatch: "#374151" },
 ];
 
 export const BRAND_COLOR_COUNT = BRANDS.length;
+
+/**
+ * Bảng màu cũ → bảng màu mới.
+ *
+ * Người dùng đang chạy hệ thống có `metaforge-brand` trong localStorage mang một trong 13 giá trị
+ * cũ. Không map thì `isBrandMode` trả false và họ rơi về mặc định — chấp nhận được, nhưng ai đang
+ * dùng "Than chì" sẽ mất đúng lựa chọn mà hệ thống MỚI vẫn còn. Chỉ map trường hợp thật sự có
+ * bản kế nhiệm (zinc = brand trung tính cũ → graphite); 11 bảng màu trang trí không có, nên rơi
+ * về mặc định.
+ */
+const LEGACY_BRAND_ALIASES: Record<string, BrandMode> = { zinc: "graphite" };
 
 export function isBrandMode(value: unknown): value is BrandMode {
   return BRANDS.some((brand) => brand.id === value);
 }
 
+/** Đọc giá trị đã lưu, chấp nhận cả tên cũ. Trả `null` nếu không hiểu được. */
+export function normalizeBrand(value: unknown): BrandMode | null {
+  if (isBrandMode(value)) return value;
+  if (typeof value === "string") return LEGACY_BRAND_ALIASES[value] ?? null;
+  return null;
+}
+
 export function applyBrand(brand: BrandMode): void {
   if (typeof document === "undefined") return;
-  if (brand === "zinc") document.documentElement.removeAttribute("data-brand");
+  if (brand === "enterprise") document.documentElement.removeAttribute("data-brand");
   else document.documentElement.setAttribute("data-brand", brand);
 }
 
-export function useBrand(controlled?: BrandMode, defaultBrand: BrandMode = "blue"): [BrandMode, (b: BrandMode) => void] {
+export function useBrand(controlled?: BrandMode, defaultBrand: BrandMode = "enterprise"): [BrandMode, (b: BrandMode) => void] {
   const [userBrand, setUserBrand] = useState<BrandMode>(() => {
     if (typeof localStorage === "undefined") return defaultBrand;
-    const value = localStorage.getItem(KEY);
-    return isBrandMode(value) ? value : defaultBrand;
+    return normalizeBrand(localStorage.getItem(KEY)) ?? defaultBrand;
   });
   useEffect(() => {
     const effective = controlled ?? userBrand;
@@ -55,8 +74,8 @@ export function useBrand(controlled?: BrandMode, defaultBrand: BrandMode = "blue
   useEffect(() => {
     if (controlled !== undefined || typeof window === "undefined" || typeof localStorage === "undefined") return;
     const sync = () => {
-      const value = localStorage.getItem(KEY);
-      if (isBrandMode(value)) setUserBrand(value);
+      const value = normalizeBrand(localStorage.getItem(KEY));
+      if (value) setUserBrand(value);
     };
     const onStorage = (event: StorageEvent) => { if (event.key === KEY) sync(); };
     window.addEventListener(CHANGE_EVENT, sync);

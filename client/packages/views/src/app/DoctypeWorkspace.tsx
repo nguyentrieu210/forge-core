@@ -7,7 +7,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { List, Rows3 } from "lucide-react";
 import { resolveBulkRenderPolicy } from "@metaforge/core";
-import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, useT } from "@metaforge/ui";
+import { Button, chromeFill, chromeText, cn, Dialog, DialogContent, DialogHeader, DialogTitle, useT } from "@metaforge/ui";
 import { useMeta } from "../container/hooks.js";
 import { SplitView } from "../detail/SplitView.js";
 import { ListContainer } from "../container/ListContainer.js";
@@ -21,6 +21,7 @@ import { buildPrintPath } from "../print/printRoute.js";
 import {
   V3_CONFIRM_DIALOG_CLASS,
   V3_DATA_SURFACE_CLASS,
+  V3_FULL_CREATE_DIALOG_CLASS,
   V3_QUICK_ENTRY_DIALOG_CLASS,
   V3_VIEW_SWITCHER_CLASS,
 } from "../data-surface/v3.js";
@@ -51,6 +52,17 @@ export function DoctypeWorkspace(props: DoctypeWorkspaceProps) {
   const isNew = name === "new";
   const decoded = name && !isNew ? decodeURIComponent(name) : undefined;
   const isTree = titleMeta.data?.is_tree === 1;
+  /**
+   * Kích cỡ màn tạo mới đi theo PHẠM VI của chứng từ, không phải theo khai báo riêng của từng app.
+   *
+   * Có bảng con nghĩa là người dùng sẽ nhập nhiều dòng, mỗi dòng nhiều cột — việc đó cần cả màn
+   * hình. Không có bảng con thì chỉ vài ô, và một hộp thoại gọn giữ được ngữ cảnh danh sách phía
+   * sau. Suy ra từ chính metadata nên không doctype nào phải khai thêm gì.
+   */
+  const hasChildTable = useMemo(
+    () => (titleMeta.data?.fields ?? []).some((field) => field.fieldtype === "Table" || field.fieldtype === "Table MultiSelect"),
+    [titleMeta.data],
+  );
   const bulkPolicy = useMemo(() => titleMeta.data ? resolveBulkRenderPolicy(titleMeta.data) : undefined, [titleMeta.data]);
   const bulkEnabled = Boolean(bulkPolicy?.enabled && !isTree);
   const isPriceListManager = doctype === "Item Price";
@@ -185,18 +197,38 @@ export function DoctypeWorkspace(props: DoctypeWorkspaceProps) {
 
       <Dialog open={isNew} onOpenChange={(open) => { if (!open) setCloseRequest((value) => value + 1); }}>
         <DialogContent
-          className={V3_QUICK_ENTRY_DIALOG_CLASS}
+          className={hasChildTable ? V3_FULL_CREATE_DIALOG_CLASS : V3_QUICK_ENTRY_DIALOG_CLASS}
           data-ui-version="v3"
-          data-surface="quick-entry"
-          onInteractOutside={(event) => { event.preventDefault(); setCloseRequest((value) => value + 1); }}
+          data-surface={hasChildTable ? "full-create" : "quick-entry"}
+          /**
+           * Một lớp nổi CHỒNG LÊN không phải là "bấm ra ngoài".
+           *
+           * Radix dựng dialog lồng, popover của ô Link và menu chọn trong portal riêng — xét theo
+           * cây DOM thì chúng nằm NGOÀI khung này, nên mọi tương tác với chúng đều bắn
+           * `onInteractOutside` cho form cha. Hệ quả: đang nhập đơn ở toàn màn hình, bấm
+           * "＋ Tạo mới" một Khách hàng là form đơn tự đóng và nhảy về danh sách, kéo theo mất
+           * những gì đã gõ.
+           *
+           * Lỗi này trước đây bị hộp xác nhận "Huỷ tạo mới?" che mất; bỏ hộp đó thì nó lộ ngay.
+           * Chỉ coi là "ra ngoài" khi tương tác không nằm trong một lớp nổi nào khác.
+           */
+          onInteractOutside={(event) => {
+            event.preventDefault();
+            const target = event.detail?.originalEvent?.target;
+            if (target instanceof Element && target.closest('[role="dialog"],[role="listbox"],[data-radix-popper-content-wrapper]')) return;
+            setCloseRequest((value) => value + 1);
+          }}
           onEscapeKeyDown={(event) => { event.preventDefault(); setCloseRequest((value) => value + 1); }}
         >
-          <DialogHeader className="shrink-0 border-b border-border/70 bg-muted/30 px-5 py-4">
+          {/* `chromeFill`/`chromeText` (từ `@metaforge/ui`) — cùng công thức với header lưới dòng
+              hàng bên dưới. Xem lý do chọn ở `control-styles.ts`. */}
+          <DialogHeader className={cn("shrink-0 border-b border-border/70 px-5 py-4", chromeFill, chromeText)}>
             <DialogTitle className="text-[15px] font-semibold tracking-tight">{t("form.create_title_prefix")} {displayTitle.toLocaleLowerCase("vi")}</DialogTitle>
           </DialogHeader>
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
             <NewFormContainer
               doctype={doctype}
+              fullWidth={hasChildTable}
               closeRequest={closeRequest}
               onCreated={(newName) => onNavigate(`${listPath}/${encodeURIComponent(newName)}`)}
               onCancel={() => onNavigate(listPath)}

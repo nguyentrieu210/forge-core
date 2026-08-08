@@ -224,7 +224,7 @@ export function AuthErrorScreen({
       <div className="pointer-events-none absolute inset-0 opacity-65"><div className="mf-auth-grid absolute inset-0" /></div>
       <section className="mf-auth-panel-enter relative w-full max-w-md rounded-xl border border-white/10 bg-white/[0.055] p-6 shadow-2xl backdrop-blur-xl sm:p-7">
         <div className="flex items-start gap-4">
-          <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-red-500/10 text-red-300">
+          <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-destructive/10 text-destructive">
             <AlertTriangle className="size-5" aria-hidden="true" />
           </div>
           <div className="min-w-0">

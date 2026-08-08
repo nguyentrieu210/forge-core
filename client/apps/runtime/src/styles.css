@@ -251,8 +251,8 @@
   --warning-text: #a85a00;
   --destructive: #e5484d;
   --destructive-text: #c92a2f;
-  --sidebar: #0b111b;
-  --sidebar-foreground: #f7f9fc;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #1c2431;
 }
 
 [data-theme="dark"] .mf-shell:has(.mf-shell-sidebar [data-alumdoor-logo]) {
@@ -286,17 +286,17 @@
 }
 
 .mf-shell:has(.mf-shell-sidebar [data-alumdoor-logo]) .mf-shell-sidebar {
-  background: linear-gradient(180deg, #101722 0%, #0b121e 55%, #080f19 100%);
-  border-right-color: #273447;
-  color: #f8fafc;
+  background: linear-gradient(180deg, #ffffff 0%, #fcfdfe 60%, #f6f8fa 100%);
+  border-right-color: #e2e6ec;
+  color: #1c2431;
 }
 .mf-shell:has(.mf-shell-sidebar [data-alumdoor-logo]) .mf-shell-brand {
   margin: 0.6rem 0.6rem 0.35rem;
   padding: 0.42rem 0.75rem;
-  border: 1px solid #e6e8ec;
+  border: 1px solid #eceef2;
   border-radius: 0.9rem;
   background: #ffffff;
-  box-shadow: 0 10px 26px -17px rgb(0 0 0 / 0.72), inset 0 -2px 0 rgb(244 91 36 / 0.16);
+  box-shadow: 0 8px 20px -16px rgb(15 23 42 / 0.18), inset 0 -2px 0 rgb(244 91 36 / 0.16);
 }
 .mf-shell:has(.mf-shell-sidebar [data-alumdoor-logo]) [data-alumdoor-logo] {
   width: 100%;
@@ -311,32 +311,41 @@
   mix-blend-mode: normal;
 }
 .mf-shell:has(.mf-shell-sidebar [data-alumdoor-logo]) .mf-shell-sidebar input[aria-label="Tìm menu"] {
-  border-color: #344257;
-  background: #151f2d;
-  color: #ffffff;
+  border-color: #d7dce4;
+  background: #ffffff;
+  color: #1c2431;
 }
-.mf-shell:has(.mf-shell-sidebar [data-alumdoor-logo]) .mf-shell-sidebar input[aria-label="Tìm menu"]::placeholder { color: #95a4b8; }
-.mf-shell:has(.mf-shell-sidebar [data-alumdoor-logo]) .mf-shell-sidebar .mf-shell-nav-group-label { color: #93a5bd; }
-.mf-shell:has(.mf-shell-sidebar [data-alumdoor-logo]) .mf-shell-sidebar .mf-shell-nav-group-label:hover { color: #ffffff; background: rgb(255 255 255 / 0.055); }
-.mf-shell:has(.mf-shell-sidebar [data-alumdoor-logo]) .mf-shell-sidebar .mf-shell-nav-item { color: #d5dde8; }
-.mf-shell:has(.mf-shell-sidebar [data-alumdoor-logo]) .mf-shell-sidebar .mf-shell-nav-item > span:first-child { color: #96a8bf; }
+.mf-shell:has(.mf-shell-sidebar [data-alumdoor-logo]) .mf-shell-sidebar input[aria-label="Tìm menu"]::placeholder { color: #8993a3; }
+.mf-shell:has(.mf-shell-sidebar [data-alumdoor-logo]) .mf-shell-sidebar .mf-shell-nav-group-label { color: #7c8798; }
+.mf-shell:has(.mf-shell-sidebar [data-alumdoor-logo]) .mf-shell-sidebar .mf-shell-nav-group-label:hover { color: #1c2431; background: rgb(15 23 42 / 0.045); }
+.mf-shell:has(.mf-shell-sidebar [data-alumdoor-logo]) .mf-shell-sidebar .mf-shell-nav-item { color: #3a4552; }
+.mf-shell:has(.mf-shell-sidebar [data-alumdoor-logo]) .mf-shell-sidebar .mf-shell-nav-item > span:first-child { color: #7c8798; }
 .mf-shell:has(.mf-shell-sidebar [data-alumdoor-logo]) .mf-shell-sidebar .mf-shell-nav-item:hover {
-  background: #182333;
-  color: #ffffff;
-  box-shadow: inset 2px 0 0 #42546d;
+  background: #fff3ec;
+  color: #a93614;
+  box-shadow: inset 2px 0 0 #f45b24;
 }
 .mf-shell:has(.mf-shell-sidebar [data-alumdoor-logo]) .mf-shell-sidebar .mf-shell-nav-item[data-active="true"],
 .mf-shell:has(.mf-shell-sidebar [data-alumdoor-logo]) .mf-shell-sidebar .mf-shell-nav-item[data-active="true"]:hover {
   background: linear-gradient(135deg, #f45b24 0%, #d94716 100%);
   border-color: #ff855a;
   color: #ffffff;
-  box-shadow: 0 11px 24px -14px rgb(244 91 36 / 0.85), inset 0 0 0 1px rgb(255 255 255 / 0.14);
+  box-shadow: 0 11px 24px -14px rgb(244 91 36 / 0.5), inset 0 0 0 1px rgb(255 255 255 / 0.25);
 }
 .mf-shell:has(.mf-shell-sidebar [data-alumdoor-logo]) .mf-shell-sidebar .mf-shell-nav-item[data-active="true"]::before { background: #ffffff; }
-.mf-shell:has(.mf-shell-sidebar [data-alumdoor-logo]) .mf-shell-sidebar .mf-shell-nav-item[data-active="true"] > span,
-.mf-shell:has(.mf-shell-sidebar [data-alumdoor-logo]) .mf-shell-sidebar .mf-shell-nav-item[data-active="true"] svg { color: #ffffff; }
-.mf-shell:has(.mf-shell-sidebar [data-alumdoor-logo]) .mf-shell-sidebar > div:last-child { color: #eef2f7; }
-.mf-shell:has(.mf-shell-sidebar [data-alumdoor-logo]) .mf-shell-sidebar > div:last-child .text-muted-foreground { color: #a6b3c4; }
+.mf-shell:has(.mf-shell-sidebar [data-alumdoor-logo]) .mf-shell-sidebar .mf-shell-nav-item > span:first-child,
+.mf-shell:has(.mf-shell-sidebar [data-alumdoor-logo]) .mf-shell-sidebar .mf-shell-nav-item svg {
+  color: #5b6675 !important;
+  filter: none;
+  opacity: 0.92;
+}
+.mf-shell:has(.mf-shell-sidebar [data-alumdoor-logo]) .mf-shell-sidebar .mf-shell-nav-item[data-active="true"] svg {
+  color: #ffffff !important;
+  filter: none;
+  opacity: 1;
+}
+.mf-shell:has(.mf-shell-sidebar [data-alumdoor-logo]) .mf-shell-sidebar > div:last-child { color: #1c2431; }
+.mf-shell:has(.mf-shell-sidebar [data-alumdoor-logo]) .mf-shell-sidebar > div:last-child .text-muted-foreground { color: #7c8798; }
 
 /* Alumdoor data surfaces carry orange only where action/state matters; content remains high-contrast. */
 .mf-shell:has(.mf-shell-sidebar [data-alumdoor-logo]) .mf-list-view thead th {

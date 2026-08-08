@@ -23,7 +23,7 @@ export function ThemeWelcomeDialog(props: ThemeWelcomeDialogProps) {
   );
   const [brand, setBrand] = useBrand(
     props.allowBrandChange === false ? props.brandMode : undefined,
-    props.brandMode ?? "blue",
+    props.brandMode ?? "enterprise",
   );
   const [open, setOpen] = useState(() => {
     if (props.allowBrandChange === false || typeof localStorage === "undefined") return false;

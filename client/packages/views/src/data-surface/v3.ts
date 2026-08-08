@@ -127,5 +127,27 @@ export const V3_VIEW_SWITCHER_CLASS =
 export const V3_CONFIRM_DIALOG_CLASS =
   "w-[min(92vw,28rem)] max-w-none overflow-hidden rounded-xl border border-border/70 bg-card p-0 shadow-2xl";
 
+/**
+ * Khung tạo mới GỌN — cho chứng từ không có bảng con.
+ *
+ * Một master như Khách hàng, ĐVT hay Tiền tệ chỉ có dăm ô; phủ kín màn hình cho nó thì người dùng
+ * mất ngữ cảnh danh sách phía sau mà chẳng đổi lấy được gì.
+ */
 export const V3_QUICK_ENTRY_DIALOG_CLASS =
   "fixed left-1/2 top-[4vh] -translate-x-1/2 !translate-y-0 duration-150 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-top-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 !zoom-in-100 flex max-h-[92vh] w-[min(96vw,68rem)] max-w-none flex-col overflow-hidden rounded-xl border border-border/70 bg-card p-0 shadow-2xl outline-none focus:outline-none focus-visible:outline-none motion-reduce:duration-0 motion-reduce:data-[state=open]:animate-none motion-reduce:data-[state=closed]:animate-none";
+
+/**
+ * Khung tạo mới TOÀN MÀN HÌNH — cho chứng từ CÓ bảng con.
+ *
+ * Kích cỡ không phải lựa chọn tuỳ hứng mà là hệ quả của việc chứng từ có bảng dòng hàng hay không.
+ * Bảng dòng hàng không sống nổi trong khung `68rem` cao `92vh`: cột bị cắt ngang, và người nhập
+ * phải cuộn một hộp thoại nằm trong một trang cũng đang cuộn — hai thanh cuộn lồng nhau cho cùng
+ * một việc.
+ *
+ * Neo `inset-0` nên phải hạ căn giữa mặc định của Radix bằng `!` — nếu không `left-1/2` và
+ * `-translate-x-1/2` vẫn thắng và khung lệch hẳn sang phải.
+ *
+ * Giữ fade vào/ra; bỏ trượt và zoom vì một bề mặt phủ kín màn hình mà còn trượt thì chỉ thấy giật.
+ */
+export const V3_FULL_CREATE_DIALOG_CLASS =
+  "fixed inset-0 !left-0 !top-0 !translate-x-0 !translate-y-0 duration-150 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 !zoom-in-100 flex h-screen max-h-none w-screen max-w-none flex-col overflow-hidden rounded-none border-0 bg-card p-0 shadow-none outline-none focus:outline-none focus-visible:outline-none motion-reduce:duration-0 motion-reduce:data-[state=open]:animate-none motion-reduce:data-[state=closed]:animate-none";

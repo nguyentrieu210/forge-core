@@ -17,9 +17,11 @@ export const Table = React.forwardRef<HTMLTableElement, TableProps>(
 Table.displayName = "Table";
 
 export const TableHeader = React.forwardRef<HTMLTableSectionElement, React.HTMLAttributes<HTMLTableSectionElement>>(
-  // `bg-muted` ĐỤC chứ không phải `bg-muted/40`: khi thead dính (sticky) thì nền bán trong suốt
-  // để các dòng dữ liệu trôi bên dưới hiện xuyên qua chữ tiêu đề.
-  ({ className, ...props }, ref) => <thead ref={ref} className={cn("[&_tr]:border-b bg-muted", className)} {...props} />,
+  // ĐỤC chứ không phải bán trong suốt: khi thead dính (sticky) thì nền mờ để các dòng dữ liệu
+  // trôi bên dưới hiện xuyên qua chữ tiêu đề. Nền là `--secondary` (graphite nhạt) chứ KHÔNG phải
+  // mảng primary đảo màu: header đảo màu biến mỗi bảng thành một khối nặng, và ở màn nhiều bảng
+  // thì các dải đậm chia vụn màn hình. Thứ bậc do độ đậm chữ + viền dưới đảm nhiệm.
+  ({ className, ...props }, ref) => <thead ref={ref} className={cn("[&_tr]:border-b bg-secondary text-foreground", className)} {...props} />,
 );
 TableHeader.displayName = "TableHeader";
 
@@ -42,7 +44,12 @@ TableRow.displayName = "TableRow";
 
 export const TableHead = React.forwardRef<HTMLTableCellElement, React.ThHTMLAttributes<HTMLTableCellElement>>(
   ({ className, ...props }, ref) => (
-    <th ref={ref} className={cn("h-9 whitespace-nowrap px-3 text-left align-middle text-xs font-medium text-muted-foreground", className)} {...props} />
+    /*
+      Tiêu đề cột phải đọc được ở khoảng cách liếc mắt: người nhập liệu quét ngang hàng tiêu đề để
+      tìm cột cần gõ, chứ không đọc từng chữ. `text-xs` + `text-muted-foreground` làm hàng tiêu đề
+      nhạt gần bằng dữ liệu bên dưới, mất luôn ranh giới giữa "tên cột" và "nội dung".
+    */
+    <th ref={ref} className={cn("h-9 whitespace-nowrap border-b border-input bg-secondary px-3 text-left align-middle text-[13px] font-semibold text-foreground", className)} {...props} />
   ),
 );
 TableHead.displayName = "TableHead";

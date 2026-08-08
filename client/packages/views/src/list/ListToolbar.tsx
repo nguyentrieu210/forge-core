@@ -142,7 +142,7 @@ export function ListToolbar(props: ListToolbarProps) {
                 <DropdownMenuLabel>Chọn định dạng</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => props.onExport?.("xlsx")}>
-                  <FileSpreadsheet className="text-emerald-600" /> Excel (.xlsx)
+                  <FileSpreadsheet className="text-success-text" /> Excel (.xlsx)
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => props.onExport?.("pdf")}>
                   <FileText className="text-destructive" /> PDF

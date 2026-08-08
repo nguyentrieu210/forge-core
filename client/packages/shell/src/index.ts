@@ -42,7 +42,7 @@ export {
   AuthBootScreen, AuthErrorScreen, AuthNotice, AuthVisualStyles, type AuthNoticeKind,
 } from "./auth/AuthPresentation.js";
 export { ChangePasswordDialog, type ChangePasswordDialogProps } from "./auth/ChangePasswordDialog.js";
-export { useBrand, applyBrand, isBrandMode, BRANDS, BRAND_COLOR_COUNT, type BrandMode } from "./brand.js";
+export { useBrand, applyBrand, isBrandMode, normalizeBrand, BRANDS, BRAND_COLOR_COUNT, type BrandMode } from "./brand.js";
 export { applyDesign } from "./design.js";
 export { resolveIcon } from "./icon.js";
 export {

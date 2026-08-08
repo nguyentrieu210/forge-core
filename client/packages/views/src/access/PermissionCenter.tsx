@@ -171,16 +171,16 @@ export function PermissionCenter({ initialTab = "users" }: { initialTab?: Permis
                               ? user.roles.map((role) => <Badge key={role} variant="secondary">{role}</Badge>)
                               /* Không vai trò = đăng nhập được nhưng không mở được gì. Nói
                                  thẳng, vì với người dùng nó trông như hệ thống hỏng. */
-                              : <span className="text-xs text-amber-600">chưa gán vai trò</span>}
+                              : <span className="text-xs text-warning-text">chưa gán vai trò</span>}
                           </div>
                         </TableCell>
                         <TableCell className="text-center">
-                          {user.enabled ? <Badge className="bg-emerald-600 hover:bg-emerald-600">Đang dùng</Badge> : <Badge variant="destructive">Đã khoá</Badge>}
+                          {user.enabled ? <Badge variant="success">Đang dùng</Badge> : <Badge variant="destructive">Đã khoá</Badge>}
                         </TableCell>
                         <TableCell className="text-right" onClick={(event: React.MouseEvent) => event.stopPropagation()}>
                           <Button variant="ghost" size="sm" onClick={() => setSelected(user.user)}>Phân quyền</Button>
                           <Button variant="ghost" size="icon-sm" title={user.enabled ? "Khoá tài khoản" : "Mở lại tài khoản"} onClick={() => toggleEnabled(user)}>
-                            {user.enabled ? <Lock className="size-4" /> : <LockOpen className="size-4 text-emerald-600" />}
+                            {user.enabled ? <Lock className="size-4" /> : <LockOpen className="size-4 text-success-text" />}
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -285,7 +285,7 @@ function CreateUserDialog({ open, onOpenChange, availableRoles, onCreated }: {
                 </label>
               ))}
             </div>
-            {!roles.length ? <p className="mt-1.5 text-xs text-amber-600">Chưa chọn vai trò — người này sẽ đăng nhập được nhưng không thấy màn hình nào.</p> : null}
+            {!roles.length ? <p className="mt-1.5 text-xs text-warning-text">Chưa chọn vai trò — người này sẽ đăng nhập được nhưng không thấy màn hình nào.</p> : null}
           </div>
           {error ? <ErrorBox message={error} /> : null}
           <div className="flex justify-end gap-2">
@@ -508,7 +508,7 @@ function RoleMatrix({ meta, doctype, setDoctype }: { meta: RolesAndDoctypes | nu
                     <TableCell className="text-center">{rule.if_owner ? <Badge variant="outline">Có</Badge> : "—"}</TableCell>
                     {ptypes.map((ptype) => (
                       <TableCell key={ptype} className="text-center">
-                        {(rule as Record<string, unknown>)[ptype] === 1 ? <Check className="mx-auto size-4 text-emerald-600" /> : <span className="text-muted-foreground">—</span>}
+                        {(rule as Record<string, unknown>)[ptype] === 1 ? <Check className="mx-auto size-4 text-success-text" /> : <span className="text-muted-foreground">—</span>}
                       </TableCell>
                     ))}
                   </TableRow>
@@ -580,7 +580,7 @@ function CheckPanel({ meta, doctype, setDoctype, users }: { meta: RolesAndDoctyp
             <h3 className="mb-2 text-sm font-semibold">Vì sao</h3>
             <div className="space-y-2">
               {(data.trace ?? []).map((item, index) => (
-                <div key={`${item.source}:${item.label}:${index}`} className={cn("rounded-lg border p-3", item.effect === "deny" && "border-destructive/30 bg-destructive/5", item.effect === "allow" && "border-emerald-500/30 bg-emerald-500/5")}>
+                <div key={`${item.source}:${item.label}:${index}`} className={cn("rounded-lg border p-3", item.effect === "deny" && "border-destructive/30 bg-destructive/5", item.effect === "allow" && "border-success/30 bg-success/5")}>
                   <div className="flex items-center gap-2"><Badge variant="outline">{item.source}</Badge><span className="text-sm font-medium">{item.label}</span></div>
                   {item.detail ? <p className="mt-1 text-xs text-muted-foreground">{item.detail}</p> : null}
                 </div>

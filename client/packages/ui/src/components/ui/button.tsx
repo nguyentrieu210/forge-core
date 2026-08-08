@@ -11,11 +11,15 @@ export const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground font-semibold hover:bg-primary/90 active:bg-primary/80",
+        // Nút hành động chính = `--primary` + hai bậc token `--primary-hover`/`--primary-active`.
+        // TRƯỚC ĐÂY hover/active làm bằng `opacity-90`/`opacity-80`: giảm độ mờ khiến nút LẪN dần
+        // vào nền phía sau (và nền đó khác nhau tuỳ màn), thay vì đậm lên như mọi hệ enterprise —
+        // trên nền graphite sáng thì hover đọc ra "đang bị vô hiệu hoá" chứ không phải "đang trỏ vào".
+        default: "bg-primary text-primary-foreground font-semibold hover:bg-primary-hover active:bg-primary-active",
         destructive: "bg-destructive text-destructive-foreground font-semibold hover:bg-destructive/90 active:bg-destructive/80",
-        outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground active:bg-accent/70",
-        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80 active:bg-secondary/60",
-        ghost: "hover:bg-accent hover:text-accent-foreground active:bg-accent/70",
+        outline: "border border-input bg-card hover:bg-secondary hover:text-foreground active:bg-accent",
+        secondary: "bg-secondary text-secondary-foreground hover:bg-accent hover:text-accent-foreground active:bg-accent",
+        ghost: "hover:bg-secondary hover:text-foreground active:bg-accent",
         // TRƯỚC: `--accent-foreground` — ở brand zinc token đó là #18181b (đen) nên "link" trông
         // y hệt chữ thường, không ai biết bấm được. Link phải mang màu primary.
         link: "text-primary underline-offset-4 hover:underline",

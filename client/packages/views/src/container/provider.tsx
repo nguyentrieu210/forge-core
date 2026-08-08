@@ -9,8 +9,10 @@ import type { FormGuideMap } from "../form/FormGuide.js";
 import { makeLocaleFormat, type LocaleConfig, type BoundFormatters, type BusinessContextSelection, type BusinessContextPolicy, type FormProfileMap } from "@metaforge/core";
 import type { FrappeAdapter } from "@metaforge/adapter-frappe";
 import { ControlRegistry, type FieldServices } from "@metaforge/controls";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, useT } from "@metaforge/ui";
+import { chromeFill, chromeText, cn, Dialog, DialogContent, DialogHeader, DialogTitle, useT } from "@metaforge/ui";
 import { adapterServices } from "./services.js";
+import { useMeta } from "./hooks.js";
+import { V3_FULL_CREATE_DIALOG_CLASS } from "../data-surface/v3.js";
 
 const LazyNewFormContainer = lazy(async () => {
   const module = await import("./NewFormContainer.js");
@@ -151,26 +153,61 @@ export function MetaForgeProvider(props: MetaForgeProviderProps) {
             dialog lồng nhau natively) — đóng entry NÀO chỉ resolve/gỡ đúng entry đó, không đụng
             entry khác đang mở bên dưới. */}
         {quickCreateStack.map((entry) => (
-          <Dialog key={entry.id} open onOpenChange={(open) => { if (!open) closeQuickCreate(entry.id, undefined); }}>
-            {/* Bấm ra ngoài/Esc đóng được. Radix tự đóng ở đây là chấp nhận được vì form quick-create
-                ngắn; mất vài ô vừa gõ đỡ khó chịu hơn là bị kẹt trong modal không thoát được. */}
-            <DialogContent className="flex h-[min(85vh,760px)] w-[min(80vw,860px)] max-w-none flex-col overflow-hidden p-0">
-              <DialogHeader className="shrink-0 border-b px-5 py-3">
-                <DialogTitle>{t("form.create_title_prefix")} {entry.doctype}</DialogTitle>
-              </DialogHeader>
-              <div className="min-h-0 flex-1 overflow-hidden p-4">
-                <Suspense fallback={<div className="grid h-full place-items-center text-sm text-muted-foreground">{t("common.loading")}</div>}>
-                  <LazyNewFormContainer
-                    doctype={entry.doctype}
-                    onCreated={(name) => closeQuickCreate(entry.id, name)}
-                    onCancel={() => closeQuickCreate(entry.id, undefined)}
-                  />
-                </Suspense>
-              </div>
-            </DialogContent>
-          </Dialog>
+          <QuickCreateDialog
+            key={entry.id}
+            doctype={entry.doctype}
+            onDone={(name) => closeQuickCreate(entry.id, name)}
+          />
         ))}
       </Ctx.Provider>
     </QueryClientProvider>
+  );
+}
+
+/**
+ * Một tầng trong chồng "＋ Tạo mới".
+ *
+ * Xếp chồng chứ không thay thế: form cha — kể cả khi đang chiếm trọn màn hình — vẫn nằm nguyên
+ * bên dưới với mọi thứ đã gõ dở. Người nhập thiếu một Khách hàng giữa chừng thì tạo tại chỗ rồi
+ * quay lại đúng ô đang đứng, không phải thoát ra, mất đơn đang nhập, rồi vào lại từ đầu.
+ *
+ * Kích cỡ theo đúng luật của màn tạo mới: chứng từ có bảng con thì chiếm trọn màn hình, không thì
+ * hộp thoại gọn. Tra `useMeta` ở đây thay vì để nơi gọi truyền vào, vì nơi gọi là một ô Link chỉ
+ * biết TÊN doctype đích chứ không biết nó có bảng con hay không.
+ */
+function QuickCreateDialog({ doctype, onDone }: { doctype: string; onDone: (name?: string) => void }) {
+  const t = useT();
+  const meta = useMeta(doctype);
+  const hasChildTable = useMemo(
+    () => (meta.data?.fields ?? []).some((field) => field.fieldtype === "Table" || field.fieldtype === "Table MultiSelect"),
+    [meta.data],
+  );
+  const title = meta.data?.label ?? doctype;
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open) onDone(undefined); }}>
+      {/* Bấm ra ngoài/Esc đóng được. Radix tự đóng ở đây là chấp nhận được vì form quick-create
+          ngắn; mất vài ô vừa gõ đỡ khó chịu hơn là bị kẹt trong modal không thoát được. */}
+      <DialogContent
+        className={hasChildTable ? V3_FULL_CREATE_DIALOG_CLASS : "flex h-[min(85vh,760px)] w-[min(80vw,860px)] max-w-none flex-col overflow-hidden p-0"}
+        data-surface={hasChildTable ? "full-create" : "quick-entry"}
+        data-quick-create-depth="nested"
+      >
+        {/* Cùng `chromeFill`/`chromeText` với header của form tạo mới ở tầng ngoài — hộp tạo lồng
+            (vd tạo Khách hàng ngay trong đơn) mang đúng sắc thương hiệu như phần còn lại. */}
+        <DialogHeader className={cn("shrink-0 border-b px-5 py-3", chromeFill, chromeText)}>
+          <DialogTitle>{t("form.create_title_prefix")} {title.toLocaleLowerCase("vi")}</DialogTitle>
+        </DialogHeader>
+        <div className="min-h-0 flex-1 overflow-hidden p-4">
+          <Suspense fallback={<div className="grid h-full place-items-center text-sm text-muted-foreground">{t("common.loading")}</div>}>
+            <LazyNewFormContainer
+              doctype={doctype}
+              fullWidth={hasChildTable}
+              onCreated={(name) => onDone(name)}
+              onCancel={() => onDone(undefined)}
+            />
+          </Suspense>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

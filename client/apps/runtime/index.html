@@ -3,7 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#7c3aed" />
+    <meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#111318" media="(prefers-color-scheme: dark)" />
     <meta name="description" content="Forge — nền tảng vận hành doanh nghiệp từ văn phòng đến hiện trường." />
     <meta name="forge-release" content="%VITE_FORGE_RELEASE_SHA%" />
     <meta name="mobile-web-app-capable" content="yes" />
@@ -19,7 +20,10 @@
         const alumdoor = location.hostname.toLowerCase() === "alu.kairo.vn" || params.get("alumdoor") === "1";
         if (!alumdoor) return;
         const logo = "/alumdoor/app-icon-192.png";
-        document.querySelector('meta[name="theme-color"]')?.setAttribute("content", "#f45b24");
+        // Có HAI thẻ theme-color (light/dark) kể từ khi bảng màu chuyển sang graphite — đặt cả hai
+        // để thanh trình duyệt giữ đúng màu thương hiệu Alumdoor ở cả hai theme, như trước đây khi
+        // chỉ có một thẻ không kèm media query.
+        document.querySelectorAll('meta[name="theme-color"]').forEach((tag) => tag.setAttribute("content", "#f45b24"));
         document.getElementById("app-icon")?.setAttribute("href", logo);
         document.getElementById("app-touch-icon")?.setAttribute("href", logo);
       })();

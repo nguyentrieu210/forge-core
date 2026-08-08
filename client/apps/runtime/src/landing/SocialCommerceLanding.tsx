@@ -91,7 +91,10 @@ const faqs = [
 
 export function SocialCommerceLanding({ page = "/", adapter }: { page?: PublicSocialPage; adapter: FrappeAdapter }) {
   useEffect(() => {
-    document.documentElement.dataset.brand = "blue";
+    // Bảng màu "blue"/"warm" đã bị gỡ khi hệ thống thu về enterprise + graphite. Trang công khai
+    // dùng đúng brand mặc định của hệ thống thay vì tự ép một tên không còn tồn tại (ép tên lạ chỉ
+    // stamp một attribute không khớp rule nào — im lặng rơi về mặc định, nhưng gây hiểu nhầm khi đọc).
+    delete document.documentElement.dataset.brand;
     document.title = page === "/" ? "Kairo Social Commerce — Chốt đơn đa kênh" : `${pageTitle(page)} — Kairo Social Commerce`;
     setMeta("description", "Nền tảng SaaS quản lý bình luận, giỏ hàng, đơn giao và COD cho đội ngũ bán hàng đa kênh.");
   }, [page]);
@@ -336,9 +339,9 @@ function ProductPreview() {
           </div>
           <div className="mt-3 grid gap-3 sm:grid-cols-[1.15fr_0.85fr]">
             <div className="rounded-xl border bg-card p-3"><div className="mb-3 flex items-center justify-between"><p className="text-xs font-semibold">Inbox mới nhất</p><span className="text-[9px] text-primary">Xem tất cả</span></div><div className="space-y-2.5">
-              <PreviewMessage initials="HN" name="Hà Nguyễn" text="Chốt M02 màu đen nhé shop" time="1 phút" tone="bg-blue-100 text-blue-700" />
-              <PreviewMessage initials="LT" name="Linh Trần" text="Mình lấy 2 cái mã A14" time="3 phút" tone="bg-violet-100 text-violet-700" />
-              <PreviewMessage initials="PT" name="Phương Thảo" text="Shop còn size L không ạ?" time="5 phút" tone="bg-amber-100 text-amber-700" />
+              <PreviewMessage initials="HN" name="Hà Nguyễn" text="Chốt M02 màu đen nhé shop" time="1 phút" tone="bg-chart-1/12 text-chart-1" />
+              <PreviewMessage initials="LT" name="Linh Trần" text="Mình lấy 2 cái mã A14" time="3 phút" tone="bg-chart-4/12 text-chart-4" />
+              <PreviewMessage initials="PT" name="Phương Thảo" text="Shop còn size L không ạ?" time="5 phút" tone="bg-chart-3/12 text-chart-3" />
             </div></div>
             <div className="rounded-xl border bg-card p-3"><p className="text-xs font-semibold">Đơn theo trạng thái</p><div className="mt-5 flex h-24 items-end gap-2" aria-label="Biểu đồ minh họa">
               {[45, 72, 58, 88, 64, 78, 52].map((height, index) => <span key={index} className="flex-1 rounded-t bg-primary/20" style={{ height: `${height}%` }}><span className="block h-2 rounded-t bg-primary" /></span>)}

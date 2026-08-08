@@ -15,7 +15,7 @@ export const APP_MANIFEST: AppManifest = {
   id: "kho-vn",
   name: "Quản lý kho",
   version: "2.0.0",
-  brand: "blue",
+  brand: "enterprise",
   domain: "stock",
   home: { route: "/ton-kho" },
 
