@@ -4,7 +4,7 @@
  * cột = field in_list_view của child, cell = control từ registry (inline edit), thêm/xoá row.
  * Data-driven từ child meta (KHÔNG hardcode).
  */
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { Fragment, useEffect, useRef, useState, type CSSProperties } from "react";
 import { aiHeaders } from "../assistant/AssistantBubble.js";
 import { ArrowDown, ArrowDownToLine, ArrowUp, Columns3, Copy, Maximize2, Pin, PinOff, Plus, RotateCcw, ScanLine, Trash2, Undo2, X } from "lucide-react";
 import { resolveField, type DocTypeMeta, type DocField, type Doc } from "@metaforge/core";
@@ -27,14 +27,14 @@ const EMPTY_LAYOUT: GridLayout = { w: {}, order: [], hidden: [], pinned: [], lab
 const PURCHASE_COMPACT_FIELDS = ["item_code", "qty", "uom", "rate", "amount"];
 const SALES_COMPACT_FIELDS = [
   "item_code", "color", "width_m", "height_m", "set_count", "sales_mode", "has_butterfly_bracket",
-  "length_m", "qty_bar", "uom", "qty", "rate", "amount",
+  "length_m", "qty_bar", "uom", "qty", "rate", "discount_percentage", "amount",
 ];
 const SALES_ORDER_ITEM_FULL_FIELDS = [
   "item_code", "door_type", "color", "width_m", "height_m", "mesh_height_m", "set_count", "sales_mode",
   "has_butterfly_bracket", "leaf_variant", "leaf_height_deduction_m", "leaf_divisor_m", "leaf_rounding",
   "leaf_count", "single_layer_leaf_count", "double_layer_leaf_count", "cut_width_m", "billable_area_sqm",
   "estimated_weight_kg", "estimated_minutes", "formula_policy", "formula_version", "formula_explanation",
-  "length_m", "qty_bar", "uom", "qty", "rate", "amount", "motor_model", "accessories", "install_note", "warehouse",
+  "length_m", "qty_bar", "uom", "qty", "rate", "discount_percentage", "amount", "motor_model", "accessories", "install_note", "warehouse",
   "availability_status", "note",
 ];
 const PURCHASE_ORDER_ITEM_FULL_FIELDS = [
@@ -379,7 +379,7 @@ const BIG_WIDTH: Record<string, string> = {
   qty: "7rem", qty_bar: "6rem", set_count: "7rem", actual_weight_kg: "7rem",
   theoretical_kg_per_m: "7rem", theoretical_kg: "8rem", is_stamped: "6rem",
   actual_kg_per_m: "7rem", actual_kg_per_sqm: "7rem", uom: "8rem",
-  rate: "8rem", amount: "9rem", available_qty: "8rem", availability_status: "13rem", note: "8rem", install_note: "8rem",
+  rate: "8rem", discount_percentage: "8rem", amount: "9rem", available_qty: "8rem", availability_status: "13rem", note: "8rem", install_note: "8rem",
 };
 export interface AverageWeightResult {
   totalLengthM?: number;
@@ -590,7 +590,9 @@ export function ChildGrid(props: ChildGridProps) {
    */
   // big-v3 resets the previous default order so the customer-approved purchase sequence is applied
   // even on browsers that already persisted the old big-table layout.
-  const layoutKey = `mf-grid-layout:${childMeta.name}:${expanded ? "big-v4" : "compact-v4"}`;
+  // v5 bỏ kích thước kéo tay cũ: chúng được lưu trước khi bảng đơn có dòng chiết khấu,
+  // khiến cột Số lượng/Chiết khấu phình ra dù schema mới đã có bề rộng chuẩn.
+  const layoutKey = `mf-grid-layout:${childMeta.name}:${expanded ? "big-v5" : "compact-v5"}`;
   const [layout, setLayout] = useState<GridLayout>(() => ({ ...EMPTY_LAYOUT, w: {}, order: [], hidden: [], pinned: [], labels: {} }));
   const loadedKey = useRef("");
   if (loadedKey.current !== layoutKey) {
@@ -692,7 +694,7 @@ export function ChildGrid(props: ChildGridProps) {
    */
   const COMPUTED_FROM = new Set([
     "qty", "rate", "qty_bar", "length_m", "theoretical_kg_per_m", "width_m", "height_m", "set_count",
-    "mesh_height_m", "sales_mode", "has_butterfly_bracket", "uom", "conversion_factor", "actual_weight_kg",
+    "mesh_height_m", "sales_mode", "has_butterfly_bracket", "uom", "conversion_factor", "actual_weight_kg", "discount_percentage",
   ]);
   const DOOR_FORMULA_INPUTS = new Set([
     "width_m", "height_m", "set_count", "mesh_height_m", "sales_mode", "has_butterfly_bracket", "uom",
@@ -704,8 +706,9 @@ export function ChildGrid(props: ChildGridProps) {
     "estimated_weight_kg", "estimated_minutes",
   ];
   const ITEM_DERIVED_FIELDS = [
-    "conversion_factor", "uom", "stock_uom", "stock_qty", "inventory_mode", "measurement_profile", "min_area_sqm",
-    "item_name", "description", "color", "colour", "rate", "amount",
+  "conversion_factor", "uom", "stock_uom", "stock_qty", "inventory_mode", "measurement_profile", "min_area_sqm",
+  "item_name", "description", "color", "colour", "rate", "amount",
+  "discount_percentage", "discount_amount", "standard_amount",
     "formula_policy", "formula_version", "formula_explanation", "width_basis", "cut_width_m", "billable_area_sqm",
     "door_type", "leaf_variant", "leaf_height_deduction_m", "leaf_divisor_m", "leaf_rounding", "leaf_count",
     "single_layer_leaf_count", "double_layer_leaf_count", "estimated_weight_kg", "estimated_minutes", "paint_required",
@@ -735,24 +738,31 @@ export function ChildGrid(props: ChildGridProps) {
    * lỗi sau khi bấm lưu. Danh sách rỗng được lọc về một mã không tồn tại (fail closed).
    */
   const fieldForRow = (field: DocField, row: Doc): DocField => {
-    const itemCode = String(row.item_code ?? "").trim();
-    if (isSalesTransactionGrid(childMeta)) {
-      const quantity = salesQuantityForRow(row);
-      if (field.fieldname === "width_m" && row.inventory_mode === "Thành phẩm theo m2") {
-        const doorType = String(row.door_type ?? "").trim();
+      const itemCode = String(row.item_code ?? "").trim();
+      if (isSalesTransactionGrid(childMeta)) {
+        const quantity = salesQuantityForRow(row);
+        if (field.fieldname === "width_m" && row.inventory_mode === "Thành phẩm theo m2") {
+        const widthBasis = String(row.width_basis ?? "").normalize("NFC").toLocaleLowerCase("vi");
         const customerGroup = String(parentDoc?.customer_group ?? "").trim();
-        const label = doorType === "Cửa Đức" && customerGroup === "Đại lý"
-          ? "Rộng PB nhựa (m)"
-          : doorType ? "Rộng PB ray (m)" : "Rộng theo chính sách (m)";
+        // Ưu tiên kết quả chính sách đã áp: đây là nguồn quyết định cuối cùng.
+        const label = widthBasis.includes("nhựa")
+          ? "Rộng PB nhựa\n(m)"
+          : widthBasis.includes("ray") ? "Rộng PB ray\n(m)"
+            : customerGroup === "Đại lý" ? "Rộng PB nhựa\n(m)"
+              : customerGroup === "Lẻ" ? "Rộng PB ray\n(m)" : "Rộng theo chính sách\n(m)";
         return { ...field, label };
       }
-      if (field.fieldname === "qty" && quantity.derived) {
-        return {
-          ...field,
-          label: quantity.label,
-          read_only: 1,
-          read_only_depends_on: undefined,
-        };
+      if (field.fieldname === "height_m" && row.inventory_mode === "Thành phẩm theo m2") {
+        return { ...field, label: "Cao PB\n(m)" };
+      }
+      if (field.fieldname === "rate") {
+        return { ...field, label: "Đơn giá\n(VNĐ)" };
+      }
+      if (field.fieldname === "discount_percentage") {
+        return { ...field, label: "Chiết khấu\n(%)" };
+      }
+      if (field.fieldname === "amount") {
+        return { ...field, label: "Thành tiền\n(VNĐ)" };
       }
       if (field.fieldname === "length_m" && quantity.policy === "LENGTH_X_PIECES") {
         return { ...field, reqd: 1, label: "Dài một cây/đoạn (m)" };
@@ -859,13 +869,23 @@ export function ChildGrid(props: ChildGridProps) {
     if (has("amount") && has("qty") && has("rate")) {
       const qty = Number(next.qty);
       const rate = Number(next.rate);
-      if (Number.isFinite(qty) && qty > 0 && Number.isFinite(rate) && rate >= 0) next.amount = qty * rate;
+      if (Number.isFinite(qty) && qty > 0 && Number.isFinite(rate) && rate >= 0) {
+        const standardAmount = Math.round(qty * rate);
+        const percent = Math.min(100, Math.max(0, Number(next.discount_percentage) || 0));
+        const discountAmount = Math.round(standardAmount * percent / 100);
+        next.standard_amount = standardAmount;
+        next.discount_amount = discountAmount;
+        next.amount = standardAmount;
+      }
       else next.amount = undefined;
     }
     return next;
   };
 
   const isDoorSalesGrid = isSalesTransactionGrid(childMeta);
+  // Đơn bán Alumdoor nhập trực tiếp trên form để giữ luồng báo giá gọn; không mở
+  // sang bảng lớn tách riêng. Các bảng nghiệp vụ khác vẫn giữ công cụ này.
+  const allowLargeGrid = !isSalesOrderGrid(childMeta);
 
   /**
    * Tính ở Worker rồi chụp kết quả vào dòng. Client chỉ làm nhiệm vụ tự điền; cùng payload
@@ -934,7 +954,14 @@ export function ChildGrid(props: ChildGridProps) {
         // SAU nó để luật cửa thắng đúng tại app Alumdoor, rồi tính tiền từ qty đã chốt.
         const adjusted = { ...withComputed({ ...entry, ...patch }), ...patch } as Doc;
         const rate = Number(adjusted.rate);
-        if ("amount" in adjusted && Number.isFinite(rate)) adjusted.amount = billable * rate;
+        if ("amount" in adjusted && Number.isFinite(rate)) {
+          const standardAmount = Math.round(billable * rate);
+          const percent = Math.min(100, Math.max(0, Number(adjusted.discount_percentage) || 0));
+          const discountAmount = Math.round(standardAmount * percent / 100);
+          adjusted.standard_amount = standardAmount;
+          adjusted.discount_amount = discountAmount;
+          adjusted.amount = standardAmount;
+        }
         return adjusted;
       });
       emitRows(merged);
@@ -949,14 +976,16 @@ export function ChildGrid(props: ChildGridProps) {
       const message = error instanceof Error ? error.message : "Không tính được công thức cửa.";
       emitRows(currentRows.map((entry, index) => index === currentRowIdx ? {
         ...entry,
-        qty: undefined,
-        amount: undefined,
-        billable_area_sqm: undefined,
-        formula_policy: undefined,
-        formula_version: undefined,
+        // Một request cũ có thể lỗi sau khi request mới đã tính xong. Không được xoá
+        // Số lượng/Thành tiền đã chụp chỉ vì lỗi trễ đó.
+        qty: entry.qty,
+        amount: entry.amount,
+        billable_area_sqm: entry.billable_area_sqm,
+        formula_policy: entry.formula_policy,
+        formula_version: entry.formula_version,
         formula_explanation: message,
-        width_basis: undefined,
-        cut_width_m: undefined,
+        width_basis: entry.width_basis,
+        cut_width_m: entry.cut_width_m,
       } : entry));
     }
   };
@@ -1107,13 +1136,6 @@ export function ChildGrid(props: ChildGridProps) {
       ["purchase_kg_per_m2", ["purchase_kg_per_m2"]],
       ["leaf_divisor_m", ["leaf_divisor_m"]],
       ["standard_rate", ["rate"]],
-      /**
-       * KHO MẶC ĐỊNH của chính mặt hàng — nan nhôm về kho nhôm, mô tơ về kho phụ kiện.
-       *
-       * Cụ thể hơn bối cảnh đang chọn, nên nó được phép ghi đè giá trị mà `rowDefaults` vừa
-       * mồi (xem điều kiện dưới). Cái nó KHÔNG bao giờ ghi đè là kho người dùng tự chọn.
-       */
-      ["default_warehouse", ["warehouse"]],
     ];
     const patch: Record<string, unknown> = {};
     await Promise.all(plan.map(async ([src, dests]) => {
@@ -1239,6 +1261,12 @@ export function ChildGrid(props: ChildGridProps) {
         if (has("availability_status")) patch.availability_status = salesContext.availability_status;
         for (const fieldname of ["door_type", "purchase_kg_per_m2", "leaf_divisor_m"]) {
           if (has(fieldname) && salesContext[fieldname] !== undefined && salesContext[fieldname] !== null) patch[fieldname] = salesContext[fieldname];
+        }
+        // Chính sách bán chuẩn: Cửa Đức giảm 15%, mọi mặt hàng khác không giảm.
+        // Chỉ mồi khi đổi mặt hàng (ô cũ đã được reset phía trên), không ghi đè mức giảm
+        // mà người dùng chủ động sửa để đơn đó đi vào luồng cần duyệt.
+        if (childMeta.name === "Sales Order Item" && has("discount_percentage")) {
+          patch.discount_percentage = String(salesContext.door_type ?? "").trim() === "Cửa Đức" ? 15 : 0;
         }
         if (parentDoc?.selling_price_list && has("rate")) {
           patch.rate = salesContext.price_missing ? undefined : salesContext.rate;
@@ -1450,7 +1478,11 @@ export function ChildGrid(props: ChildGridProps) {
     let sum = 0;
     let seen = false;
     for (const row of rows) {
-      const value = Number(row[column.fieldname]);
+      // Dòng hàng vẫn hiển thị Thành tiền chuẩn; riêng dòng tổng phải là số thực
+      // khách cần thanh toán, tức trừ khoản chiết khấu đã hiện ở dòng phụ.
+      const value = column.fieldname === "amount" && isSalesOrderGrid(childMeta)
+        ? Number(row.amount) - Math.max(0, Number(row.discount_amount) || 0)
+        : Number(row[column.fieldname]);
       if (Number.isFinite(value)) { sum += value; seen = true; }
     }
     if (seen) totals.set(column.fieldname, sum);
@@ -1738,7 +1770,7 @@ export function ChildGrid(props: ChildGridProps) {
       <div className="overflow-x-auto rounded-md border border-input [scrollbar-width:thin]">
         {/* Bảng lớn CHIA phần trong khung (`w-full`, không ép min-width) nên 12 cột vừa trọn
             màn hình; bảng gọn vẫn tràn để cuộn vì khung của nó hẹp hơn tổng các cột. */}
-        <Table className={`mf-child-grid-table ${expanded ? "w-full table-fixed" : "w-full table-auto"}`} style={expanded ? undefined : { minWidth: `${minWidthRem}rem` }}>
+        <Table className="mf-child-grid-table w-full table-fixed" style={expanded ? undefined : { minWidth: `${minWidthRem}rem` }}>
           <colgroup>
             {!readOnly ? <col style={{ width: 40, minWidth: 40, maxWidth: 40 }} /> : null}
             <col style={{ width: 48, minWidth: 48, maxWidth: 48 }} />
@@ -1753,8 +1785,8 @@ export function ChildGrid(props: ChildGridProps) {
             {cols.map((c) => (
               <col
                 key={c.fieldname}
-                className={expanded ? "[width:var(--mf-col-width)]" : undefined}
-                style={expanded ? { "--mf-col-width": columnWidth(c) || (c.fieldname === flexible ? "10rem" : gridWidth(c)) } as CSSProperties : undefined}
+                className="[width:var(--mf-col-width)]"
+                style={{ "--mf-col-width": columnWidth(c) || (c.fieldname === flexible ? "10rem" : gridWidth(c)) } as CSSProperties}
               />
             ))}
             {!readOnly ? <col className="w-[4.5rem]" /> : null}
@@ -1787,18 +1819,17 @@ export function ChildGrid(props: ChildGridProps) {
                     .map((row) => fieldForRow(c, row).label)
                     .filter((label): label is string => Boolean(label)))];
                   if (rowLabels.length === 1) headerLabel = rowLabels[0]!;
-                  if (c.fieldname === "qty") {
-                    const labels = [...new Set(rows.map((row) => salesQuantityForRow(row).label))];
-                    if (labels.length === 1) headerLabel = labels[0]!;
-                  } else if (c.fieldname === "rate") {
-                    const uoms = [...new Set(rows.map((row) => String(row.uom ?? "").trim()).filter(Boolean))];
-                    if (uoms.length === 1) headerLabel = `Đơn giá / ${uoms[0]}`;
+                  // Bảng có thể vừa có cửa vừa có ray/phụ kiện. Khi đó nhãn chung
+                  // "Rộng (m)" của vật tư không được làm mất PB ray/PB nhựa của cửa.
+                  if (c.fieldname === "width_m") {
+                    const doorWidthLabel = rowLabels.find((label) => label.startsWith("Rộng PB ray") || label.startsWith("Rộng PB nhựa"));
+                    if (doorWidthLabel) headerLabel = doorWidthLabel;
                   }
                 }
                 return (
                 <TableHead
                   key={c.fieldname}
-                  className={`group relative truncate whitespace-nowrap ${numeric ? "text-center" : ""} ${sticky.className}`}
+                  className={`group relative whitespace-pre-line text-center leading-tight ${sticky.className}`}
                   style={sticky.style}
                   draggable={!readOnly}
                   onDragStart={() => { dragged.current = c.fieldname; }}
@@ -1827,9 +1858,19 @@ export function ChildGrid(props: ChildGridProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.map((row, ri) => (
+            {rows.map((row, ri) => {
+              const discountColumn = isSalesOrderGrid(childMeta)
+                ? cols.find((column) => column.fieldname === "discount_percentage")
+                : undefined;
+              const discountColumnIndex = discountColumn ? cols.indexOf(discountColumn) : -1;
+              const discountAmountColumn = isSalesOrderGrid(childMeta)
+                ? cols.find((column) => column.fieldname === "amount")
+                : undefined;
+              const DiscountControl = discountColumn ? registry.resolve(discountColumn.fieldtype) ?? FallbackControl : null;
+              const DiscountAmountControl = discountAmountColumn ? registry.resolve(discountAmountColumn.fieldtype) ?? FallbackControl : null;
+              return (
+              <Fragment key={String(row.name ?? ri)}>
               <TableRow
-                key={String(row.name ?? ri)}
                 className={(expanded && pickedRow === ri) || selectedSet.has(rowKey(row, ri)) ? "bg-primary/10 hover:bg-primary/10" : "hover:bg-transparent"}
                 {...(expanded ? { onFocusCapture: () => setPickedRow(ri), onClick: () => setPickedRow(ri) } : {})}
               >
@@ -1842,6 +1883,10 @@ export function ChildGrid(props: ChildGridProps) {
                 {cols.map((c) => {
                   const sticky = stickyColumn(c.fieldname);
                   const Control = registry.resolve(c.fieldtype) ?? FallbackControl;
+                  // Chiết khấu có dòng riêng bên dưới từng mặt hàng để không làm chật dòng nhập chính.
+                  if (c.fieldname === "discount_percentage" && discountColumn) {
+                    return <TableCell key={c.fieldname} className={`!bg-muted/30 ${sticky.className}`} style={sticky.style} />;
+                  }
                   // `list_only` means "show in a table", not "hide from a table". The shared form
                   // resolver hides it for standalone form fields, so clear the flag inside ChildGrid.
                   const gridField = fieldForRow(c.list_only ? { ...c, list_only: 0 } : c, row);
@@ -1855,7 +1900,7 @@ export function ChildGrid(props: ChildGridProps) {
                   // expose a writable rate during a rolling release.
                   const serverPricedSalesField = childMeta.name === "Sales Order Item"
                     && Boolean(parentDoc?.selling_price_list)
-                    && (c.fieldname === "rate" || c.fieldname === "discount_percentage");
+                    && c.fieldname === "rate";
                   const cellReadOnly = Boolean(readOnly || rf.readOnly || serverPricedSalesField || (expanded && !rf.visible));
                   const cellHint = !rf.visible
                     ? "Không áp dụng cho mặt hàng này"
@@ -1881,7 +1926,7 @@ export function ChildGrid(props: ChildGridProps) {
                       key={c.fieldname}
                       data-cell={`${ri}:${cols.indexOf(c)}`}
                       data-editable={cellReadOnly ? "false" : "true"}
-                      className={`align-top transition-colors ${numeric ? "text-center [&_input]:text-center" : ""} ${
+                      className={`align-top text-center transition-colors [&_input]:text-center [&_.mf-control]:justify-center ${
                         cellReadOnly
                           ? "!bg-muted/80 text-muted-foreground [&_.mf-control]:border-muted-foreground/20 [&_.mf-control]:bg-muted/40"
                           : "!bg-primary/[0.07] ring-1 ring-inset ring-primary/25 focus-within:!bg-primary/[0.12] focus-within:ring-2 focus-within:ring-primary/60 [&_.mf-control]:border-primary/40 [&_.mf-control]:bg-background"
@@ -1909,7 +1954,7 @@ export function ChildGrid(props: ChildGridProps) {
                   );
                 })}
                 {!readOnly ? (
-                  <TableCell className="whitespace-nowrap">
+                  <TableCell className="whitespace-nowrap text-center">
                     <Button type="button" variant="ghost" size="icon-sm" className="text-muted-foreground" onClick={() => setDetailRow(ri)} aria-label="Chi tiết dòng" title="Chi tiết dòng">
                       <Maximize2 />
                     </Button>
@@ -1919,7 +1964,48 @@ export function ChildGrid(props: ChildGridProps) {
                   </TableCell>
                 ) : null}
               </TableRow>
-            ))}
+              {discountColumn && discountAmountColumn && DiscountControl && DiscountAmountControl ? (
+                <TableRow className="hover:bg-transparent">
+                  <TableCell
+                    colSpan={(readOnly ? 1 : 2) + discountColumnIndex}
+                    className="h-11 border-t-0 bg-muted/20"
+                  />
+                  <TableCell className="border-t-0 bg-muted/20 px-2 py-1.5 text-center [&_input]:!text-center [&_.mf-control]:!justify-center" style={stickyColumn(discountColumn.fieldname).style}>
+                    <DiscountControl
+                      field={fieldForRow(discountColumn.list_only ? { ...discountColumn, list_only: 0 } : discountColumn, row)}
+                      value={row.discount_percentage ?? 0}
+                      onChange={(value: unknown) => setCell(ri, "discount_percentage", value)}
+                      readOnly={readOnly}
+                      services={services}
+                      docname={String(row.name ?? "")}
+                      parentDoctype={childMeta.name}
+                      docValues={row}
+                      roles={roles}
+                      compact
+                    />
+                  </TableCell>
+                  <TableCell className="border-t-0 bg-muted/20 px-2 py-1.5 text-center [&_input]:!text-center [&_.mf-control]:!justify-center" style={stickyColumn(discountAmountColumn.fieldname).style}>
+                    <DiscountAmountControl
+                      field={fieldForRow(discountAmountColumn.list_only ? { ...discountAmountColumn, list_only: 0 } : discountAmountColumn, row)}
+                      // Lưu khoản chiết khấu là số dương để phép tính tổng rõ ràng;
+                      // hiển thị số âm ở dòng phụ để người bán nhận ra đây là tiền được trừ.
+                      value={-(Math.max(0, Number(row.discount_amount) || 0))}
+                      onChange={() => { /* Giá trị tự tính từ tỷ lệ chiết khấu. */ }}
+                      readOnly
+                      services={services}
+                      docname={String(row.name ?? "")}
+                      parentDoctype={childMeta.name}
+                      docValues={row}
+                      roles={roles}
+                      compact
+                    />
+                  </TableCell>
+                  <TableCell colSpan={cols.length - discountColumnIndex - 2 + (readOnly ? 0 : 1)} className="border-t-0 bg-muted/20" />
+                </TableRow>
+              ) : null}
+              </Fragment>
+              );
+            })}
             {rows.length === 0 ? (
               <TableRow className="hover:bg-transparent">
                 <TableCell className="h-16 text-center text-muted-foreground" colSpan={cols.length + (readOnly ? 1 : 3)}>
@@ -1930,11 +2016,11 @@ export function ChildGrid(props: ChildGridProps) {
             {rows.length > 0 && totals.size > 0 ? (
               <TableRow className="border-t-2 bg-muted/40 font-medium hover:bg-muted/40">
                 {!readOnly ? <TableCell className="sticky left-0 z-20 bg-muted/40" /> : null}
-                <TableCell className={`sticky z-20 bg-muted/40 text-right text-xs text-muted-foreground ${readOnly ? "left-0" : "left-10"}`}>Σ</TableCell>
+                <TableCell className={`sticky z-20 bg-muted/40 text-center text-xs text-muted-foreground ${readOnly ? "left-0" : "left-10"}`}>Σ</TableCell>
                 {cols.map((c) => {
                   const sticky = stickyColumn(c.fieldname);
                   return (
-                  <TableCell key={c.fieldname} className={`whitespace-nowrap text-right tabular-nums ${sticky.className}`} style={sticky.style}>
+                  <TableCell key={c.fieldname} className={`whitespace-nowrap text-center tabular-nums ${sticky.className}`} style={sticky.style}>
                     {totals.has(c.fieldname)
                       ? (services?.fmt?.number
                           ? services.fmt.number(totals.get(c.fieldname)!)
@@ -1964,7 +2050,7 @@ export function ChildGrid(props: ChildGridProps) {
           const Control = registry.resolve(f.fieldtype) ?? FallbackControl;
           const serverPriced = childMeta.name === "Sales Order Item"
             && Boolean(parentDoc?.selling_price_list)
-            && (f.fieldname === "rate" || f.fieldname === "discount_percentage");
+            && f.fieldname === "rate";
           return (
             <div key={f.fieldname} className={`grid min-w-0 gap-1.5 ${columns.includes("grid-cols-1") ? "" : detailFieldSpan(f)}`}>
               <label className="text-sm font-medium" htmlFor={`detail-${f.fieldname}`}>
@@ -2040,11 +2126,11 @@ export function ChildGrid(props: ChildGridProps) {
           </FileButton>
           <span className="text-xs text-muted-foreground">Chép vùng trong Excel rồi Ctrl+V ngay trên bảng</span>
         </>
-      ) : (
+      ) : allowLargeGrid ? (
         <Button type="button" variant="outline" size="sm" onClick={() => { setExpanded(true); setPickedRow(rows.length ? 0 : null); }}>
           <Maximize2 /> Mở bảng lớn
         </Button>
-      )}
+      ) : null}
       <span className="inline-flex items-center gap-3 rounded-md border bg-card px-2.5 py-1.5 text-xs font-medium" aria-label="Chú thích trạng thái ô">
         <span className="inline-flex items-center gap-1.5 text-foreground">
           <span className="size-3.5 rounded-sm border border-primary/50 bg-primary/10 ring-1 ring-primary/20" /> Ô nhập liệu
@@ -2128,9 +2214,26 @@ export function ChildGrid(props: ChildGridProps) {
     </Dialog>
   );
 
+  const discountPolicyWarnings = childMeta.name === "Sales Order Item"
+    ? rows.flatMap((row, index) => {
+        const doorType = String(row.door_type ?? "").trim();
+        const expected = doorType === "Cửa Đức" ? 15 : 0;
+        const actual = Number(row.discount_percentage ?? 0);
+        return row.item_code && Number.isFinite(actual) && actual !== expected
+          ? [`Dòng ${index + 1} (${String(row.item_code)}): ${actual}% thay vì ${expected}%`]
+          : [];
+      })
+    : [];
+  const discountPolicyNotice = discountPolicyWarnings.length ? (
+    <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950" role="status">
+      <span className="font-semibold">Chiết khấu cần duyệt:</span> {discountPolicyWarnings.join(" · ")}
+    </div>
+  ) : null;
+
   if (expanded) {
     return (
       <div className="mf-grid space-y-2">
+        {discountPolicyNotice}
         <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
           Đang nhập ở bảng lớn — {rows.length} dòng.
         </div>
@@ -2178,6 +2281,7 @@ export function ChildGrid(props: ChildGridProps) {
 
   return (
     <div className="mf-grid space-y-2">
+      {discountPolicyNotice}
       {table}
       {toolbar}
       {columnDialog}

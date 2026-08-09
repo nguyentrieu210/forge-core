@@ -5,6 +5,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { Eye } from "lucide-react";
 import { applyContextPolicy, resolveFormRenderPolicy, serializeCreateDocument, type Doc, type DocField, type DocTypeMeta } from "@metaforge/core";
 import { Button, toast, useT } from "@metaforge/ui";
 import { FormView } from "../form/FormView.js";
@@ -35,6 +36,8 @@ function resolveDefault(f: DocField): string | undefined {
 export interface NewFormContainerProps {
   doctype: string;
   onCreated?: (name: string) => void;
+  /** Lưu chứng từ mới rồi mở ngay bản xem thử in ấn. */
+  onPreviewCreated?: (name: string) => void;
   onCancel?: () => void;
   /** Bộ đếm "cha yêu cầu đóng" (vd người dùng bấm ra ngoài modal / nhấn Esc). Tăng giá trị ⇒ chạy
    * ĐÚNG luồng Huỷ sẵn có: chưa nhập gì thì đóng luôn, đang nhập dở thì hỏi xác nhận. Dùng bộ đếm
@@ -89,7 +92,7 @@ export function NewFormContainer(props: NewFormContainerProps) {
   // resetSeq đổi ⇒ doc mới (blankDoc lại) + key FormView đổi ⇒ remount sạch (RHF defaultValues chỉ
   // chụp 1 lần lúc mount nên PHẢI remount, không thể chỉ đổi prop `doc` mà form tự nhận ra).
   const [resetSeq, setResetSeq] = useState(0);
-  const saveIntentRef = useRef<"close" | "continue">("close");
+  const saveIntentRef = useRef<"close" | "continue" | "preview">("close");
   const contextDefaults = useMemo(() => applyContextPolicy(doctype, businessContext, contextPolicies).defaults, [doctype, businessContext, contextPolicies]);
   // Nhân bản (Duplicate) — form "new" mở từ FormContainer.onAction("duplicate") có thể mang theo
   // prefill qua sessionStorage. Tiêu thụ ĐÚNG 1 LẦN (ref, không phải mỗi lần useMemo chạy lại) —
@@ -182,6 +185,9 @@ export function NewFormContainer(props: NewFormContainerProps) {
       if (saveIntentRef.current === "continue") {
         toast.success(`${t("form.created")} ${created.name} — ${t("form.continue_new_record")}`);
         setResetSeq((s) => s + 1);
+      } else if (saveIntentRef.current === "preview") {
+        toast.success("Đã lưu đơn và mở bản xem thử");
+        props.onPreviewCreated?.(String(created.name));
       } else {
         toast.success(t("form.created"));
         props.onCreated?.(String(created.name));
@@ -218,6 +224,11 @@ export function NewFormContainer(props: NewFormContainerProps) {
         fullWidth={props.fullWidth}
         footerActions={<>
           <Button type="button" variant="outline" disabled={saving} onClick={requestCancel}>{t("common.cancel")}</Button>
+          {doctype === "Sales Order" && props.onPreviewCreated ? (
+            <Button type="submit" variant="outline" disabled={!caps.create || saving} onClick={() => { saveIntentRef.current = "preview"; }}>
+              <Eye className="size-4" /> Xem thử bản in
+            </Button>
+          ) : null}
           <Button type="submit" variant="outline" disabled={!caps.create || saving} onClick={() => { saveIntentRef.current = "continue"; }}>{t("form.save_and_new")}</Button>
           <Button type="submit" disabled={!caps.create || saving} onClick={() => { saveIntentRef.current = "close"; }}>{saving ? t("form.saving") : t("form.save_and_open")}</Button>
         </>}

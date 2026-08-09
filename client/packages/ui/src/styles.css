@@ -799,6 +799,16 @@
   [data-density="touch"] .mf-shell-nav-item { min-height: 2.75rem; }
   [data-density="touch"] .mf-page-header { min-height: 4rem; padding-block: 1rem; }
   [data-density="touch"] .mf-shell-content :is(button, input, [role="combobox"]) { min-height: 2.75rem; }
+  /* Checkbox là biểu tượng trạng thái. Vùng chứa/nhãn đã đủ lớn để chạm;
+     kéo chính ô tick lên 44px làm nó thành hình chữ nhật. */
+  [data-density="touch"] .mf-form-view [role="checkbox"] {
+    min-width: 1rem !important;
+    width: 1rem !important;
+    max-width: 1rem !important;
+    min-height: 1rem !important;
+    height: 1rem !important;
+    max-height: 1rem !important;
+  }
 
   /* Shared surfaces and headers */
   .mf-surface,
@@ -941,6 +951,16 @@
   .mf-form-view {
     border-radius: 0;
     box-shadow: none;
+  }
+  /* Checkbox trong form luôn là ô vuông. Các mật độ giao diện chỉ tăng vùng
+     chứa và nhãn để dễ chạm, không được kéo chính ô trạng thái này thành chữ nhật. */
+  .mf-form-view [role="checkbox"] {
+    min-width: 1rem !important;
+    width: 1rem !important;
+    max-width: 1rem !important;
+    min-height: 1rem !important;
+    height: 1rem !important;
+    max-height: 1rem !important;
   }
   .mf-form-header {
     background: var(--card);

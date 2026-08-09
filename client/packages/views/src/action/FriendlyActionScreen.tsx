@@ -212,7 +212,6 @@ function FieldEditor({ field, values, onChange, idPrefix = "supplier-delivery" }
             docValues={values}
           />
         : <Input id={id} value={String(values[field.fieldname] ?? "")} onChange={(event) => onChange(field.fieldname, event.target.value)} />}
-      {field.description ? <p className="text-[11px] leading-4 text-muted-foreground">{field.description}</p> : null}
     </div>
   );
 }

@@ -54,15 +54,16 @@ export function resolveFormActions(ctx: FormActionCtx): FormActionDesc[] {
   // Khoá thao tác đổi trạng thái khi form đang dirty ⇒ ép Lưu trước (không chạy trên snapshot cũ).
   const dirtyGuard = ctx.dirty ? { disabled: true, disabledReason: DIRTY_GUARD_REASON } : {};
 
-  // Lưu — Draft, có quyền write (hoặc tạo mới + create)
-  if (ctx.docstatus === 0 && (p.write || (ctx.isNew && p.create))) {
+  // Lưu — bản ghi đã lưu và sạch thì không hiện nút. Người dùng chỉ thấy Lưu sau
+  // khi sửa dữ liệu; form tạo mới vẫn giữ nút để bắt đầu luồng nhập.
+  if (ctx.docstatus === 0 && (p.write || (ctx.isNew && p.create)) && (ctx.isNew || ctx.dirty || ctx.saving)) {
     out.push({
       kind: "save",
       label: ctx.saving ? "Đang lưu…" : "Lưu",
       variant: "default",
       primary: !ctx.isSubmittable,
-      disabled: ctx.saving || !ctx.dirty,
-      disabledReason: ctx.saving ? "Đang lưu thay đổi" : !ctx.dirty ? "Không có thay đổi cần lưu" : undefined,
+      disabled: ctx.saving,
+      disabledReason: ctx.saving ? "Đang lưu thay đổi" : undefined,
     });
   }
 

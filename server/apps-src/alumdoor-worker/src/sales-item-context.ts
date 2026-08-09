@@ -284,7 +284,9 @@ export async function salesItemContext(call: SalesPlatformCall, args: Json): Pro
   }
 
   const managedStock = !(item.is_stock_item === 0 || item.is_stock_item === false || normalizedText(item.item_nature) === "Dịch vụ");
-  const warehouse = normalizedText(args.warehouse ?? item.default_warehouse);
+  // Kho xuất của đơn là ngữ cảnh chứng từ hoặc lựa chọn ngay trên dòng. `default_warehouse`
+  // không phải field của Item (nó thuộc Item Default theo công ty), nên không được đọc từ Item.
+  const warehouse = normalizedText(args.warehouse);
   let availableStockQty: number | null = null;
   let availableQty: number | null = null;
   let stockStatus = "Không quản lý tồn";

@@ -64,6 +64,9 @@ interface SalesTotalsData extends JsonObject {
   additional_discount_percentage?: DecimalInput | undefined;
   discount_amount?: DecimalInput | undefined;
   discount_amount_minor?: number;
+  /** Optional commercial surcharge, used by Alumdoor sales orders. */
+  surcharge_amount?: DecimalInput | undefined;
+  surcharge_amount_minor?: number;
 }
 
 interface CurrencyContextData extends JsonObject {
@@ -94,6 +97,8 @@ export interface SalesOrderData extends SalesTotalsData, CurrencyContextData {
   /** Server-owned amendment generation; starts at 1 and increments from amended_from. */
   revision_no?: number;
   items: SalesItem[];
+  /** Server-derived: a line discount differs from Alumdoor's standard policy and needs approval. */
+  discount_requires_approval?: boolean;
   taxes?: TaxRow[];
   delivered_percentage?: string;
   billed_percentage?: string;

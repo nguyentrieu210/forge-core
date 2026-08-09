@@ -235,6 +235,9 @@ export function DoctypeWorkspace(props: DoctypeWorkspaceProps) {
               fullWidth={hasChildTable}
               closeRequest={closeRequest}
               onCreated={(newName) => onNavigate(`${listPath}/${encodeURIComponent(newName)}`)}
+              onPreviewCreated={(newName) => onNavigate(printBase === "/print"
+                ? buildPrintPath(doctype, newName)
+                : `${printBase}/${encodeURIComponent(doctype)}/${encodeURIComponent(newName)}`)}
               onCancel={() => onNavigate(listPath)}
             />
           </div>

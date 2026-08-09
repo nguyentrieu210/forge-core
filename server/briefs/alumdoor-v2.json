@@ -1864,7 +1864,14 @@
      "description": "Mã được tự gợi ý khi tạo. Sau khi lưu, dùng Thao tác khác → Đổi tên để đổi mã an toàn."
     },
     "item_name:Data! Tên hàng",
-    "item_group:Link(Item Group)! Nhóm hàng",
+    {
+     "fieldname": "item_group",
+     "fieldtype": "Link",
+     "options": "Item Group",
+     "label": "Nhóm hàng",
+     "required": true,
+     "link_filters": "{\"is_group\":0,\"disabled\":0}"
+    },
     "item_nature:Select(Hàng tồn kho,Dịch vụ,Tài sản)!=(Hàng tồn kho) Bản chất mặt hàng",
     {
      "fieldname": "material_stage",
@@ -1960,7 +1967,8 @@
      "//": "Bật = mọi dòng sổ mang HAI con số: actual_qty_micros và actual_weight_micros.",
      "fieldname": "has_catch_weight",
      "fieldtype": "Check",
-     "label": "Cân theo kiện (catch weight)"
+     "label": "Cân theo kiện (catch weight)",
+     "hidden": true
     },
     {
      "fieldname": "weight_uom",
@@ -1992,11 +2000,11 @@
      "fieldtype": "Section Break",
      "label": "Nhận diện và phân loại"
     },
-    "brand:Link(Brand) Thương hiệu",
-    "manufacturer:Link(Manufacturer) Nhà sản xuất",
-    "manufacturer_part_no:Data Mã của nhà sản xuất",
-    "material_specification:Link(Material Specification) Quy cách kỹ thuật",
-    "default_color:Link(Item Color) Màu mặc định",
+    { "fieldname": "brand", "fieldtype": "Link", "options": "Brand", "label": "Thương hiệu", "hidden": true },
+    { "fieldname": "manufacturer", "fieldtype": "Link", "options": "Manufacturer", "label": "Nhà sản xuất", "hidden": true },
+    { "fieldname": "manufacturer_part_no", "fieldtype": "Data", "label": "Mã của nhà sản xuất", "hidden": true },
+    { "fieldname": "material_specification", "fieldtype": "Link", "options": "Material Specification", "label": "Quy cách kỹ thuật", "hidden": true },
+    { "fieldname": "default_color", "fieldtype": "Link", "options": "Item Color", "label": "Màu mặc định", "hidden": true },
     {
      "fieldname": "allowed_colors",
      "fieldtype": "Table",
@@ -2004,7 +2012,7 @@
      "label": "Các màu được phép",
      "description": "Để trống nếu mặt hàng dùng được mọi mã màu đang hoạt động. Có khai thì báo giá, mua hàng, lô nhôm và sản xuất chỉ được chọn trong danh sách này."
     },
-    "barcodes:Table(Item Barcode) Mã vạch",
+    { "fieldname": "barcodes", "fieldtype": "Table", "options": "Item Barcode", "label": "Mã vạch", "hidden": true },
     {
      "fieldname": "tab_item_accounts",
      "fieldtype": "Tab Break",
@@ -2028,29 +2036,30 @@
      "options": "FIFO\nBình quân di động",
      "label": "Phương pháp giá vốn",
      "default": "FIFO",
+     "hidden": true,
      "description": "TT99/2025 cho phép mỗi nhóm hàng một phương pháp. Đổi giữa chừng phải ghi audit — thông tư đòi nhất quán giữa các kỳ."
     },
     {
      "fieldname": "tab_item_tracking",
      "fieldtype": "Tab Break",
-     "label": "Theo dõi"
+     "label": "Quản lý lô & serial"
     },
     {
      "fieldname": "section_tracking",
      "fieldtype": "Section Break",
-     "label": "Theo dõi và trạng thái"
+     "label": "Quản lý lô & serial"
     },
     "has_batch_no:Check Theo dõi số lô",
     "has_serial_no:Check Theo dõi serial",
-    "allow_negative_stock:Check Cho phép tồn âm",
-    "shelf_life_in_days:Int Hạn sử dụng (ngày)",
+    { "fieldname": "allow_negative_stock", "fieldtype": "Check", "label": "Cho phép tồn âm", "hidden": true },
+    { "fieldname": "shelf_life_in_days", "fieldtype": "Int", "label": "Hạn sử dụng (ngày)", "hidden": true },
     {
      "fieldname": "min_area_sqm",
      "fieldtype": "Float",
      "label": "Diện tích tối thiểu tính tiền (m2/bộ)",
      "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'"
     },
-    "description:Small Text Quy cách / xuất xứ",
+    { "fieldname": "description", "fieldtype": "Small Text", "label": "Quy cách / xuất xứ", "hidden": true },
     "disabled:Check Ngừng kinh doanh"
    ],
    "permissions": {
@@ -2218,6 +2227,7 @@
    "fields": [
     "price_list_name:Data*! Tên bảng giá",
     "effective_date:Date! Ngày áp dụng",
+    "price_group:Select(Đại lý,Lẻ)! Nhóm giá áp dụng",
     "currency:Link(Currency)-!=(VND) Tiền tệ",
     "note:Small Text Áp dụng cho ai / khi nào",
     "disabled:Check Ngừng dùng"
@@ -2510,7 +2520,7 @@
      "fieldname": "mesh_height_m",
      "fieldtype": "Float",
      "label": "Cao lưới (m)",
-     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'"
+     "depends_on": "eval:doc.door_type == 'Cửa Lưới'"
     },
     "formula_policy:Link(Cutting Policy)~- Công thức đã áp",
     "width_basis:Data~- Cơ sở rộng",
@@ -2628,10 +2638,8 @@
     {
      "fieldname": "qty",
      "fieldtype": "Float",
-     "label": "SL tính tiền",
-     "required": true,
-     "read_only_depends_on": "eval:(doc.inventory_mode == 'Thành phẩm theo m2' && (doc.uom == 'm2' || doc.uom == 'M2' || doc.uom == 'm²' || doc.uom == 'Bộ')) || (doc.inventory_mode == 'Nhôm cây/lá' && (doc.uom == 'Mét' || doc.uom == 'M' || doc.uom == 'Cây' || doc.uom == 'Lá'))",
-     "description": "Ô máy tính theo quy cách của dòng: cửa = m² đã chốt × số bộ; ray/trục = dài × số cây; phụ kiện = số lượng theo ĐVT bán."
+     "label": "Số lượng",
+     "required": true
     },
     "conversion_factor:Float~- Hệ số về ĐVT tồn",
     "stock_qty:Float~- SL quy đổi tồn",
@@ -2665,7 +2673,7 @@
    "icon": "file-text",
    "group": "Bán hàng",
    "naming": "BG-.YYYY.-####",
-   "title": "customer",
+   "title": "dh_code",
    "submittable": true,
    "list": [
     "customer",
@@ -2687,7 +2695,7 @@
     "contact_person:Data Người liên hệ",
     "phone:Data Điện thoại",
     "install_address:Small Text Địa chỉ công trình",
-    "selling_price_list:Link(Price List) Bảng giá áp dụng",
+    { "fieldname": "selling_price_list", "fieldtype": "Link", "options": "Price List", "label": "Bảng giá áp dụng", "fetch_from": "customer.default_price_list" },
     {
      "//": "Lấy TỪ HỒ SƠ KHÁCH, không để người lập chọn tay.",
      "//vi-sao": [
@@ -2790,6 +2798,7 @@
     "availability_status",
     "qty",
     "rate",
+    "discount_percentage",
     "amount"
    ],
    "fields": [
@@ -2981,6 +2990,9 @@
     "available_stock_uom:Link(UOM)~- ĐVT tồn khả dụng",
     "availability_status:Data~- Tồn và giá",
     "rate:Currency! Đơn giá",
+    "standard_amount:Currency~- Thành tiền chuẩn (VNĐ)",
+    "discount_percentage:Percent=(0) Chiết khấu (%)",
+    "discount_amount:Currency~- Tiền chiết khấu (VNĐ)",
     "amount:Currency~ Thành tiền",
     "motor_model:Link(Item) Mô tơ kèm theo",
     "accessories:Small Text Phụ kiện kèm theo",
@@ -3006,8 +3018,9 @@
    "list": [
     "customer",
     "transaction_date",
-    "grand_total",
-    "delivered_percentage"
+    "delivery_date",
+    "delivered_percentage",
+    "grand_total"
    ],
    "search": [
     "customer"
@@ -3023,7 +3036,7 @@
     "manual_note:Small Text Ghi chú vận hành",
     "operational_change_reason:Small Text- Lý do đổi vận hành",
     "against_quotation:Link(Quotation) Theo báo giá",
-    "selling_price_list:Link(Price List) Bảng giá áp dụng",
+    { "fieldname": "selling_price_list", "fieldtype": "Link", "options": "Price List", "label": "Bảng giá áp dụng", "fetch_from": "customer.default_price_list" },
     {
      "//": "Ảnh chụp nhóm giá của khách — xem chú thích cùng trường ở Báo giá.",
      "fieldname": "customer_group",
@@ -3035,7 +3048,20 @@
     },
     "install_address:Small Text Địa chỉ giao / lắp đặt",
     "items:Table(Sales Order Item)! Dòng hàng",
-    "grand_total:Currency~ Tổng tiền",
+    "total_amount:Currency~- Tổng tiền hàng",
+    "discount_amount:Currency~- Tổng chiết khấu",
+    "vat_rate:Percent=(0) VAT (%)",
+    "vat_amount:Currency~- Tiền VAT",
+    "surcharge_amount:Currency=(0) Phụ thu",
+    "grand_total:Currency~- Tiền phải trả",
+    {
+     "fieldname": "discount_requires_approval",
+     "fieldtype": "Check",
+     "label": "Cần duyệt chiết khấu",
+     "read_only": true,
+     "hidden": true,
+     "in_list_view": true
+    },
     "delivered_percentage:Percent~ Đã giao (%)",
     "billed_percentage:Percent~ Đã xuất hoá đơn (%)",
     "note:Small Text Ghi chú"

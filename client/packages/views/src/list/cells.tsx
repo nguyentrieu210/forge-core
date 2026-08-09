@@ -73,9 +73,12 @@ const TONE_CLS: Record<Tone, string> = {
 /** scMap prototype: Đang làm=blue · Chờ duyệt=amber · Hoàn thành=green · Quá hạn/Huỷ=red · Mở/Nháp=subtle. */
 export function statusTone(value: string): Tone {
   const v = value.toLowerCase();
+  // Tiến độ giao hàng của đơn: chưa giao là cảnh báo cần xử lý, giao một phần
+  // đang theo dõi, hoàn thành là thành công.
+  if (/(chưa giao|not delivered)/.test(v)) return "destructive";
   if (/(working|in progress|processing|đang|xử lý|transit|chuyển)/.test(v)) return "info";
   if (/(pending|chờ|quarantine|review|kiểm)/.test(v)) return "warning";
-  if (/(closed|completed|done|approved|paid|received|hoàn thành|đóng|duyệt|xong|đã nhận)/.test(v)) return "success";
+  if (/(closed|completed|done|approved|paid|received|delivered|hoàn thành|đóng|duyệt|xong|đã nhận|đã giao)/.test(v)) return "success";
   if (/(cancel|rejected|failed|overdue|error|hold|huỷ|hủy|từ chối|lỗi|quá hạn|giữ|discrepancy|lệch)/.test(v)) return "destructive";
   return "subtle";
 }
@@ -104,10 +107,23 @@ function CheckCell({ checked }: { checked: boolean }) {
   );
 }
 
+/** Tiến độ giao: 0% trung tính, đang giao màu cảnh báo, giao đủ màu thành công. */
+function DeliveryPercentage({ value, col, fmt }: { value: unknown; col: ListColumn; fmt?: BoundFormatters }) {
+  const percentage = Number(value ?? 0);
+  const text = formatValue(value, col, fmt) || "0%";
+  const tone = percentage >= 100
+    ? "border-success/25 bg-success/5 text-success-text"
+    : percentage > 0
+      ? "border-warning/30 bg-warning/12 text-warning-text"
+      : "border-destructive/25 bg-destructive/10 text-destructive-text";
+  return <span className={cn("inline-flex min-h-6 items-center justify-center rounded-full border px-2 py-0.5 text-[12px] font-semibold tabular-nums", tone)}>{text}</span>;
+}
+
 /** Render 1 cell (không gồm cột tiêu đề — cột đó ListView tự dựng link+avatar). */
 export function renderCell(value: unknown, col: ListColumn, fmt?: BoundFormatters) {
   if (col.isStatus) return <StatusBadge value={value == null ? "" : String(value)} optionLabels={col.optionLabels} />;
   if (col.fieldtype === "Check") return <CheckCell checked={Boolean(value)} />;
+  if (col.fieldname === "delivered_percentage") return <DeliveryPercentage value={value} col={col} fmt={fmt} />;
   // Select: ô lưu giá trị GỐC tiếng Anh ("Material Transfer"); đổi sang nhãn đã dịch KHI HIỆN,
   // không đụng tới giá trị. Đây là lý do danh sách trước đây vẫn đầy chữ Anh dù form đã dịch.
   if (col.fieldtype === "Select" && value != null && col.optionLabels) {

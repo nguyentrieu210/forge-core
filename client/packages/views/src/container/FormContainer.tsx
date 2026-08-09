@@ -7,6 +7,7 @@
  */
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { Download, Eye, Loader2 } from "lucide-react";
 import { resolveFormRenderPolicy, type Doc } from "@metaforge/core";
 import type { ListViewSnapshot } from "@metaforge/adapter-frappe";
 import { Button, ConfirmDialog, PromptDialog, toast, useT } from "@metaforge/ui";
@@ -19,6 +20,7 @@ import { stashDuplicate } from "./duplicate.js";
 import { recordRecentDoc } from "./recent-docs.js";
 import { SubmitPreviewDialog, type SubmitPreview } from "./SubmitPreviewDialog.js";
 import { AllocationTimelineDialog, type AllocationTimeline } from "./AllocationTimelineDialog.js";
+import { downloadPrintPdf } from "../print/downloadPdf.js";
 
 export interface FormContainerProps {
   doctype: string;
@@ -64,6 +66,7 @@ export function FormContainer(props: FormContainerProps) {
   const [allocationTimeline, setAllocationTimeline] = useState<AllocationTimeline | null>(null);
   const [allocationTimelineLoading, setAllocationTimelineLoading] = useState(false);
   const [allocationTimelineError, setAllocationTimelineError] = useState<string | null>(null);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
   const supportsAllocationTimeline = doctype === "Purchase Order" || doctype === "Purchase Receipt";
 
   useEffect(() => {
@@ -155,6 +158,34 @@ export function FormContainer(props: FormContainerProps) {
       return;
     }
     props.onClose();
+  };
+
+  const downloadSalesPdf = async () => {
+    if (downloadingPdf) return;
+    setDownloadingPdf(true);
+    try {
+      const pdf = await adapter.downloadPdf(doctype, name);
+      const href = URL.createObjectURL(pdf);
+      try {
+        const anchor = document.createElement("a");
+        anchor.href = href;
+        anchor.download = `${doctype}-${name}.pdf`;
+        anchor.click();
+      } finally {
+        URL.revokeObjectURL(href);
+      }
+      toast.success("Đã tải PDF");
+    } catch (error) {
+      try {
+        const html = await adapter.printHtml(doctype, name);
+        await downloadPrintPdf(html, `${doctype}-${name}.pdf`);
+        toast.success("Đã tải PDF");
+      } catch {
+        toast.error(error instanceof Error ? error.message : "Không thể tải PDF");
+      }
+    } finally {
+      setDownloadingPdf(false);
+    }
   };
 
   const onAction = async (kind: FormActionKind) => {
@@ -272,6 +303,17 @@ export function FormContainer(props: FormContainerProps) {
             headerActions={(
               <>
                 {props.headerActions}
+                {doctype === "Sales Order" && props.onPrint ? (
+                  <>
+                    <Button type="button" variant="outline" onClick={props.onPrint}>
+                      <Eye className="size-4" /> Xem thử bản in
+                    </Button>
+                    <Button type="button" variant="outline" disabled={downloadingPdf} onClick={() => void downloadSalesPdf()}>
+                      {downloadingPdf ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+                      {downloadingPdf ? "Đang tải…" : "Tải PDF"}
+                    </Button>
+                  </>
+                ) : null}
                 {supportsAllocationTimeline && Number(doc.docstatus ?? 0) !== 0 ? (
                   <Button
                     type="button"

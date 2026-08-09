@@ -131,36 +131,50 @@ export class SalesOrderController extends BaseController<SalesOrderData> {
     if (locksOrderPricing && !input.selling_price_list) throw errors.validation("Bảng giá áp dụng là bắt buộc");
     const orderDiscountPercentage = input.additional_discount_percentage ?? 0;
     const orderDiscountMicros = toScaledInt(orderDiscountPercentage, 6, "additional_discount_percentage");
-    const suppliedDiscountAmount = input.discount_amount === undefined
-      ? 0
-      : toScaledInt(input.discount_amount, 6, "discount_amount");
-    if (locksOrderPricing && orderDiscountMicros === 0 && suppliedDiscountAmount !== 0) {
-      throw errors.validation("Đơn hàng chỉ cho phép chiết khấu theo % toàn đơn");
-    }
     const currency = await resolveCurrencyContext(context, input.company, input.currency, input.transaction_date);
     const currencyScale = currency.transactionScale;
     const itemSnapshots = await applyUomConversion(context as unknown as ControllerContext<JsonObject>, input.items, { transactionKind: "sales" });
     const pricedItems = await applySellingPricing(context, itemSnapshots, input.selling_price_list, input.currency, input.transaction_date, input.customer, input.customer_group);
-    const totals = calculateSalesTotals(pricedItems, input.taxes ?? [], currencyScale, {
+    const discountPolicy = locksOrderPricing
+      ? await applyAlumdoorDiscountPolicy(context, pricedItems)
+      : { items: pricedItems, requiresApproval: false };
+    const totals = calculateSalesTotals(discountPolicy.items, input.taxes ?? [], currencyScale, {
       use_priced_quantity: true,
       apply_discount_on: locksOrderPricing ? "Net Total" : input.apply_discount_on,
       additional_discount_percentage: orderDiscountPercentage,
-      ...(locksOrderPricing ? {} : { discount_amount: input.discount_amount }),
+      // Alumdoor nhập % giảm tại từng dòng. UI cộng thành `discount_amount` ở đầu đơn
+      // để controller hạch toán đúng tiền phải trả; không còn ép chiết khấu toàn đơn.
+      discount_amount: input.discount_amount,
     });
+    // Phụ thu của Alumdoor là khoản cộng cố định trên đơn, sau VAT. Canonicalize bằng
+    // số nguyên theo đơn vị tiền để client không thể ghi tổng phải trả tùy ý.
+    const surchargeMinor = Math.max(0, toScaledInt(input.surcharge_amount ?? 0, currencyScale, "surcharge_amount"));
+    const adjustedTotals = surchargeMinor === 0 ? totals : {
+      ...totals,
+      surcharge_amount: fromScaledInt(surchargeMinor, currencyScale),
+      surcharge_amount_minor: surchargeMinor,
+      grand_total_minor: totals.grand_total_minor + surchargeMinor,
+      grand_total: fromScaledInt(totals.grand_total_minor + surchargeMinor, currencyScale),
+      rounded_total_minor: totals.rounded_total_minor + surchargeMinor,
+      rounded_total: fromScaledInt(totals.rounded_total_minor + surchargeMinor, currencyScale),
+    };
     // Master-data EXISTENCE is deliberately validated at submit, not while a
     // lightweight draft is being edited. The posting gate remains authoritative.
     if (context.command.action === "submit") {
       await assertMasterData(context, [
         ["Company", input.company], ["Customer", input.customer], ["Currency", input.currency],
-        ...totals.items.map((item): [string, string] => ["Item", item.item_code]),
-        ...totals.taxes.map((tax): [string, string] => ["Account", tax.account]),
+        ...adjustedTotals.items.map((item): [string, string] => ["Item", item.item_code]),
+        ...adjustedTotals.taxes.map((tax): [string, string] => ["Account", tax.account]),
       ]);
     }
     return {
       ...input,
+      // Đơn cũ có thể còn giảm giá ở đầu đơn. Từ nay cả kiểu giảm đó cũng phải đi duyệt,
+      // vì chính sách Alumdoor chỉ cho phép 15% trên dòng Cửa Đức, 0% ở dòng khác.
+      discount_requires_approval: discountPolicy.requiresApproval || orderDiscountMicros !== 0,
       currency_scale: currencyScale,
-      ...totals,
-      ...baseTotals(totals, currency, currencyScale),
+      ...adjustedTotals,
+      ...baseTotals(adjustedTotals, currency, currencyScale),
       company_currency: currency.companyCurrency,
       company_currency_scale: currency.companyScale,
       conversion_rate: fromScaledInt(currency.rateMicros, 6),
@@ -184,6 +198,31 @@ export class SalesOrderController extends BaseController<SalesOrderData> {
     if (context.command.action === "cancel") return ["sales_order.cancelled", "sales_order.status_changed"];
     return ["sales_order.updated"];
   }
+}
+
+/**
+ * Chính sách chiết khấu của Alumdoor được suy từ Item master, không tin `door_type` do client gửi:
+ * Cửa Đức mặc định 15%, các mặt hàng còn lại 0%. Mức khác vẫn được giữ để người có quyền duyệt
+ * quyết định, đồng thời cờ trên đầu đơn được máy chủ ghi lại cho danh sách và audit.
+ */
+async function applyAlumdoorDiscountPolicy(
+  context: ControllerContext<SalesOrderData>,
+  items: SalesItem[],
+): Promise<{ items: SalesItem[]; requiresApproval: boolean }> {
+  let requiresApproval = false;
+  const normalized = await Promise.all(items.map(async (item) => {
+    const master = await context.reader.getMasterRecordData(context.command.tenant_id, "Item", item.item_code);
+    const expectedMicros = String(master?.door_type ?? "").trim() === "Cửa Đức" ? 15_000_000 : 0;
+    const requestedMicros = item.discount_percentage === undefined || item.discount_percentage === null || item.discount_percentage === ""
+      ? expectedMicros
+      : toScaledInt(item.discount_percentage, 6, "discount_percentage");
+    if (requestedMicros < 0 || requestedMicros > 100_000_000) {
+      throw errors.validation("discount_percentage must be from 0 to 100");
+    }
+    if (requestedMicros !== expectedMicros) requiresApproval = true;
+    return { ...item, discount_percentage: fromScaledInt(requestedMicros, 6) };
+  }));
+  return { items: normalized, requiresApproval };
 }
 
 export class DeliveryNoteController extends BaseController<DeliveryNoteData> {

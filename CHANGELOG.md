@@ -1,5 +1,26 @@
 # CHANGELOG
 
+## Unreleased
+
+### Added
+
+- Nút `+` cạnh các trường liên kết có thể tạo mới, mở đúng biểu mẫu tạo nhanh và tự chọn bản ghi vừa lưu.
+
+### Changed
+
+- The sales-line mesh-height field appears only for Cửa Lưới.
+- Sales Orders now select the latest active price list for the customer's price group, while preserving a manual override.
+- Renamed the Item tracking section to “Quản lý lô & serial”.
+- The Item tracking section hides expiry, negative-stock, origin/specification, and per-item valuation fields while retaining BOM, lot, serial, and retirement controls.
+- Form checkboxes stay square even when the touch-density layout is enabled.
+- The Item identity section now retains only the allowed-colors table.
+- The Item form no longer shows the unused catch-weight setting.
+- The Item list's Item Group filter now shows only active leaf groups, matching the Item form.
+
+- Ẩn các dòng mô tả phụ của trường trên toàn bộ biểu mẫu để bố cục gọn và cân bằng hơn.
+- Dòng hàng Đơn hàng không còn đọc `Item.default_warehouse`; kho xuất chỉ lấy từ lựa chọn của chứng từ/dòng hàng.
+- Ô chọn Nhóm hàng của Mặt hàng chỉ hiển thị nhóm lá đang hoạt động, không còn nhóm cha.
+
 ## 0.2.0 — Enterprise Parallel Baseline — 2026-08-03
 
 ### Added

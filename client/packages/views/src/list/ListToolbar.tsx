@@ -39,7 +39,7 @@ export interface ListToolbarProps {
   /** Xuất toàn bộ kết quả đang lọc; luôn nằm trên toolbar, không bắt buộc chọn dòng trước. */
   onExport?: (format: ExportFormat) => void;
   exporting?: boolean;
-  searchLink?: (doctype: string, text: string) => Promise<Array<{ value: string; description?: string }>>;
+  searchLink?: (doctype: string, text: string, opts?: { filters?: Record<string, unknown> | Array<unknown> }) => Promise<Array<{ value: string; description?: string }>>;
   density?: "comfortable" | "compact";
   onDensityChange?: (d: "comfortable" | "compact") => void;
   /** Khôi phục đồng thời thứ tự, cột ẩn, bề rộng, mật độ và gom nhóm. */
@@ -314,13 +314,13 @@ function FilterControl({ filter, value, onChange, searchLink }: { filter: Standa
     );
   }
   if (filter.fieldtype === "Link" && filter.linkDoctype && searchLink) {
-    return <LinkFilter label={filter.label} doctype={filter.linkDoctype} value={value} onChange={onChange} search={searchLink} />;
+    return <LinkFilter label={filter.label} doctype={filter.linkDoctype} filters={filter.linkFilters} value={value} onChange={onChange} search={searchLink} />;
   }
   // Data/khác → input lọc (debounce nhẹ)
   return <FilterInput label={filter.label} value={value} onChange={onChange} />;
 }
 
-function LinkFilter({ label, doctype, value, onChange, search }: { label: string; doctype: string; value: string; onChange: (value: string) => void; search: NonNullable<ListToolbarProps["searchLink"]> }) {
+function LinkFilter({ label, doctype, filters, value, onChange, search }: { label: string; doctype: string; filters?: Record<string, unknown> | Array<unknown>; value: string; onChange: (value: string) => void; search: NonNullable<ListToolbarProps["searchLink"]> }) {
   const t = useT();
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
@@ -334,12 +334,12 @@ function LinkFilter({ label, doctype, value, onChange, search }: { label: string
     const current = ++seq.current;
     const timer = setTimeout(() => {
       setLoading(true);
-      void search(doctype, text).then((result) => {
+      void search(doctype, text, { filters }).then((result) => {
         if (seq.current === current) setItems(result);
       }).catch(() => { if (seq.current === current) setItems([]); }).finally(() => { if (seq.current === current) setLoading(false); });
     }, 200);
     return () => clearTimeout(timer);
-  }, [open, text, doctype, search]);
+  }, [open, text, doctype, filters, search]);
   return <Popover open={open} onOpenChange={setOpen}>
     <PopoverTrigger asChild><Button type="button" variant="outline" className="h-8 min-w-[8rem] max-w-[12rem] justify-between font-normal"><span className="truncate">{value ? (selectedLabel || value) : label}</span><ChevronsUpDown className="ml-2 size-3.5 opacity-50" /></Button></PopoverTrigger>
     <PopoverContent align="start" className="w-72 p-0"><Command shouldFilter={false}><CommandInput value={text} onValueChange={setText} placeholder={`${t("common.search").replace("…", "")} ${label.toLowerCase()}…`} /><CommandList>

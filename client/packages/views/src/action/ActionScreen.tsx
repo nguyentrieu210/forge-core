@@ -281,8 +281,6 @@ export function ActionScreen({ action, onOpen }: ActionScreenProps) {
 
   return (
     <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4" data-action-screen={action.name}>
-      {action.description ? <p className="text-sm text-muted-foreground">{action.description}</p> : null}
-
       <section className="rounded-xl border bg-card p-4" aria-label="Thông tin thao tác">
         {standardFields.length ? (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -312,7 +310,6 @@ export function ActionScreen({ action, onOpen }: ActionScreenProps) {
                         value={String(values[field.fieldname] ?? "")}
                         onChange={(event) => changeValue(field.fieldname, event.target.value)}
                       />}
-                  {field.description ? <p className="text-xs text-muted-foreground">{field.description}</p> : null}
                 </div>
               );
             })}
@@ -442,7 +439,6 @@ function BulkTransactionGrid({ actionName, field, spec, rows, onChange, registry
           <div className="text-sm font-semibold">
             {field.label}{field.required ? <span className="ml-0.5 text-destructive">*</span> : null}
           </div>
-          {field.description ? <p className="mt-1 text-xs text-muted-foreground">{field.description}</p> : null}
         </div>
         <Button type="button" variant="outline" size="sm" disabled={effectiveRows.length >= spec.maxRows} onClick={addRow}>
           Thêm dòng

@@ -10,6 +10,7 @@ import { Printer, ArrowLeft, Minus, Plus, RotateCcw, RefreshCw, Download, Loader
 import { Button, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, toast, useT } from "@metaforge/ui";
 import { useMetaForge } from "../container/provider.js";
 import { PrintView } from "./PrintView.js";
+import { downloadPrintPdf } from "./downloadPdf.js";
 
 export interface PrintContainerProps {
   doctype: string;
@@ -87,7 +88,13 @@ export function PrintContainer({ doctype, name, format, onFormatChange, onBack }
       }
       toast.success("Đã tạo file PDF");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Không thể tạo file PDF");
+      try {
+        const html = printQ.data ?? await adapter.printHtml(doctype, name, selectedFormat);
+        await downloadPrintPdf(html, `${doctype}-${name}.pdf`);
+        toast.success("Đã tạo file PDF");
+      } catch {
+        toast.error(error instanceof Error ? error.message : "Không thể tạo file PDF");
+      }
     } finally {
       setDownloading(false);
     }

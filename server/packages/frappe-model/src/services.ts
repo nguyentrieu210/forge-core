@@ -409,6 +409,30 @@ export function renderPrintFormat(format: PrintFormatMeta, document: CanonicalDo
     template.replace(/{{\s*([a-zA-Z0-9_.]+)\s*(?:\|\s*([a-z0-9]+)\s*)?}}/g, (_match, path: string, filter?: string) =>
       escapeHtml(applyFilter(resolvePath(scope, path), filter, locale)));
 
+  // Optional visual blocks, limited to a plain field path rather than arbitrary
+  // expressions. This lets a sales print show the discount row only when it exists.
+  const renderConditionals = (template: string, scope: Record<string, JsonValue>): string => template.replace(
+    /{{#if\s+([a-zA-Z0-9_.]+)\s*}}([\s\S]*?){{\/if}}/g,
+    (_match, path: string, body: string) => {
+      const value = resolvePath(scope, path);
+      return value === "" || value === "0" || value === "false" ? "" : body;
+    },
+  );
+
+  // A table column is visible when at least one child row has its corresponding
+  // value. This mirrors the child grid rule that removes an all-inapplicable
+  // column (for example, mesh height on an order without a mesh door).
+  const renderAnyRowConditionals = (template: string): string => template.replace(
+    /{{#(ifAny|ifNone)\s+([a-zA-Z0-9_]+)\.([a-zA-Z0-9_]+)\s*}}([\s\S]*?){{\/\1}}/g,
+    (_match, kind: string, table: string, field: string, body: string) => {
+      const hasValue = (tables.get(table) ?? []).some((row) => {
+        const value = row[field];
+        return value !== undefined && value !== null && value !== "" && value !== 0 && value !== false;
+      });
+      return (kind === "ifAny" ? hasValue : !hasValue) ? body : "";
+    },
+  );
+
   /**
    * `{{#each items}} … {{/each}}` — one pass, not nested.
    *
@@ -418,12 +442,15 @@ export function renderPrintFormat(format: PrintFormatMeta, document: CanonicalDo
    * table is the one construct a document genuinely needs; `{{ _index }}` gives the line
    * number, and a row field shadows the parent document's field of the same name.
    */
-  const expanded = format.html.replace(/{{#each\s+([a-zA-Z0-9_]+)\s*}}([\s\S]*?){{\/each}}/g, (_match, field: string, body: string) =>
+  const expanded = renderAnyRowConditionals(format.html).replace(/{{#each\s+([a-zA-Z0-9_]+)\s*}}([\s\S]*?){{\/each}}/g, (_match, field: string, body: string) =>
     (tables.get(field) ?? [])
-      .map((row, index) => interpolate(body, { ...context, ...(row as Record<string, JsonValue>), _index: index + 1 }))
+      .map((row, index) => {
+        const rowScope = { ...context, ...(row as Record<string, JsonValue>), _index: index + 1 };
+        return interpolate(renderConditionals(body, rowScope), rowScope);
+      })
       .join(""));
 
-  return `<!doctype html><html><head><meta charset="utf-8"><style>${format.css ?? ""}</style></head><body>${interpolate(expanded, context)}</body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><style>${format.css ?? ""}</style></head><body>${interpolate(renderConditionals(expanded, context), context)}</body></html>`;
 }
 
 /**
@@ -435,22 +462,23 @@ export function renderPrintFormat(format: PrintFormatMeta, document: CanonicalDo
  * built here and never passes through it.
  */
 function applyFilter(value: string, filter: string | undefined, locale: string): string {
-  if (!filter || value === "") return value;
+  const printable = filter === "money0" && value === "" ? "0" : value;
+  if (!filter || printable === "") return printable;
   if (filter === "qrcode") {
     const qr = qrcode(0, "M");
-    qr.addData(value, "Byte");
+    qr.addData(printable, "Byte");
     qr.make();
     return qr.createDataURL(3, 2);
   }
-  if (filter === "money" || filter === "number" || filter === "number2") {
-    const parsed = Number(value);
-    if (!Number.isFinite(parsed)) return value;
-    const fractionDigits = filter === "money" ? 0 : filter === "number2" ? 2 : Math.min(4, (value.split(".")[1] ?? "").length);
+  if (filter === "money" || filter === "money0" || filter === "number" || filter === "number2") {
+    const parsed = Number(printable);
+    if (!Number.isFinite(parsed)) return printable;
+    const fractionDigits = filter === "money" || filter === "money0" ? 0 : filter === "number2" ? 2 : Math.min(4, (printable.split(".")[1] ?? "").length);
     return new Intl.NumberFormat(locale.startsWith("vi") ? "vi-VN" : locale, { minimumFractionDigits: fractionDigits, maximumFractionDigits: fractionDigits }).format(parsed);
   }
   if (filter === "date") {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return value;
+    const date = new Date(printable);
+    if (Number.isNaN(date.getTime())) return printable;
     const pad = (part: number) => String(part).padStart(2, "0");
     return `${pad(date.getUTCDate())}-${pad(date.getUTCMonth() + 1)}-${date.getUTCFullYear()}`;
   }

@@ -81,6 +81,16 @@ export function NumberControl(p: FieldControlProps) {
   if (p.masked) return <Masked />;
   const step = p.field.fieldtype === "Int" ? "1" : "any";
   const suffix = p.field.fieldtype === "Percent" ? "%" : undefined;
+  // Bảng bán hàng dùng VNĐ: giá và thành tiền luôn là số nguyên. Chuẩn hoá ngay
+  // tại control để dữ liệu nhập tay cũng không còn phần thập phân.
+  const compactVnd = p.compact && p.field.fieldtype === "Currency";
+  const numericProps: FieldControlProps = compactVnd
+    ? {
+        ...p,
+        field: { ...p.field, precision: "0" },
+        onChange: (value) => p.onChange(value === null || value === "" ? null : Math.round(Number(value))),
+      }
+    : p;
 
   /**
    * Ô CHỈ ĐỌC hiện chữ đã định dạng, không dùng ô nhập kiểu number của trình duyệt.
@@ -92,10 +102,12 @@ export function NumberControl(p: FieldControlProps) {
   const fmt = p.services?.fmt;
   if (p.readOnly && fmt && p.value !== null && p.value !== undefined && p.value !== "") {
     const ft = p.field.fieldtype;
-    const rawPrecision = p.field.precision;
+    const rawPrecision = numericProps.field.precision;
     const prec = rawPrecision !== undefined && rawPrecision !== null && rawPrecision !== ""
       ? Number(rawPrecision) : undefined;
-    const text = ft === "Currency" ? fmt.currency(p.value as number, prec)
+    // Trong bảng con, đơn vị tiền đã được ghi rõ ở tiêu đề cột. Không lặp ký hiệu
+    // trong ô vì cột hẹp sẽ đẩy "đ" xuống dòng, làm lệch cả hàng.
+    const text = ft === "Currency" && !p.compact ? fmt.currency(p.value as number, prec)
       : ft === "Int" ? fmt.number(p.value as number, 0)
       : fmt.number(p.value as number, prec);
     return (
@@ -109,7 +121,7 @@ export function NumberControl(p: FieldControlProps) {
   }
 
   // `step` chỉ còn nghĩa với ô number; ô tiền/số thực dùng ô văn bản có nhóm hàng nghìn.
-  if (fmt && p.field.fieldtype !== "Int") return <GroupedNumberInput {...p} suffix={suffix} />;
+  if (fmt && p.field.fieldtype !== "Int") return <GroupedNumberInput {...numericProps} suffix={suffix} />;
 
   return (
     <div className="relative">
@@ -325,7 +337,9 @@ export function CheckControl(p: FieldControlProps) {
     <div className="flex h-9 items-center">
       <Checkbox
         id={labelId(p)}
-        className="mf-control"
+        // `!size-4` giữ ô tick luôn vuông 16px, kể cả khi người dùng chọn mật độ
+        // "chạm" (quy tắc chung tăng chiều cao button cho vùng bấm, không áp dụng cho glyph).
+        className="mf-control !size-4"
         checked={Boolean(p.value)}
         disabled={p.readOnly}
         aria-invalid={p.error ? true : undefined}
@@ -453,6 +467,7 @@ function LinkDiagnostic({ id, tone, children }: { id: string; tone: "error" | "w
  */
 export function LinkControl(p: FieldControlProps) {
   const t = useT();
+  const [creatingFromField, setCreatingFromField] = useState(false);
   if (p.masked) return <Masked />;
   const isDynamic = p.field.fieldtype === "Dynamic Link";
   const target = p.linkTarget ?? (isDynamic ? undefined : p.field.options);
@@ -503,25 +518,58 @@ export function LinkControl(p: FieldControlProps) {
   }
 
   const filters = buildLinkFilters(p.field, p.docValues);
+  // Nút cộng cạnh ô Link là lối vào rõ ràng cho thao tác tạo danh mục ngay khi
+  // đang nhập form. Dùng chính quickCreate trung tâm (và form/permission thật)
+  // thay vì tự dựng form nhỏ tại control, nên sau khi lưu vẫn trả về đúng name
+  // để chọn lại ở form đang mở.
+  const canCreateFromField = Boolean(p.services?.quickCreate) && !p.readOnly && !p.compact;
+  const createFromField = async () => {
+    if (!p.services?.quickCreate || creatingFromField) return;
+    setCreatingFromField(true);
+    try {
+      const name = await p.services.quickCreate(target);
+      if (name) p.onChange(name);
+    } finally {
+      setCreatingFromField(false);
+    }
+  };
   return (
-    <LinkCombobox
-      id={id}
-      value={value}
-      target={target}
-      search={search}
-      resolveDisplay={p.services?.resolveDisplay}
-      quickCreate={p.services?.quickCreate}
-      getMeta={p.services?.getMeta}
-      filters={filters}
-      referenceDoctype={p.parentDoctype}
-      readOnly={p.readOnly}
-      error={p.error}
-      describedBy={p.describedBy}
-      required={p.required}
-      label={p.label}
-      {...(p.compact ? { compact: true } : {})}
-      onChange={(v) => p.onChange(v)}
-    />
+    <div className="flex min-w-0 items-center gap-2">
+      <div className="min-w-0 flex-1">
+        <LinkCombobox
+          id={id}
+          value={value}
+          target={target}
+          search={search}
+          resolveDisplay={p.services?.resolveDisplay}
+          quickCreate={p.services?.quickCreate}
+          getMeta={p.services?.getMeta}
+          filters={filters}
+          referenceDoctype={p.parentDoctype}
+          readOnly={p.readOnly}
+          error={p.error}
+          describedBy={p.describedBy}
+          required={p.required}
+          label={p.label}
+          {...(p.compact ? { compact: true } : {})}
+          onChange={(v) => p.onChange(v)}
+        />
+      </div>
+      {canCreateFromField ? (
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="size-11 shrink-0 md:size-9"
+          aria-label={`${t("control.link_create_new")} ${p.label ?? target}`}
+          title={`${t("control.link_create_new")} ${p.label ?? target}`}
+          disabled={creatingFromField}
+          onClick={() => { void createFromField(); }}
+        >
+          {creatingFromField ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Plus className="size-4" aria-hidden="true" />}
+        </Button>
+      ) : null}
+    </div>
   );
 }
 

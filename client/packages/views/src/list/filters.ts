@@ -5,7 +5,7 @@
  *  - buildServerQuery: ListState → ListOpts cho adapter.getList (server-side, tập lớn).
  *  - applyClientQuery: lọc/sắp/trang IN-MEMORY cho mock (demo) — cùng ngữ nghĩa server.
  */
-import type { DocTypeMeta, DocField, Doc, ListOpts, Fieldtype, FilterOperator } from "@metaforge/core";
+import { buildLinkFilters, type DocTypeMeta, type DocField, type Doc, type ListOpts, type Fieldtype, type FilterOperator } from "@metaforge/core";
 import { deriveColumns, isStatusField, type ListColumn } from "./columns.js";
 
 export interface StandardFilter {
@@ -15,6 +15,8 @@ export interface StandardFilter {
   /** cho Select: các lựa chọn (đã tách \n). */
   options?: string[];
   linkDoctype?: string;
+  /** Bộ lọc Link khai báo trong DocType (ví dụ chỉ chọn nhóm lá). */
+  linkFilters?: Record<string, unknown> | Array<unknown>;
 }
 
 export interface ListState {
@@ -58,6 +60,7 @@ export function deriveStandardFilters(meta: DocTypeMeta): StandardFilter[] {
       fieldtype: f.fieldtype,
       options: f.fieldtype === "Select" ? splitOptions(f.options) : undefined,
       linkDoctype: f.fieldtype === "Link" ? f.options : undefined,
+      linkFilters: f.fieldtype === "Link" ? buildLinkFilters(f, {}) : undefined,
     });
   }
   return out;

@@ -169,6 +169,7 @@ export function FormView(props: FormViewProps) {
     return [...names];
   }, [meta, fetchRules]);
   const reactiveValues = useWatch({ control: form.control, name: reactiveFields });
+  const salesOrderItems = useWatch({ control: form.control, name: "items", disabled: meta.name !== "Sales Order" }) as Array<Record<string, unknown>> | undefined;
   const values = useMemo(() => {
     const current = { ...form.getValues() };
     reactiveFields.forEach((fieldname, index) => {
@@ -176,6 +177,22 @@ export function FormView(props: FormViewProps) {
     });
     return current;
   }, [form, reactiveFields, reactiveValues]);
+
+  // Cờ này chỉ là trạng thái tổng hợp của các dòng: hệ thống tự lưu để danh sách biết đơn nào
+  // cần duyệt, nhưng không để người dùng tự bật/tắt. Server sẽ tính lại khi ghi chứng từ.
+  useEffect(() => {
+    if (meta.name !== "Sales Order") return;
+    // Mở đơn cũ chưa có cờ này không được tự biến thành một lần sửa. Khi người dùng sửa dòng
+    // hàng, `items` đã làm form dirty rồi thì mới đồng bộ cờ đi kèm vào lần lưu đó.
+    if (!form.formState.isDirty) return;
+    const requiresApproval = (salesOrderItems ?? []).some((item) => {
+      const expected = String(item.door_type ?? "").trim() === "Cửa Đức" ? 15 : 0;
+      return Number(item.discount_percentage ?? 0) !== expected;
+    });
+    if (Boolean(form.getValues("discount_requires_approval")) !== requiresApproval) {
+      form.setValue("discount_requires_approval", requiresApproval, { shouldDirty: true });
+    }
+  }, [form, form.formState.isDirty, meta.name, salesOrderItems]);
 
   // Ctrl/Cmd+S = Lưu (chặn hộp thoại lưu trang mặc định của trình duyệt). Đọc isDirty/onValid MỚI
   // NHẤT qua ref — đăng ký listener 1 lần, không tái đăng ký mỗi phím gõ.
@@ -233,6 +250,42 @@ export function FormView(props: FormViewProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [values, fetchRules, services, doc.name, doc.modified]);
 
+  // Đơn bán: khi đổi khách, tự lấy bảng giá còn hiệu lực mới nhất đúng Nhóm giá.
+  // Người dùng vẫn có thể đổi Bảng giá áp dụng sau đó cho trường hợp báo giá đặc biệt.
+  const autoPriceListKey = useRef("");
+  useEffect(() => {
+    if (props.meta.name !== "Sales Order" || !services?.fetchDocument || !services.searchLink) return;
+    const customer = String(values.customer ?? "").trim();
+    if (!customer) return;
+    const date = String(values.transaction_date ?? "").trim();
+    const key = `${customer}\u0000${date}`;
+    // Chỉ tự chọn bảng giá khi người dùng đang lập đơn hoặc vừa đổi khách/ngày.
+    // Nếu chạy ngay lúc mở chứng từ cũ, setValue bên dưới sẽ biến một bản ghi
+    // vừa tải thành dirty và làm nút Lưu tự xuất hiện.
+    if (!props.isNew && !form.formState.isDirty) {
+      autoPriceListKey.current = key;
+      return;
+    }
+    if (autoPriceListKey.current === key) return;
+    autoPriceListKey.current = key;
+    void services.fetchDocument("Customer", customer).then(async (customerDoc) => {
+      const group = String(customerDoc.price_group ?? "").trim();
+      if (!group) return;
+      form.setValue("customer_group", group as never, { shouldDirty: true });
+      const preferred = String(customerDoc.default_price_list ?? "").trim();
+      if (preferred) { form.setValue("selling_price_list", preferred as never, { shouldDirty: true }); return; }
+      // Không truyền filter xuống Link search: metadata vừa được mở rộng có thể còn nằm
+      // trong cache của worker. Lọc sau khi đọc bản ghi giúp chọn bảng giá vẫn ổn định.
+      const candidates = await services.searchLink!("Price List", "", { pageLength: 100 });
+      const records = await Promise.all(candidates.map(async (candidate) => ({ name: candidate.value, doc: await services.fetchDocument!("Price List", candidate.value) })));
+      const eligible = records.filter(({ doc: priceList }) => String(priceList.price_group ?? "").trim() === group
+        && !Boolean(priceList.disabled)
+        && (!date || !String(priceList.effective_date ?? "") || String(priceList.effective_date) <= date));
+      eligible.sort((left, right) => String(right.doc.effective_date ?? "").localeCompare(String(left.doc.effective_date ?? "")));
+      if (eligible[0]) form.setValue("selling_price_list", eligible[0].name as never, { shouldDirty: true });
+    }).catch(() => { /* Không chặn lập đơn nếu dữ liệu bảng giá chưa hoàn chỉnh. */ });
+  }, [props.meta.name, values.customer, values.transaction_date, services, form]);
+
   /**
    * Tổng chứng từ cộng lại NGAY khi gõ, không đợi lưu.
    *
@@ -252,7 +305,7 @@ export function FormView(props: FormViewProps) {
       table: table.fieldname,
       sumAmount: has("grand_total"),
       sumQty: has("total_qty"),
-      orderDiscount: meta.name === "Sales Order" && has("additional_discount_percentage"),
+      salesSummary: meta.name === "Sales Order" && has("total_amount") && has("vat_rate") && has("vat_amount") && has("surcharge_amount"),
       discountAmount: has("discount_amount"),
     };
   }, [meta]);
@@ -271,12 +324,23 @@ export function FormView(props: FormViewProps) {
           const rate = Number(row.rate);
           return sum + (Number.isFinite(qty) && Number.isFinite(rate) ? qty * rate : 0);
         }, 0));
-        const rawPercentage = totalFields.orderDiscount ? Number(current.additional_discount_percentage ?? 0) : 0;
-        const percentage = Number.isFinite(rawPercentage) ? Math.min(100, Math.max(0, rawPercentage)) : 0;
-        const discount = round(subtotal * percentage / 100);
-        const grandTotal = round(subtotal - discount);
-        if (totalFields.discountAmount && Number(current.discount_amount ?? 0) !== discount) {
-          form.setValue("discount_amount", discount as never, { shouldDirty: false });
+        const lineDiscount = totalFields.salesSummary
+          ? round(rows.reduce((sum, rawRow) => sum + Math.max(0, Number((rawRow as Doc).discount_amount) || 0), 0))
+          : 0;
+        const rawVatRate = totalFields.salesSummary ? Number(current.vat_rate ?? 0) : 0;
+        const vatRate = Number.isFinite(rawVatRate) ? Math.min(100, Math.max(0, rawVatRate)) : 0;
+        const netBeforeVat = round(subtotal - lineDiscount);
+        const vatAmount = round(netBeforeVat * vatRate / 100);
+        const surcharge = totalFields.salesSummary ? Math.max(0, Number(current.surcharge_amount ?? 0) || 0) : 0;
+        const grandTotal = totalFields.salesSummary ? round(netBeforeVat + vatAmount + surcharge) : subtotal;
+        if (totalFields.salesSummary && Number(current.total_amount ?? 0) !== subtotal) {
+          form.setValue("total_amount", subtotal as never, { shouldDirty: false });
+        }
+        if (totalFields.discountAmount && Number(current.discount_amount ?? 0) !== lineDiscount) {
+          form.setValue("discount_amount", lineDiscount as never, { shouldDirty: false });
+        }
+        if (totalFields.salesSummary && Number(current.vat_amount ?? 0) !== vatAmount) {
+          form.setValue("vat_amount", vatAmount as never, { shouldDirty: false });
         }
         if (Number(current.grand_total ?? 0) !== grandTotal) {
           form.setValue("grand_total", grandTotal as never, { shouldDirty: false });
@@ -292,7 +356,7 @@ export function FormView(props: FormViewProps) {
       if (!info.name
         || info.name === totalFields.table
         || info.name.startsWith(`${totalFields.table}.`)
-        || (totalFields.orderDiscount && info.name === "additional_discount_percentage")) {
+        || (totalFields.salesSummary && (info.name === "vat_rate" || info.name === "surcharge_amount"))) {
         updateTotals(next as FieldValues);
       }
     });
@@ -529,7 +593,16 @@ export function FormView(props: FormViewProps) {
               ),
             );
             return (
-              <section key={si} className="mf-form-section py-3">
+              <section
+                key={si}
+                className={cn(
+                  "mf-form-section py-3",
+                  // Khối thanh toán của đơn bán là phần để chốt với khách, đặt gọn ở giữa
+                  // thay vì kéo hết ngang form như các trường nhập liệu thông thường.
+                  meta.name === "Sales Order" && section.label === "Tổng kết"
+                    && "w-full rounded-lg border bg-muted/10 px-4 md:ml-auto md:max-w-[36rem] [&_.mf-form-grid]:justify-center [&_.mf-field]:text-center [&_.mf-field>label]:text-center [&_.mf-control]:justify-center [&_input]:text-center",
+                )}
+              >
                 <div className="mf-section-heading mb-3 flex items-center gap-3">
                   <h3 className="shrink-0 text-[15px] font-semibold tracking-[-0.01em] text-foreground">
                     {section.label || t("form.section_general", "Thông tin chung")}
@@ -625,8 +698,8 @@ function Field({ id, rf, width, form, registry, services, docName, parentDoctype
       control={form.control}
       render={({ field: f, fieldState }) => {
         // Check = ô tick: nhãn phải nằm NGAY BÊN PHẢI ô tick trên cùng một dòng (như ERPNext Desk).
-        // Bố cục dọc dùng chung cho mọi field khiến ô tick 16px rơi xuống dưới nhãn + mô tả, trông
-        // như một field bị lỗi và chiếm gấp 3 chiều cao cần thiết.
+        // Nhãn phải nằm cùng hàng với ô tick; xếp dọc khiến ô tick 16px rơi xuống dưới nhãn,
+        // trông như một field bị lỗi và chiếm gấp chiều cao cần thiết.
         const isCheck = field.fieldtype === "Check";
         const control = (
           <Control
@@ -637,7 +710,7 @@ function Field({ id, rf, width, form, registry, services, docName, parentDoctype
             readOnly={rf.readOnly}
             masked={rf.masked}
             error={fieldState.error?.message}
-            describedBy={[descriptionId(field, id), fieldState.error ? `${id}-error` : undefined].filter(Boolean).join(" ") || undefined}
+            describedBy={fieldState.error ? `${id}-error` : undefined}
             required={rf.required}
             label={field.label ?? field.fieldname}
             services={services}
@@ -654,10 +727,6 @@ function Field({ id, rf, width, form, registry, services, docName, parentDoctype
             {rf.required ? <span className="mf-required ml-0.5 text-destructive" aria-hidden="true">*</span> : null}
           </>
         );
-        {/* field.description (Frappe help text) — ERPNext Desk luôn hiện dòng chú thích này. */}
-        const description = typeof field.description === "string" && field.description
-          ? <p id={`${id}-desc`} className="text-[11px] leading-snug text-muted-foreground">{field.description}</p>
-          : null;
         const wrapper = cn(
           "mf-field",
           /**
@@ -683,7 +752,6 @@ function Field({ id, rf, width, form, registry, services, docName, parentDoctype
                 <div className="flex shrink-0 items-center">{control}</div>
                 <div className="min-w-0 flex-1">
                   <label htmlFor={id} className="block cursor-pointer text-[13px] font-medium leading-5 text-foreground">{label}</label>
-                  {description}
                 </div>
               </div>
               {fieldState.error ? <span id={`${id}-error`} className="mt-1 block text-xs text-destructive" role="alert">{fieldState.error.message}</span> : null}
@@ -700,7 +768,6 @@ function Field({ id, rf, width, form, registry, services, docName, parentDoctype
               Đưa về gần màu chữ chính và tăng một bậc cỡ chữ.
             */}
             <label htmlFor={id} className="text-[13px] font-medium leading-tight text-foreground">{label}</label>
-            {description ? <div className="-mt-0.5">{description}</div> : null}
             {control}
             {fieldState.error ? <span id={`${id}-error`} className="text-xs text-destructive" role="alert">{fieldState.error.message}</span> : null}
           </div>
@@ -708,8 +775,4 @@ function Field({ id, rf, width, form, registry, services, docName, parentDoctype
       }}
     />
   );
-}
-
-function descriptionId(field: ResolvedField["field"], id: string): string | undefined {
-  return typeof field.description === "string" && field.description ? `${id}-desc` : undefined;
 }

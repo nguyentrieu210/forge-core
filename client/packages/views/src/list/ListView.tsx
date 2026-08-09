@@ -37,6 +37,10 @@ import type { ExportFormat } from "../report/export.js";
 
 export interface ListViewProps {
   meta: DocTypeMeta;
+  /** Cột được bổ sung theo ngữ cảnh nghiệp vụ (ví dụ trạng thái giao suy ra từ % giao). */
+  columns?: ListColumn[];
+  /** Căn giữa tiêu đề và giá trị khi cấu hình màn hình yêu cầu. */
+  centerContent?: boolean;
   rows: Doc[];
   total?: number;
   loading?: boolean;
@@ -51,6 +55,14 @@ export interface ListViewProps {
   onBulkDelete?: (names: string[]) => void;
   /** Xoá một bản ghi ngay trên dòng/card; container chịu trách nhiệm xác nhận. */
   onDelete?: (name: string) => void;
+  /** Duyệt một chứng từ nháp; container phải dùng luồng submit có kiểm quyền từ máy chủ. */
+  onApprove?: (name: string) => void;
+  /** Điều kiện nghiệp vụ theo từng dòng để hiện Duyệt. */
+  canApprove?: (row: Doc) => boolean;
+  /** Đánh dấu một dòng có cảnh báo nghiệp vụ. */
+  isWarningRow?: (row: Doc) => boolean;
+  /** Tên chứng từ đang duyệt để khoá nút, tránh bấm duyệt trùng. */
+  approvingName?: string | null;
   onExport?: (names: string[], visibleFields: string[], format: ExportFormat) => void;
   exporting?: boolean;
   title?: string;
@@ -62,7 +74,7 @@ export interface ListViewProps {
   roles?: string[];
   /** doctype::name → title đã resolve cho Link cells. */
   displayValues?: Record<string, string>;
-  searchLink?: (doctype: string, text: string) => Promise<Array<{ value: string; description?: string }>>;
+  searchLink?: (doctype: string, text: string, opts?: { filters?: Record<string, unknown> | Array<unknown> }) => Promise<Array<{ value: string; description?: string }>>;
   /** Sửa nhanh một field ngay trên danh sách (Select). Không truyền ⇒ danh sách chỉ đọc. */
   onInlineUpdate?: (name: string, patch: Record<string, unknown>) => Promise<void>;
   /** Đổi ảnh của một dòng ngay từ avatar. Không truyền ⇒ avatar chỉ hiển thị. */
@@ -80,7 +92,7 @@ const INDEX_W = "w-12 min-w-12 max-w-12";
 export function ListView(props: ListViewProps) {
   const t = useT();
   const { meta, rows, state, onStateChange, onRowClick } = props;
-  const derivedColumns = useMemo(() => deriveColumns(meta, { roles: props.roles }), [meta, props.roles]);
+  const derivedColumns = useMemo(() => props.columns ?? deriveColumns(meta, { roles: props.roles }), [meta, props.columns, props.roles]);
   const preferenceSpecs = useMemo<ColumnPreferenceSpec[]>(
     () => derivedColumns.map((column) => ({
       fieldname: column.fieldname,
@@ -331,7 +343,8 @@ export function ListView(props: ListViewProps) {
   const sortField = state.sort.split(":")[0];
   const sortDir = state.sort.split(":")[1];
   const numericCols = columns.filter((c) => c.align === "right" && !c.isStatus);
-  const totalCols = columns.length + (props.onDelete ? 4 : 3); // checkbox + STT + dữ liệu + thao tác? + đệm
+  const hasRowActions = Boolean(props.onDelete || props.onApprove);
+  const totalCols = columns.length + (hasRowActions ? 4 : 3); // checkbox + STT + dữ liệu + thao tác + đệm
   const pinnedOffsets = useMemo(() => {
     let left = 100; // checkbox 44px + STT 56px
     const offsets = new Map<string, number>();
@@ -415,6 +428,7 @@ export function ListView(props: ListViewProps) {
     const name = String(row.name);
     const selected = selectedSet.has(name);
     const isActive = props.activeRow === name;
+    const isWarning = Boolean(props.isWarningRow?.(row));
     return (
       <TableRow
         key={name}
@@ -429,6 +443,7 @@ export function ListView(props: ListViewProps) {
           "cursor-pointer bg-card [&>td]:align-top",
           // Run3: hàng đang mở = viền trái 2px primary + nền soft + đậm hơn (Frappe/Linear)
           isActive && "bg-accent font-medium shadow-[inset_2px_0_0_var(--primary)] hover:bg-accent",
+          isWarning && "bg-amber-50 hover:bg-amber-100 [&>td]:!bg-amber-50 hover:[&>td]:!bg-amber-100",
         )}
         onClick={() => onRowClick?.(row)}
         onKeyDown={(event) => {
@@ -458,30 +473,53 @@ export function ListView(props: ListViewProps) {
           <TableCell key={c.fieldname} data-col={c.fieldname} // Bề rộng do <colgroup> quyết định — không đặt w-full/w-px ở ô nữa, hai nguồn tranh nhau
                      // thì trình duyệt chọn theo luật riêng và kết quả không đoán được.
                     style={pinnedLeft === undefined ? undefined : { left: pinnedLeft }}
-                    className={cn(c.align === "right" && "text-right", c.align === "center" && "text-center", compact && "py-1", !c.isTitle && "whitespace-nowrap", pinnedLeft !== undefined && "sticky z-10 bg-card shadow-[inset_-1px_0_0_var(--border)]")}>
+                    className={cn(props.centerContent ? "text-center" : c.align === "right" && "text-right", (props.centerContent || c.align === "center") && "text-center", compact && "py-1", !c.isTitle && "whitespace-nowrap", pinnedLeft !== undefined && "sticky z-10 bg-card shadow-[inset_-1px_0_0_var(--border)]")}>
             {c.isTitle
-                    ? <TitleCell row={row} col={c} imgField={imgField} displayValues={props.displayValues} onUploadImage={props.onUploadImage} />
+                    ? <TitleCell row={row} col={c} centered={props.centerContent} imgField={imgField} displayValues={props.displayValues} onUploadImage={props.onUploadImage} />
                     : c.fieldtype === "Link" && c.options
                       ? <LinkCell doctype={c.options} value={row[c.fieldname]} displayValues={props.displayValues} />
                       : renderCell(row[c.fieldname], c, props.fmt)}
           </TableCell>
         );})}
-        {props.onDelete && Number(row.docstatus ?? 0) === 0 ? (
-          <TableCell className={cn("w-12 px-2 text-center", compact && "py-1")}>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-              aria-label={`${t("common.delete")} ${name}`}
-              title={t("common.delete")}
-              onClick={(event) => {
-                event.stopPropagation();
-                props.onDelete?.(name);
-              }}
-            >
-              <Trash2 />
-            </Button>
+        {hasRowActions ? (
+          <TableCell className={cn("w-28 px-2 text-center", compact && "py-1")}>
+            {Number(row.docstatus ?? 0) === 0 ? <div className="flex items-center justify-center gap-1">
+              {isWarning ? <Badge variant="outline" className="border-amber-300 bg-amber-100 text-amber-900">Cần duyệt</Badge> : null}
+              {props.onApprove && props.canApprove?.(row) ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1 px-2 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
+                  disabled={props.approvingName === name}
+                  aria-label={`Duyệt ${name}`}
+                  title="Duyệt đơn hàng"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    props.onApprove?.(name);
+                  }}
+                >
+                  {props.approvingName === name ? <Loader2 className="animate-spin" /> : <Check />}
+                  Duyệt
+                </Button>
+              ) : null}
+              {props.onDelete ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                  aria-label={`${t("common.delete")} ${name}`}
+                  title={t("common.delete")}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    props.onDelete?.(name);
+                  }}
+                >
+                  <Trash2 />
+                </Button>
+              ) : null}
+            </div> : null}
           </TableCell>
         ) : null}
         <TableCell aria-hidden className="p-0" />
@@ -560,13 +598,14 @@ export function ListView(props: ListViewProps) {
           ) : rows.map((row, index) => {
             const name = String(row.name);
             const selected = selectedSet.has(name);
+            const isWarning = Boolean(props.isWarningRow?.(row));
             const titleCol = columns.find((column) => column.isTitle) ?? columns[0];
             const detailCols = columns.filter((column) => column.fieldname !== titleCol?.fieldname).slice(0, 4);
             return (
               <article
                 key={name}
                 data-list-row={name}
-                className={cn("bg-card p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring", props.activeRow === name && "bg-accent shadow-[inset_3px_0_0_var(--primary)]")}
+                className={cn("bg-card p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring", props.activeRow === name && "bg-accent shadow-[inset_3px_0_0_var(--primary)]", isWarning && "bg-amber-50")}
                 onClick={() => onRowClick?.(row)}
                 onKeyDown={(event) => {
                   if (event.target !== event.currentTarget) return;
@@ -583,26 +622,45 @@ export function ListView(props: ListViewProps) {
                   </span>
                   <div className="min-w-0 flex-1">
                     {titleCol ? <TitleCell row={row} col={titleCol} imgField={imgField} displayValues={props.displayValues} onUploadImage={props.onUploadImage} /> : <span className="font-medium">{name}</span>}
+                    {isWarning ? <Badge variant="outline" className="mt-1 border-amber-300 bg-amber-100 text-amber-900">Chiết khấu cần duyệt</Badge> : null}
                     {detailCols.length ? <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
                       {detailCols.map((column) => <div key={column.fieldname} className="min-w-0"><dt className="truncate text-muted-foreground">{column.label}</dt><dd className="mt-0.5 truncate font-medium">{column.fieldtype === "Link" && column.options ? <LinkCell doctype={column.options} value={row[column.fieldname]} displayValues={props.displayValues} /> : renderCell(row[column.fieldname], column, props.fmt)}</dd></div>)}
                     </dl> : null}
                   </div>
-                  {props.onDelete && Number(row.docstatus ?? 0) === 0 ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      className="shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                      aria-label={`${t("common.delete")} ${name}`}
-                      title={t("common.delete")}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        props.onDelete?.(name);
-                      }}
-                    >
-                      <Trash2 />
-                    </Button>
-                  ) : null}
+                  {hasRowActions && Number(row.docstatus ?? 0) === 0 ? <div className="flex shrink-0 items-center gap-1">
+                    {props.onApprove && props.canApprove?.(row) ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="gap-1 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
+                        disabled={props.approvingName === name}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          props.onApprove?.(name);
+                        }}
+                      >
+                        {props.approvingName === name ? <Loader2 className="animate-spin" /> : <Check />}
+                        Duyệt
+                      </Button>
+                    ) : null}
+                    {props.onDelete ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                        aria-label={`${t("common.delete")} ${name}`}
+                        title={t("common.delete")}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          props.onDelete?.(name);
+                        }}
+                      >
+                        <Trash2 />
+                      </Button>
+                    ) : null}
+                  </div> : null}
                   <span className="text-xs tabular-nums text-muted-foreground">#{pageStart + index + 1}</span>
                 </div>
               </article>
@@ -636,7 +694,7 @@ export function ListView(props: ListViewProps) {
                 }
               />
             ))}
-            {props.onDelete ? <col className="w-12" /> : null}
+            {hasRowActions ? <col className="w-28" /> : null}
             {/*
               Cột đệm là cột auto DUY NHẤT: nhận phần dư khi bảng rộng, về 0 khi tổng cột vượt khung.
               Nhờ đó checkbox/STT và các width người dùng đặt không bị thuật toán table phân lại.
@@ -662,6 +720,7 @@ export function ListView(props: ListViewProps) {
                   dir={sortDir}
                   onClick={() => toggleSort(c.fieldname)}
                   compact={compact}
+                  centerContent={props.centerContent}
                   dragOver={dragOverCol === c.fieldname}
                   onDragStart={() => { dragColRef.current = c.fieldname; }}
                   onDragOverCol={() => setDragOverCol(c.fieldname)}
@@ -679,8 +738,8 @@ export function ListView(props: ListViewProps) {
                   onFilterChange={(value) => onStateChange({ filters: { ...state.filters, [c.fieldname]: value }, page: 1, selected: [] })}
                 />
               ))}
-              {props.onDelete ? (
-                <TableHead className={cn("sticky top-0 z-30 w-12 px-2 text-center bg-muted", compact && "h-7")}>
+              {hasRowActions ? (
+                <TableHead className={cn("sticky top-0 z-30 w-28 px-2 text-center bg-muted", compact && "h-7")}>
                   {t("common.actions", "Thao tác")}
                 </TableHead>
               ) : null}
@@ -762,12 +821,12 @@ export function ListView(props: ListViewProps) {
                   <TableCell
                     key={c.fieldname}
                     style={pinnedLeft === undefined ? undefined : { left: pinnedLeft }}
-                    className={cn(c.align === "right" && "text-right tabular-nums", pinnedLeft !== undefined && "sticky z-10 bg-card shadow-[inset_-1px_0_0_var(--border)]")}
+                    className={cn(props.centerContent ? "text-center tabular-nums" : c.align === "right" && "text-right tabular-nums", pinnedLeft !== undefined && "sticky z-10 bg-card shadow-[inset_-1px_0_0_var(--border)]")}
                   >
                     {c.align === "right" && !c.isStatus ? formatValue(aggregateColumn(rows, c), c) : null}
                   </TableCell>
                 );})}
-                {props.onDelete ? <TableCell aria-hidden className="w-12 p-0" /> : null}
+                {hasRowActions ? <TableCell aria-hidden className="w-28 p-0" /> : null}
                 <TableCell aria-hidden className="p-0" />
               </TableRow>
             </TableFooter>
@@ -789,7 +848,7 @@ export function ListView(props: ListViewProps) {
 }
 
 // ── Title cell (avatar + link) ────────────────────────────────────────────────
-function TitleCell({ row, col, imgField, displayValues, onUploadImage }: { row: Doc; col: ListColumn; imgField?: string; displayValues?: Record<string, string>; onUploadImage?: (name: string, file: File) => Promise<void> }) {
+function TitleCell({ row, col, centered, imgField, displayValues, onUploadImage }: { row: Doc; col: ListColumn; centered?: boolean; imgField?: string; displayValues?: Record<string, string>; onUploadImage?: (name: string, file: File) => Promise<void> }) {
   const t = useT();
   const raw = col.fieldname === "name" ? String(row.name) : String(row[col.fieldname] ?? row.name ?? "");
   const text = col.fieldtype === "Link" && col.options ? (displayValues?.[`${col.options}::${raw}`] ?? raw) : raw;
@@ -800,13 +859,13 @@ function TitleCell({ row, col, imgField, displayValues, onUploadImage }: { row: 
   const id = String(row.name ?? "");
   const showId = Boolean(id) && id !== text;
   return (
-    <div className="flex items-center gap-2.5">
+    <div className={cn("flex items-center gap-2.5", centered && "justify-center text-center")}>
       {imgField ? (
         onUploadImage
           ? <AvatarUpload name={id} src={src} alt={text} onUpload={onUploadImage} />
           : <RowAvatar src={src} alt={text} />
       ) : null}
-      <span className="flex min-w-0 flex-col">
+      <span className={cn("flex min-w-0 flex-col", centered && "items-center")}>
         <span className="truncate font-medium text-foreground hover:text-primary hover:underline">{text || t("list.untitled", "(không tên)")}</span>
         {showId ? <span className="truncate text-[11px] text-muted-foreground">{id}</span> : null}
       </span>
@@ -864,10 +923,10 @@ function HeaderValueFilter({ label, values, value, onChange }: { label: string; 
 }
 
 function SortHeader({
-  col, active, dir, onClick, compact, dragOver, onDragStart, onDragOverCol, onDragLeaveCol, onDropCol,
+  col, active, dir, onClick, compact, centerContent, dragOver, onDragStart, onDragOverCol, onDragLeaveCol, onDropCol,
   width, onResize, onResizeStart, onAutoFit, onMoveLeft, onMoveRight, pinnedLeft, filterValue, filterValues, onFilterChange,
 }: {
-  col: ListColumn; active: boolean; dir?: string; onClick: () => void; compact?: boolean;
+  col: ListColumn; active: boolean; dir?: string; onClick: () => void; compact?: boolean; centerContent?: boolean;
   dragOver?: boolean;
   onDragStart?: () => void;
   onDragOverCol?: () => void;
@@ -956,8 +1015,8 @@ function SortHeader({
       onDragLeave={() => onDragLeaveCol?.()}
       onDrop={(e) => { if (!onDropCol) return; e.preventDefault(); onDropCol(); }}
       className={cn(
-        col.align === "right" && "text-right",
-        col.align === "center" && "text-center",
+        centerContent ? "text-center" : col.align === "right" && "text-right",
+        (centerContent || col.align === "center") && "text-center",
         compact && "h-7",
         // Cột tiêu đề nuốt hết phần dư, các cột khác co sát nội dung. Trước đây mọi cột chia đều
         // bề ngang nên bảng ít cột bị kéo dãn, chữ nằm rời rạc cách nhau cả gang tay.
@@ -979,7 +1038,7 @@ function SortHeader({
           if (event.key === "ArrowRight") { event.preventDefault(); onMoveRight?.(); }
         }}
         title="Sắp xếp; Alt + ←/→ để đổi vị trí cột"
-        className={cn("-ml-2 h-7 max-w-full gap-1 truncate px-2 pr-8 font-medium data-[active=true]:text-foreground", col.align === "right" && "ml-0")}
+        className={cn("-ml-2 h-7 max-w-full gap-1 truncate px-2 pr-8 font-medium data-[active=true]:text-foreground", (centerContent || col.align === "center") && "justify-center text-center", col.align === "right" && !centerContent && "ml-0")}
         data-active={active}
       >
         <span className="truncate">{col.label}</span>

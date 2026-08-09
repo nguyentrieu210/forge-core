@@ -12,7 +12,7 @@ import { ConfirmDialog, Skeleton, toast, useT } from "@metaforge/ui";
 import { ListView } from "../list/ListView.js";
 import { formatValue } from "../list/cells.js";
 import { buildCsv, downloadCsv, downloadXlsx, printTablePdf, stampedName, type ExportFormat } from "../report/export.js";
-import { deriveColumns, imageField } from "../list/columns.js";
+import { deriveColumns, imageField, type ListColumn } from "../list/columns.js";
 import { buildServerQuery } from "../list/filters.js";
 import { useListUrlState, type UrlStateBridge } from "../list/useListState.js";
 import { stableColumnPreferenceScope } from "../list/column-preferences.js";
@@ -20,6 +20,16 @@ import { useMetaForge } from "./provider.js";
 import { useMeta, useListView, NO_CAPS } from "./hooks.js";
 
 const EMPTY_META: DocTypeMeta = { name: "", fields: [], permissions: [] };
+
+/** Kích thước mở đầu gọn cho bảng Đơn hàng; vẫn có thể kéo rộng từng cột. */
+const SALES_ORDER_INITIAL_WIDTHS: Record<string, number> = {
+  name: 132,
+  customer: 132,
+  transaction_date: 104,
+  delivery_date: 108,
+  delivered_percentage: 98,
+  grand_total: 124,
+};
 
 export interface ListContainerProps {
   doctype: string;
@@ -53,13 +63,62 @@ export function ListContainer(props: ListContainerProps) {
 
   const [state, patch] = useListUrlState(bridge, meta);
 
-  const columns = useMemo(() => deriveColumns(meta, { roles }), [meta, roles]);
+  const baseColumns = useMemo(() => {
+    const derived = deriveColumns(meta, { roles });
+    if (doctype !== "Sales Order") return derived;
+    return derived.map((column) => {
+      const defaultWidth = SALES_ORDER_INITIAL_WIDTHS[column.fieldname];
+      return defaultWidth === undefined
+        ? column
+        : { ...column, defaultWidth, minWidth: Math.min(column.minWidth, defaultWidth) };
+    });
+  }, [doctype, meta, roles]);
+  // Trạng thái giao được suy ra trực tiếp từ tiến độ thực giao; không tạo thêm
+  // trường dữ liệu để người dùng có thể sửa lệch với số % giao hàng.
+  const columns = useMemo<ListColumn[]>(() => {
+    if (doctype !== "Sales Order") return baseColumns;
+    const statusColumn: ListColumn = {
+      fieldname: "_delivery_status",
+      label: "Trạng thái giao",
+      fieldtype: "Select",
+      align: "center",
+      isStatus: true,
+      isTitle: false,
+      isImage: false,
+      defaultWidth: 126,
+      minWidth: 116,
+    };
+    const deliveryProgress = baseColumns.find((column) => column.fieldname === "delivered_percentage");
+    if (!deliveryProgress) return [...baseColumns, statusColumn];
+    // Đưa cả trạng thái và % lên trước ngày giao dự kiến: mobile chỉ giữ bốn
+    // thông tin phụ, vì vậy người dùng vẫn thấy tiến độ thay vì một ngày trống.
+    const withoutProgress = baseColumns.filter((column) => column.fieldname !== "delivered_percentage");
+    const deliveryDateIndex = withoutProgress.findIndex((column) => column.fieldname === "delivery_date");
+    const insertAt = deliveryDateIndex < 0 ? withoutProgress.length : deliveryDateIndex;
+    return [...withoutProgress.slice(0, insertAt), statusColumn, deliveryProgress, ...withoutProgress.slice(insertAt)];
+  }, [baseColumns, doctype]);
   // Global context is enforced by adapter.getContextualList/getContextualCount on the server,
   // including warehouse fields in child tables. Do not duplicate it as a parent-only filter here.
-  const listOpts = useMemo<ListOpts>(() => buildServerQuery(meta, state, columns), [meta, state, columns]);
+  const listOpts = useMemo<ListOpts>(() => {
+    const query = buildServerQuery(meta, state, baseColumns);
+    /**
+     * Cờ này là dữ liệu điều khiển của danh sách Đơn hàng: nó không phải cột để
+     * người dùng xem/chỉnh, nhưng cần có trên từng dòng để tô cảnh báo và mở nút
+     * Duyệt. `queryFields` chủ động bỏ field hidden, nên phải nạp riêng ở đây.
+     */
+    if (doctype !== "Sales Order") return query;
+    return { ...query, fields: [...new Set([...(query.fields ?? []), "discount_requires_approval"])] };
+  }, [doctype, meta, state, baseColumns]);
   const ready = Boolean(metaQ.data) && !isSingle;
   const viewQ = useListView(doctype, listOpts, ready);
-  const rows = viewQ.data?.rows ?? [];
+  const rows = useMemo(() => (viewQ.data?.rows ?? []).map((row) => {
+    if (doctype !== "Sales Order") return row;
+    const delivered = Number(row.delivered_percentage ?? 0);
+    return {
+      ...row,
+      _delivery_status: delivered >= 100 ? "Hoàn thành" : delivered > 0 ? "Đang giao" : "Chưa giao",
+    };
+  }), [doctype, viewQ.data?.rows]);
   const caps = viewQ.data?.capabilities ?? NO_CAPS;
   const displayValues = useMemo(
     () => Object.fromEntries((viewQ.data?.display_values ?? []).map((r) => [displayValueKey(r.doctype, r.name), r.label])),
@@ -74,6 +133,7 @@ export function ListContainer(props: ListContainerProps) {
   // Xoá hàng loạt không thể hoàn tác — hỏi xác nhận TRƯỚC (trước đây gọi API ngay, 0 xác nhận nào,
   // 1 cú click nhầm ở toolbar chọn nhiều dòng = mất dữ liệu vĩnh viễn hàng loạt).
   const [pendingDelete, setPendingDelete] = useState<string[] | null>(null);
+  const [approvingName, setApprovingName] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const confirmBulkDelete = useCallback((names: string[]) => setPendingDelete(names), []);
   const doBulkDelete = useCallback(async () => {
@@ -94,6 +154,23 @@ export function ListContainer(props: ListContainerProps) {
       setPendingDelete(null);
     }
   }, [adapter, doctype, pendingDelete, patch, refresh]);
+
+  // Duyệt đơn qua đúng `submit` của adapter: lấy đủ document trước khi gửi để server kiểm quyền,
+  // validate lại tiền/tồn và ghi audit log. Không đổi docstatus ở client.
+  const approveSalesOrder = useCallback(async (name: string) => {
+    if (approvingName) return;
+    setApprovingName(name);
+    try {
+      const { doc } = await adapter.getDoc(doctype, name);
+      await adapter.submit(doc);
+      toast.success("Đã duyệt đơn hàng");
+      await viewQ.refetch();
+    } catch (error) {
+      toast.error(adapter.mapError(error).message);
+    } finally {
+      setApprovingName(null);
+    }
+  }, [adapter, approvingName, doctype, viewQ]);
 
   /**
    * Xuất Excel từ danh sách.
@@ -188,6 +265,8 @@ export function ListContainer(props: ListContainerProps) {
     <>
       <ListView
         meta={meta}
+        columns={columns}
+        centerContent={doctype === "Sales Order"}
         rows={rows}
         total={viewQ.data?.count}
         // Chỉ che bảng ở lần tải đầu. Refetch có dữ liệu cache (do người dùng chủ động làm mới hoặc
@@ -202,6 +281,10 @@ export function ListContainer(props: ListContainerProps) {
         onRefresh={refresh}
         onBulkDelete={caps.delete ? confirmBulkDelete : undefined}
         onDelete={caps.delete ? (name) => setPendingDelete([name]) : undefined}
+        onApprove={doctype === "Sales Order" && caps.submit ? (name) => { void approveSalesOrder(name); } : undefined}
+        canApprove={(row) => row.discount_requires_approval === true || row.discount_requires_approval === 1 || row.discount_requires_approval === "1"}
+        isWarningRow={(row) => doctype === "Sales Order" && (row.discount_requires_approval === true || row.discount_requires_approval === 1 || row.discount_requires_approval === "1")}
+        approvingName={approvingName}
         onExport={exportSelected}
         exporting={exporting}
         title={meta.label || meta.name || doctype}
@@ -209,7 +292,7 @@ export function ListContainer(props: ListContainerProps) {
         fmt={fmt}
         roles={roles}
         displayValues={displayValues}
-        searchLink={(target, text) => adapter.searchLink(target, text, { referenceDoctype: doctype, pageLength: 20 })}
+        searchLink={(target, text, opts) => adapter.searchLink(target, text, { referenceDoctype: doctype, pageLength: 20, filters: opts?.filters })}
         /* Sửa nhanh trên danh sách — chỉ mở khi user THỰC SỰ có quyền ghi. caps.write do server
            trả về (fail-closed), không suy đoán ở client. */
         onInlineUpdate={caps.write ? async (name, patch) => {

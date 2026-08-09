@@ -20,7 +20,7 @@ const SALES_STANDARD_FIELDS = new Set([
   "has_butterfly_bracket", "leaf_variant", "leaf_height_deduction_m", "leaf_divisor_m", "leaf_rounding",
   "leaf_count", "single_layer_leaf_count", "double_layer_leaf_count", "cut_width_m", "billable_area_sqm",
   "estimated_weight_kg", "estimated_minutes", "formula_policy", "formula_version", "formula_explanation",
-  "uom", "qty", "rate", "amount", "motor_model", "accessories", "install_note", "warehouse",
+  "uom", "qty", "rate", "discount_percentage", "amount", "motor_model", "accessories", "install_note", "warehouse",
   "availability_status", "note",
 ]);
 
