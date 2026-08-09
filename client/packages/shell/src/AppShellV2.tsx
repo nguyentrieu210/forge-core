@@ -300,14 +300,14 @@ export function AppShell(props: AppShellProps) {
                           "mf-shell-nav-item relative mb-0.5 w-full justify-start gap-2 overflow-hidden border border-transparent font-normal transition-all",
                           collapsed && "justify-center px-0 max-md:justify-start max-md:px-3",
                           !collapsed && "pr-7",
-                          active && "border-primary/20 bg-primary/12 font-bold text-primary shadow-sm hover:bg-primary/16 before:absolute before:inset-y-1 before:left-0 before:w-1 before:rounded-r-full before:bg-primary",
+                          active && "bg-primary text-primary-foreground font-semibold shadow-sm hover:bg-primary-hover active:bg-primary-active before:absolute before:inset-y-1 before:left-0 before:w-1 before:rounded-r-full before:bg-primary-foreground/70",
                           item.disabledReason && "opacity-50",
                         )}
                         data-active={active ? "true" : "false"}
                         aria-current={active ? "page" : undefined}
                         onClick={() => go(item)}
                       >
-                        <span className={cn("shrink-0 text-white/90 brightness-110 [&_svg]:size-4", active && "text-white brightness-150 filter drop-shadow-[0_0_3px_rgba(255,255,255,0.8)]")}>{item.icon}</span>
+                        <span className={cn("shrink-0 text-white/90 brightness-110 [&_svg]:size-4", active && "text-primary-foreground brightness-100")}>{item.icon}</span>
                         {!collapsed ? <span className="min-w-0 flex-1 truncate text-left">{item.label}</span> : null}
                         {!collapsed && item.badge != null ? <Badge variant={active ? "default" : "secondary"} className="ml-auto max-w-14 truncate">{item.badge}</Badge> : null}
                       </Button>

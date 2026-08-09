@@ -17,7 +17,7 @@ import { addMinor, fromScaledInt, multiplyScaled, negateMinor, toScaledInt } fro
 import { domainEvent } from "../../outbox/src/index.js";
 import { buildTrackedStockLines, deriveOutgoingValuation } from "../../clouderp-stock/src/index.js";
 import { resolveServerPrice } from "../../clouderp-pricing/src/index.js";
-import { applyUomConversion, stockQtyMicros } from "../../clouderp-core/src/uom.js";
+import { applyUomConversion, pricedQtyMicros, stockQtyMicros } from "../../clouderp-core/src/uom.js";
 import { assertCurrencyScale, calculateSalesTotals } from "./totals.js";
 import type { DeliveryIssuePurpose, DeliveryNoteData, PaymentEntryData, SalesInvoiceData, SalesItem, SalesOrderData } from "./types.js";
 
@@ -142,6 +142,7 @@ export class SalesOrderController extends BaseController<SalesOrderData> {
     const itemSnapshots = await applyUomConversion(context as unknown as ControllerContext<JsonObject>, input.items, { transactionKind: "sales" });
     const pricedItems = await applySellingPricing(context, itemSnapshots, input.selling_price_list, input.currency, input.transaction_date, input.customer, input.customer_group);
     const totals = calculateSalesTotals(pricedItems, input.taxes ?? [], currencyScale, {
+      use_priced_quantity: true,
       apply_discount_on: locksOrderPricing ? "Net Total" : input.apply_discount_on,
       additional_discount_percentage: orderDiscountPercentage,
       ...(locksOrderPricing ? {} : { discount_amount: input.discount_amount }),
@@ -372,6 +373,7 @@ export class SalesInvoiceController extends BaseController<SalesInvoiceData> {
     const itemSnapshots = await applyUomConversion(context as unknown as ControllerContext<JsonObject>, input.items, { transactionKind: "sales" });
     const pricedItems = await applySellingPricing(context, itemSnapshots, input.selling_price_list, input.currency, input.posting_at, input.customer, input.customer_group);
     const totals = calculateSalesTotals(pricedItems, input.taxes ?? [], currencyScale, {
+      use_priced_quantity: true,
       apply_discount_on: input.apply_discount_on,
       additional_discount_percentage: input.additional_discount_percentage,
       discount_amount: input.discount_amount,
@@ -761,8 +763,13 @@ interface ResolvedCurrencyContext {
 async function applySellingPricing<T extends SalesItem>(context: ControllerContext<JsonObject>, items: T[], priceList: string | undefined, currency: string, postingDate: string, customer: string, customerGroup?: string): Promise<T[]> {
   if (!priceList) return items;
   return Promise.all(items.map(async (item) => {
-    const qtyMicros = item.qty_micros ?? toScaledInt(item.qty, 6);
-    const price = await resolveServerPrice(context, { itemCode:item.item_code, qtyMicros, postingDate, priceList, documentCurrency:currency, ...(typeof item.uom === "string" && item.uom ? { uom:item.uom } : {}), partyType:"Customer", party:customer, ...(customerGroup?{customerGroup}:{}) });
+    // Bậc giá phải chạy trên đúng trục của đơn giá. Hầu hết dòng dùng transaction qty;
+    // catch-weight dùng số kg thực mà UOM core đã chụp vào priced_qty_micros.
+    const qtyMicros = pricedQtyMicros(item);
+    const priceUom = typeof item.rate_uom === "string" && item.rate_uom.trim()
+      ? item.rate_uom.trim()
+      : typeof item.uom === "string" ? item.uom.trim() : "";
+    const price = await resolveServerPrice(context, { itemCode:item.item_code, qtyMicros, postingDate, priceList, documentCurrency:currency, ...(priceUom ? { uom:priceUom } : {}), partyType:"Customer", party:customer, ...(customerGroup?{customerGroup}:{}) });
     return { ...item, rate:price.rate, rate_minor:price.rate_minor, item_price:price.item_price, ...(price.pricing_rule?{pricing_rule:price.pricing_rule}:{}), ...(price.discount_percentage?{discount_percentage:price.discount_percentage}:{}) };
   }));
 }

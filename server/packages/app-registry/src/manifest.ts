@@ -317,7 +317,7 @@ export interface AppDesignManifest {
 export interface AppClientManifest {
   brand?:
     | "zinc" | "blue" | "warm" | "sakura" | "emerald" | "ocean" | "violet"
-    | "indigo" | "teal" | "amber" | "rose" | "aurora" | "sunset";
+    | "indigo" | "teal" | "amber" | "rose" | "aurora" | "sunset" | "orange";
   /** Overview/Process definition key (`hr`, `stock`, `selling`…). */
   domain?: string;
   /** Landing screen. A route must be one this app's nav actually reaches — see below. */
@@ -679,7 +679,7 @@ function parseChart(
 
 const BRANDS = new Set([
   "zinc", "blue", "warm", "sakura", "emerald", "ocean", "violet",
-  "indigo", "teal", "amber", "rose", "aurora", "sunset",
+  "indigo", "teal", "amber", "rose", "aurora", "sunset", "orange",
 ]);
 const CATALOG_MODES = new Set(["manifest", "workspace", "hybrid"]);
 const DESIGN_DENSITIES = new Set(["compact", "comfortable", "touch"]);

@@ -615,6 +615,10 @@ export async function calculateSalesProductionLine(
     ]);
     const chosen = choosePolicy(policies, doorType, text(item.item_group));
     const sets = positiveInteger(args.set_count ?? 1, "Số bộ");
+    const requestedPurpose = text(args.purpose).toLocaleLowerCase("vi");
+    const formulaPurpose = requestedPurpose === "bán hàng" || requestedPurpose === "sales"
+      ? "sales"
+      : chosen.parsed.purchase_formula === "Barem kg/m2" ? "all" : "sales";
     const formula = calculateDoorFormula(chosen.parsed, {
       door_type: doorType,
       item_group: text(item.item_group),
@@ -628,7 +632,9 @@ export async function calculateSalesProductionLine(
       set_count: sets,
       min_area_sqm: Number(item.min_area_sqm ?? 0) || 0,
       ...(Number(item.purchase_kg_per_m2 ?? 0) > 0 ? { kg_per_m2: Number(item.purchase_kg_per_m2) } : {}),
-      purpose: chosen.parsed.purchase_formula === "Barem kg/m2" ? "all" : "sales",
+      // Màn bán chỉ cần trục m². Không được bắt Cao lưới/barem mua vào trước khi người bán
+      // có thể báo giá; luồng tạo sản xuất vẫn để `all` và kiểm đủ đầu vào vật tư.
+      purpose: formulaPurpose,
     });
     let leaf: LeafPlan | null = null;
     let leafError: string | null = null;

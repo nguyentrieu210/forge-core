@@ -840,5 +840,16 @@ test("công thức cửa tách khỏi chính sách giá và phủ đủ năm lo�
   }
   const gap = byType.get("Cửa Đức").retail_cut_deduction_m - byType.get("Cửa Đức").dealer_cut_deduction_m;
   assert.ok(Math.abs(gap - 0.06) < 1e-9, "khoảng cách hai cách đo phải là 0,06 m");
-  assert.ok(brief.actions.find((entry) => entry.name === "tinh-cong-thuc-cua"), "phải có màn tính thử dùng đúng Worker");
+  for (const source of [brief, v2Brief]) {
+    const calculator = source.actions.find((entry) => entry.name === "tinh-cong-thuc-cua");
+    assert.ok(calculator, "phải có màn tính thử dùng đúng Worker");
+    assert.ok(calculator.fields.some((entry) => typeof entry === "string" && entry.startsWith("width_pb_ray_m:Float!") && entry.includes("Rộng PB ray")));
+    assert.ok(calculator.fields.some((entry) => typeof entry === "string" && entry.startsWith("width_pb_nhua_m:Float!") && entry.includes("Rộng PB nhựa")));
+    assert.ok(calculator.fields.some((entry) => typeof entry === "string" && entry.startsWith("selling_rate:Currency")));
+    assert.ok(!calculator.fields.some((entry) => typeof entry === "string" && entry.startsWith("sales_mode:")));
+    assert.ok(!calculator.fields.some((entry) => typeof entry === "string" && entry.startsWith("has_butterfly_bracket:")));
+    for (const hidden of ["purpose", "ray_type", "mesh_height_m", "actual_purchase_kg", "purchase_rate"]) {
+      assert.ok(!calculator.fields.some((entry) => typeof entry === "string" && entry.startsWith(`${hidden}:`)));
+    }
+  }
 });

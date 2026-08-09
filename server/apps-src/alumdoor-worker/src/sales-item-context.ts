@@ -28,6 +28,13 @@ function normalizedText(value: unknown): string {
   return String(value ?? "").normalize("NFC").trim();
 }
 
+function normalizedUom(value: unknown): string {
+  return normalizedText(value).toLocaleLowerCase("vi");
+}
+
+const AREA_UOMS = new Set(["m2", "m²", "sqm"]);
+const SET_UOMS = new Set(["bộ", "bo", "set"]);
+
 function sameText(left: unknown, right: unknown): boolean {
   return normalizedText(left) === normalizedText(right);
 }
@@ -62,6 +69,7 @@ async function listResources(
 interface ItemPriceLookup {
   price: Json | null;
   name: string;
+  sourceUom: string;
 }
 
 /**
@@ -77,15 +85,13 @@ async function resolveItemPriceRecord(
   priceList: string,
   itemCode: string,
   selectedUom: string,
+  baseUom: string,
 ): Promise<ItemPriceLookup> {
   const exactName = `${priceList}:${itemCode}:${selectedUom}`;
   const legacyName = `${priceList}:${itemCode}`;
 
   const legacy = await readResource(call, "Item Price", legacyName);
   const compatibleLegacy = legacy && sameText(legacy.uom, selectedUom) ? legacy : null;
-  if (compatibleLegacy && !truthy(compatibleLegacy.disabled)) {
-    return { price: compatibleLegacy, name: legacyName };
-  }
 
   let exact: Json | null = null;
   let exactReadError: Error | null = null;
@@ -94,7 +100,12 @@ async function resolveItemPriceRecord(
   } catch (error) {
     exactReadError = error instanceof Error ? error : new Error(String(error));
   }
-  if (exact && !truthy(exact.disabled)) return { price: exact, name: exactName };
+  if (exact && !truthy(exact.disabled)) return { price: exact, name: exactName, sourceUom: selectedUom };
+  // Exact UOM là override. Nếu endpoint tên Unicode chưa route được, legacy hợp lệ vẫn là
+  // fallback tương thích; lỗi probe không được làm mất giá đang dùng của dữ liệu cũ.
+  if (compatibleLegacy && !truthy(compatibleLegacy.disabled)) {
+    return { price: compatibleLegacy, name: legacyName, sourceUom: selectedUom };
+  }
 
   let rows: Json[];
   try {
@@ -121,16 +132,32 @@ async function resolveItemPriceRecord(
   }
   if (active.length === 1) {
     const selected = active[0]!;
-    return { price: selected, name: normalizedText(selected.name) || exactName };
+    return { price: selected, name: normalizedText(selected.name) || exactName, sourceUom: selectedUom };
   }
 
-  const disabled = compatibleLegacy ?? exact ?? matching[0] ?? null;
+  if (baseUom && baseUom !== selectedUom) {
+    const baseMatches = rows.filter((row) =>
+      sameText(row.price_list, priceList)
+      && sameText(row.item_code, itemCode)
+      && sameText(row.uom, baseUom));
+    const activeBase = baseMatches.filter((row) => !truthy(row.disabled));
+    if (activeBase.length > 1) {
+      throw new Error(`Có nhiều đơn giá đang hoạt động cho ${itemCode} · ${baseUom} trong bảng giá ${priceList}.`);
+    }
+    if (activeBase.length === 1) {
+      const selected = activeBase[0]!;
+      return { price: selected, name: normalizedText(selected.name) || `${priceList}:${itemCode}:${baseUom}`, sourceUom: baseUom };
+    }
+  }
+
+  const disabled = exact ?? compatibleLegacy ?? matching[0] ?? null;
   if (!disabled && exactReadError) throw exactReadError;
   return {
     price: disabled,
     name: disabled
       ? normalizedText(disabled.name) || (disabled === compatibleLegacy ? legacyName : exactName)
       : exactName,
+    sourceUom: selectedUom,
   };
 }
 
@@ -186,6 +213,15 @@ export async function salesItemContext(call: SalesPlatformCall, args: Json): Pro
   if (defaultSalesUom && !factorByUom.has(defaultSalesUom) && defaultSalesUom === stockUom) {
     factorByUom.set(defaultSalesUom, 1);
   }
+  // Cửa bán m² nhưng tồn Bộ có hệ số theo TỪNG kích thước dòng, nên Item không được phép
+  // khai một conversion tĩnh. Vẫn mở ĐVT bán và tra giá/m²; conversion thật sẽ được máy
+  // tính cửa chụp sau khi có rộng, cao và số bộ.
+  const dynamicAreaToSet = normalizedText(item.inventory_mode) === "Thành phẩm theo m2"
+    && AREA_UOMS.has(normalizedUom(defaultSalesUom))
+    && SET_UOMS.has(normalizedUom(stockUom));
+  if (dynamicAreaToSet && defaultSalesUom && !factorByUom.has(defaultSalesUom)) {
+    factorByUom.set(defaultSalesUom, 1);
+  }
   const allowedUoms = [...factorByUom.keys()];
   const selectedUom = normalizedText(args.uom) || defaultSalesUom || stockUom;
   if (!selectedUom || !factorByUom.has(selectedUom)) {
@@ -195,6 +231,7 @@ export async function salesItemContext(call: SalesPlatformCall, args: Json): Pro
     }, 422);
   }
   const conversionFactor = factorByUom.get(selectedUom) ?? 1;
+  const dynamicSelectedUom = dynamicAreaToSet && AREA_UOMS.has(normalizedUom(selectedUom));
 
   const priceList = normalizedText(args.price_list);
   const documentCurrency = normalizedText(args.currency ?? item.currency ?? "VND") || "VND";
@@ -206,7 +243,7 @@ export async function salesItemContext(call: SalesPlatformCall, args: Json): Pro
   if (priceList) {
     const expectedName = `${priceList}:${itemCode}:${selectedUom}`;
     try {
-      const lookup = await resolveItemPriceRecord(call, priceList, itemCode, selectedUom);
+      const lookup = await resolveItemPriceRecord(call, priceList, itemCode, selectedUom, defaultSalesUom);
       const price = lookup.price;
       itemPrice = lookup.name;
       if (price && !truthy(price.disabled)) {
@@ -223,7 +260,13 @@ export async function salesItemContext(call: SalesPlatformCall, args: Json): Pro
           priceMissing = true;
           priceError = `Đơn giá ${selectedUom} không hợp lệ.`;
         } else {
-          rate = parsed;
+          const sourceFactor = factorByUom.get(lookup.sourceUom);
+          if (!sourceFactor) {
+            priceMissing = true;
+            priceError = `ĐVT "${lookup.sourceUom}" chưa có hệ số quy đổi trên mặt hàng ${itemCode}.`;
+          } else {
+            rate = parsed * conversionFactor / sourceFactor;
+          }
         }
       } else {
         priceMissing = true;
@@ -256,9 +299,12 @@ export async function salesItemContext(call: SalesPlatformCall, args: Json): Pro
           .filter((row) => (!row.item_code || sameText(row.item_code, itemCode))
             && (!row.warehouse || sameText(row.warehouse, warehouse)))
           .reduce((sum, row) => sum + quantityFromRow(row), 0);
-        availableQty = availableStockQty / conversionFactor;
+        const selectedAvailableQty = availableStockQty / conversionFactor;
+        availableQty = dynamicSelectedUom ? null : selectedAvailableQty;
         stockStatus = availableStockQty > 0
-          ? `Còn ${cleanNumber(availableQty)} ${selectedUom}`
+          ? dynamicSelectedUom
+            ? `Còn ${cleanNumber(availableStockQty)} ${stockUom} · m² quy đổi theo kích thước dòng`
+            : `Còn ${cleanNumber(selectedAvailableQty)} ${selectedUom}`
           : "Hết hàng";
       } catch (error) {
         stockReadError = error instanceof Error ? error.message : "Không đọc được tồn kho.";
@@ -284,7 +330,7 @@ export async function salesItemContext(call: SalesPlatformCall, args: Json): Pro
     selected_uom: selectedUom,
     allowed_uoms: allowedUoms,
     uom_options: allowedUoms.map((uom) => ({ uom, conversion_factor: factorByUom.get(uom) })),
-    conversion_factor: conversionFactor,
+    conversion_factor: dynamicSelectedUom ? null : conversionFactor,
     stock_uom: stockUom,
     warehouse: warehouse || null,
     managed_stock: managedStock,

@@ -13,6 +13,7 @@
  */
 import { useMemo, useState, type ClipboardEvent, type ReactNode } from "react";
 import type { AppAction, AppActionCall, AppActionField, DocField, Fieldtype } from "@metaforge/core";
+import { actionFieldLabel, actionRequestValues, doorSalesSummary, isActionFieldVisible } from "./door-width-label.js";
 import {
   Button, Input, Label, Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@metaforge/ui";
@@ -172,6 +173,7 @@ function emptyValue(value: unknown): boolean {
 function missingInputs(action: AppAction, values: Values): string[] {
   const missing: string[] = [];
   for (const field of action.fields) {
+    if (!isActionFieldVisible(action, field, values)) continue;
     const bulk = parseBulkTransactionSpec(field);
     if (!bulk) {
       if (field.required && emptyValue(values[field.fieldname])) missing.push(field.label);
@@ -242,8 +244,11 @@ export function ActionScreen({ action, onOpen }: ActionScreenProps) {
 
   const changeValue = (fieldname: string, value: unknown) => {
     setValues((previous) => ({ ...previous, [fieldname]: value }));
-    setPreview(undefined);
-    setResult(undefined);
+    const keepsDoorArea = action.name === "tinh-cong-thuc-cua" && fieldname === "selling_rate";
+    if (!keepsDoorArea) {
+      setPreview(undefined);
+      setResult(undefined);
+    }
     setError(undefined);
   };
 
@@ -253,7 +258,7 @@ export function ActionScreen({ action, onOpen }: ActionScreenProps) {
     setBusy(phase);
     setError(undefined);
     try {
-      const answer = await adapter.callPost<unknown>(call.method, values);
+      const answer = await adapter.callPost<unknown>(call.method, actionRequestValues(action, values));
       if (phase === "preview") { setPreview(answer); setResult(undefined); }
       else { setResult(answer); setPreview(undefined); }
     } catch (caught) {
@@ -266,7 +271,9 @@ export function ActionScreen({ action, onOpen }: ActionScreenProps) {
   }
 
   const shown = result ?? preview;
-  const standardFields = action.fields.filter((field) => !parseBulkTransactionSpec(field));
+  const isDoorCalculator = action.name === "tinh-cong-thuc-cua";
+  const doorSummary = doorSalesSummary(action.name, shown, values.selling_rate);
+  const standardFields = action.fields.filter((field) => !parseBulkTransactionSpec(field) && isActionFieldVisible(action, field, values));
   const bulkFields = action.fields.flatMap((field) => {
     const spec = parseBulkTransactionSpec(field);
     return spec ? [{ field, spec }] : [];
@@ -286,7 +293,7 @@ export function ActionScreen({ action, onOpen }: ActionScreenProps) {
               return (
                 <div key={field.fieldname} className="flex min-w-0 flex-col gap-1.5">
                   <Label htmlFor={id}>
-                    {field.label}
+                    {actionFieldLabel(action, field, values)}
                     {field.required ? <span className="ml-0.5 text-destructive">*</span> : null}
                   </Label>
                   {Control
@@ -326,23 +333,46 @@ export function ActionScreen({ action, onOpen }: ActionScreenProps) {
         ))}
 
         <div className="mt-4 flex flex-wrap items-center gap-2 border-t pt-4">
-          {action.preview
-            ? <Button variant="outline" disabled={Boolean(busy)} onClick={() => run(action.preview!, "preview")}>
-                {busy === "preview" ? "Đang tính…" : action.preview.label}
+          {isDoorCalculator
+            ? <Button disabled={Boolean(busy)} onClick={() => run(action.preview ?? action.commit, action.preview ? "preview" : "commit")}>
+                {busy ? "Đang tính…" : "Tính tiền"}
               </Button>
-            : null}
-          <Button disabled={Boolean(busy)} onClick={() => run(action.commit, "commit")}>
-            {busy === "commit" ? "Đang chạy…" : action.commit.label}
-          </Button>
+            : <>
+                {action.preview
+                  ? <Button variant="outline" disabled={Boolean(busy)} onClick={() => run(action.preview!, "preview")}>
+                      {busy === "preview" ? "Đang tính…" : action.preview.label}
+                    </Button>
+                  : null}
+                <Button disabled={Boolean(busy)} onClick={() => run(action.commit, "commit")}>
+                  {busy === "commit" ? "Đang chạy…" : action.commit.label}
+                </Button>
+              </>}
           {missing.length
             ? <span className="text-xs text-muted-foreground">Còn thiếu {missing.length} ô bắt buộc</span>
             : null}
         </div>
       </section>
 
+      {doorSummary ? (
+        <section className="grid gap-3 rounded-xl border bg-card p-4 sm:grid-cols-3" aria-label="Tổng tiền cửa" data-door-sales-summary>
+          <div className="rounded-lg bg-muted/30 p-3">
+            <p className="text-xs text-muted-foreground">Diện tích tính tiền</p>
+            <p className="mt-1 text-lg font-semibold">{fmt.number(doorSummary.area)} m²</p>
+          </div>
+          <div className="rounded-lg bg-muted/30 p-3">
+            <p className="text-xs text-muted-foreground">Đơn giá bán / m²</p>
+            <p className="mt-1 text-lg font-semibold">{doorSummary.rate == null ? "Chưa nhập" : fmt.currency(doorSummary.rate)}</p>
+          </div>
+          <div className="rounded-lg bg-primary/10 p-3">
+            <p className="text-xs text-muted-foreground">Thành tiền</p>
+            <p className="mt-1 text-lg font-semibold text-primary">{doorSummary.amount == null ? "Chưa có đơn giá" : fmt.currency(doorSummary.amount)}</p>
+          </div>
+        </section>
+      ) : null}
+
       {error ? <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive" role="alert">{error}</div> : null}
 
-      {shown != null
+      {shown != null && !isDoorCalculator
         ? <ActionResult
             value={shown}
             table={action.result_table}

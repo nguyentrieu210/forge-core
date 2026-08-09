@@ -196,23 +196,19 @@
       "label": "Tính công thức cửa",
       "icon": "calculator",
       "group": "Bán hàng",
-      "description": "Tính cùng lúc rộng cắt, m2 bán và kg mua dự toán theo đúng loại cửa, nhóm khách và tách món/trọn bộ.",
+      "description": "Tính diện tích bán và thành tiền theo đúng loại cửa và nhóm khách.",
       "permission": "Quotation",
       "fields": [
         "item_code:Link(Item)! Mặt hàng cửa",
         "customer_group:Select(Đại lý,Lẻ)! Nhóm giá",
-        "purpose:Select(Bán hàng,Sản xuất,Dự toán mua,Tất cả)!=(Bán hàng) Cần tính",
-        "sales_mode:Select(Trọn bộ,Tách món)!=(Trọn bộ) Cách bán",
-        "has_butterfly_bracket:Check Có bản bướm",
-        "width_m:Float! Rộng khai theo chính sách (m)",
+        "width_pb_ray_m:Float! Rộng PB ray (m)",
+        "width_pb_nhua_m:Float! Rộng PB nhựa (m)",
         "height_m:Float Cao phủ bì (m)",
-        "mesh_height_m:Float Cao lưới (m)",
         "set_count:Int!=(1) Số bộ",
-        "actual_purchase_kg:Float Kg mua thực tế (Cửa Đức)",
-        "purchase_rate:Currency Đơn giá mua / kg"
+        "selling_rate:Currency Đơn giá bán / m2"
       ],
-      "preview": "alumdoor.door.calculate | Tính thử",
-      "commit": "alumdoor.door.calculate | Tính lại",
+      "preview": "alumdoor.door.calculate | Tính tiền",
+      "commit": "alumdoor.door.calculate | Tính tiền",
       "resultTable": "results"
     },
     {

@@ -7,7 +7,7 @@ const json = (data, status = 200) => new Response(JSON.stringify(data), {
   headers: { "content-type": "application/json" },
 });
 
-test("sales preview uses the authoritative legacy Item Price before probing an exact Unicode-UOM name", async () => {
+test("sales preview falls back to legacy when the exact Unicode-UOM route is unavailable", async () => {
   const calls = [];
   const call = async (path) => {
     calls.push(path);
@@ -51,6 +51,6 @@ test("sales preview uses the authoritative legacy Item Price before probing an e
   assert.equal(body.rate, 180000);
   assert.equal(body.price_missing, false);
   assert.equal(body.item_price, "Giá niêm yết:TRỤC 114_1.8LY");
-  assert.equal(calls.some((path) => path.includes("%3AM%C3%A9t")), false,
-    "a valid authoritative legacy record must stop the risky exact-name probe");
+  assert.equal(calls.some((path) => path.includes("%3AM%C3%A9t")), true,
+    "the exact UOM override is probed before using the compatible legacy fallback");
 });

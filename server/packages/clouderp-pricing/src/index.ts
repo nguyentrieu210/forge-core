@@ -48,12 +48,17 @@ export async function resolveServerPrice(
 
   let priceName = lineUom ? exactPriceName : legacyPriceName;
   let itemPrice: JsonObject | null = null;
-  if (compatibleLegacy && !disabled(compatibleLegacy.disabled)) {
-    itemPrice = compatibleLegacy;
-    priceName = legacyPriceName;
-  } else if (exact && !disabled(exact.disabled)) {
+  let convertedFromUom = "";
+  let item: JsonObject | null = null;
+  let listedPrices: Array<{ name: string; data: JsonObject }> | null = null;
+  // Giá khai đúng ĐVT của dòng là override thương mại và luôn thắng record legacy.
+  // Legacy chỉ còn là đường tương thích cho dữ liệu cũ chưa có tên ba thành phần.
+  if (exact && !disabled(exact.disabled)) {
     itemPrice = exact;
     priceName = exactPriceName;
+  } else if (compatibleLegacy && !disabled(compatibleLegacy.disabled)) {
+    itemPrice = compatibleLegacy;
+    priceName = legacyPriceName;
   }
 
   /**
@@ -66,8 +71,8 @@ export async function resolveServerPrice(
    */
   let fieldMatches: Array<{ name: string; data: JsonObject }> = [];
   if (!itemPrice) {
-    const listed = await context.reader.listMasterRecordData(context.command.tenant_id, "Item Price");
-    fieldMatches = listed.filter(({ data }) => fieldMatchedPrice(data, priceList, itemCode, lineUom));
+    listedPrices = await context.reader.listMasterRecordData(context.command.tenant_id, "Item Price");
+    fieldMatches = listedPrices.filter(({ data }) => fieldMatchedPrice(data, priceList, itemCode, lineUom));
     const active = fieldMatches.filter(({ data }) => !disabled(data.disabled));
     if (active.length > 1) {
       throw errors.validation(
@@ -80,11 +85,31 @@ export async function resolveServerPrice(
     }
   }
 
+  // A selling-UOM price is optional. When it is absent, resolve from the Item's base
+  // sales UOM and convert through the Item UOM factors. An exact price always wins.
+  if (!itemPrice && lineUom) {
+    item = await context.reader.getMasterRecordData(context.command.tenant_id, "Item", itemCode);
+    const baseUom = normalizedText(item?.default_sales_uom) || normalizedText(item?.stock_uom);
+    if (item && baseUom && baseUom !== lineUom) {
+      listedPrices ??= await context.reader.listMasterRecordData(context.command.tenant_id, "Item Price");
+      const baseMatches = listedPrices.filter(({ data }) => fieldMatchedPrice(data, priceList, itemCode, baseUom));
+      const activeBase = baseMatches.filter(({ data }) => !disabled(data.disabled));
+      if (activeBase.length > 1) {
+        throw errors.validation(`Multiple active Item Price records match ${priceList} / ${itemCode} / ${baseUom}`);
+      }
+      if (activeBase.length === 1) {
+        itemPrice = activeBase[0]!.data;
+        priceName = activeBase[0]!.name;
+        convertedFromUom = baseUom;
+      }
+    }
+  }
+
   if (!itemPrice) {
-    const disabledCandidate = compatibleLegacy
-      ? { name: legacyPriceName, data: compatibleLegacy }
-      : exact
-        ? { name: exactPriceName, data: exact }
+    const disabledCandidate = exact
+      ? { name: exactPriceName, data: exact }
+      : compatibleLegacy
+        ? { name: legacyPriceName, data: compatibleLegacy }
         : fieldMatches[0];
     if (disabledCandidate) {
       itemPrice = disabledCandidate.data;
@@ -105,13 +130,20 @@ export async function resolveServerPrice(
   if (!currency) throw errors.reference(`Item Price ${priceName} must define currency`);
   if (currency !== documentCurrency) throw errors.reference(`Item Price ${priceName} currency does not match document currency`);
   const priceUom = normalizedText(itemPrice.uom);
-  if (priceUom && lineUom && priceUom !== lineUom) {
+  if (priceUom && lineUom && priceUom !== lineUom && !convertedFromUom) {
     throw errors.validation(`Item Price ${priceName} applies to UOM "${priceUom}", but the document row uses "${lineUom}"`);
   }
   const currencyMaster = await context.reader.getMasterRecordData(context.command.tenant_id, "Currency", currency);
   const scale = typeof currencyMaster?.currency_scale === "number" ? currencyMaster.currency_scale : 2;
   let rate = toScaledInt(decimal(itemPrice.rate, "item price rate"), scale, "item price rate");
   if (rate < 0) throw errors.validation("Item Price rate cannot be negative");
+  if (convertedFromUom) {
+    item ??= await context.reader.getMasterRecordData(context.command.tenant_id, "Item", itemCode);
+    if (!item) throw errors.reference(`Item ${itemCode} does not exist`);
+    const sourceFactor = uomFactorMicros(item, convertedFromUom);
+    const targetFactor = uomFactorMicros(item, lineUom);
+    rate = multiplyDivideRounded(rate, targetFactor, sourceFactor);
+  }
 
   const rules = await context.reader.listMasterRecordData(context.command.tenant_id, "Pricing Rule");
   const matches = rules
@@ -141,7 +173,8 @@ export async function resolveServerPrice(
     currency,
     currency_scale: scale,
     item_price: priceName,
-    ...(priceUom ? { uom: priceUom } : {}),
+    ...((lineUom || priceUom) ? { uom: lineUom || priceUom } : {}),
+    ...(convertedFromUom ? { source_uom: convertedFromUom } : {}),
     ...(selected ? { pricing_rule: selected.name } : {}),
     ...(discount ? { discount_percentage: discount } : {}),
   };
@@ -170,6 +203,32 @@ function ruleScore(rule: JsonObject): number {
 function decimal(value: unknown, field: string): string | number {
   if (typeof value !== "string" && typeof value !== "number") throw errors.validation(`${field} must be numeric`);
   return value;
+}
+
+function uomFactorMicros(item: JsonObject, uom: string): number {
+  const stockUom = normalizedText(item.stock_uom);
+  if (uom === stockUom) return 1_000_000;
+  const rows = Array.isArray(item.uom_conversions) ? item.uom_conversions : [];
+  const match = rows.find((value) => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+    return normalizedText((value as JsonObject).uom) === uom;
+  }) as JsonObject | undefined;
+  if (!match) throw errors.validation(`UOM "${uom}" has no conversion factor on Item ${normalizedText(item.name) || normalizedText(item.item_code)}`);
+  const factor = toScaledInt(decimal(match.conversion_factor, `conversion factor for ${uom}`), 6, `conversion factor for ${uom}`);
+  if (factor <= 0) throw errors.validation(`Conversion factor for UOM "${uom}" must be greater than zero`);
+  return factor;
+}
+
+function multiplyDivideRounded(value: number, multiplier: number, divisor: number): number {
+  if (![value, multiplier, divisor].every(Number.isSafeInteger) || divisor <= 0) {
+    throw errors.validation("Pricing arithmetic exceeds safe integer bounds");
+  }
+  const numerator = BigInt(value) * BigInt(multiplier);
+  const denominator = BigInt(divisor);
+  const rounded = (numerator + denominator / 2n) / denominator;
+  const result = Number(rounded);
+  if (!Number.isSafeInteger(result)) throw errors.validation("Pricing arithmetic exceeds safe integer bounds");
+  return result;
 }
 
 function divideRounded(numerator: number, denominator: number): number {

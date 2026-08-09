@@ -98,6 +98,22 @@ Bốn chỗ phải sửa cùng một lượt, nếu không sẽ mâu thuẫn nha
 4. **Bậc giá theo m²** phải tính trên diện tích tính tiền do Worker trả ra, không phải diện tích
    hình học mặc định.
 
+### Trục tính tiền của bảng dòng bán
+
+Mọi dòng vẫn giữ một bất biến duy nhất: `Thành tiền = SL tính tiền × Đơn giá` trên đúng ĐVT
+bán. Khác nhau nằm ở cách hệ thống tạo `SL tính tiền`:
+
+| Kiểu dòng | Ô người dùng nhập | SL tính tiền do hệ thống chốt |
+|---|---|---|
+| Cửa bán m² | Rộng, cao, số bộ, cách bán, bản bướm | `billable_area_sqm` từ Cutting Policy |
+| Ray/trục bán Mét | Dài một cây/đoạn, số cây/đoạn | `dài × số cây` |
+| Ray/trục bán Cây/Lá | Số cây/lá | số cây/lá |
+| Phụ kiện/hàng thường | Số lượng theo ĐVT bán | số lượng nhập trực tiếp |
+
+`stock_qty = qty × conversion_factor` là trục tồn kho riêng, không được lấy để tính tiền.
+Client chỉ xem trước; Worker kiểm tra lại lượng theo quy cách, nhân giá tra đúng ĐVT và server
+ghi đè `amount`. UOM core chỉ đổi lượng thương mại sang ĐVT tồn, không tự dựng lại công thức cửa.
+
 ## 6. Còn treo
 
 - **439 khách chưa phân loại đáng tin.** Hiện 321 mang giá trị mặc định "Đại lý", 114 để "Khác",

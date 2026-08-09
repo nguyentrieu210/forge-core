@@ -2,10 +2,14 @@
 
 ## Unreleased — Alumdoor UI
 
+- Màn Tính công thức cửa chỉ giữ dữ liệu bán hàng; bỏ toàn bộ trường/kết quả sản xuất và mua hàng. Rộng PB ray và Rộng PB nhựa là hai ô riêng, tự ẩn/hiện theo nhóm khách. Kết quả giữ cố định diện tích, đơn giá và thành tiền khi sửa giá.
 - Sidebar Alumdoor dùng nền đen ở cả giao diện sáng và tối; chữ/icon trắng xám, hover tương phản và mục đang chọn giữ màu cam thương hiệu.
+- Bảng dòng bán hàng đổi sang quy cách tính tiền theo Item/ĐVT: cửa dùng m² từ Cutting Policy × số bộ, ray/trục dùng chiều dài × số cây, phụ kiện nhập trực tiếp theo ĐVT; số lượng tính tiền và thành tiền là ô máy tính, server kiểm tra lại trước khi ghi.
+- Bảng gọn tự hiện cột rộng/cao/số bộ cho cửa hoặc dài/số cây cho ray–trục, đồng thời giữ giá exact UOM và giá tự quy đổi từ ĐVT gốc.
 
 ## Unreleased — Price List matrix
 
+- `Item Price` dùng Bulk runtime chuẩn theo `viewPolicy.bulk`; không còn có màn nhập giá hard-code riêng cho Alumdoor.
 - Alumdoor metadata `2.2.1` bổ sung ngày áp dụng cho Bảng giá và định danh Item Price theo đúng ĐVT.
 - `Item Price` chỉ còn một workspace chuyên dụng, luôn mở trực tiếp và không phụ thuộc Bulk policy: Bảng giá theo ngày → Nhóm hàng → Mặt hàng → ma trận ĐVT × các Bảng giá hiện hữu.
 - Cây tải theo thao tác mở từng cấp, có tìm kiếm Bảng giá/Mặt hàng; panel cây kéo giãn và lưu kích thước theo chuẩn Forge.

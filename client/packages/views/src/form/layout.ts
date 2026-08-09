@@ -35,7 +35,7 @@ export function isFullWidthField(fieldtype: string): boolean {
   return FULL_WIDTH_TYPES.has(fieldtype);
 }
 
-export type FormFieldWidth = "full" | "half" | "third";
+export type FormFieldWidth = "full" | "two_thirds" | "half" | "third";
 
 const THIRD_WIDTH_TYPES = new Set([
   "Check", "Int", "Float", "Currency", "Percent", "Duration", "Rating",
@@ -50,7 +50,7 @@ const THIRD_WIDTH_NAMES = /(^|_)(status|state|uom|unit|currency|priority)(_|$)/i
  * nội dung dài chiếm trọn hàng, field nhận diện ngắn chiếm 1/3, còn lại chiếm 1/2.
  */
 export function resolveFormFieldWidth(field: DocField, _titleField?: string): FormFieldWidth {
-  if (field.form_width === "full" || field.form_width === "half" || field.form_width === "third") return field.form_width;
+  if (field.form_width === "full" || field.form_width === "two_thirds" || field.form_width === "half" || field.form_width === "third") return field.form_width;
   if (isFullWidthField(field.fieldtype)) return "full";
   if (THIRD_WIDTH_TYPES.has(field.fieldtype) || THIRD_WIDTH_NAMES.test(field.fieldname)) return "third";
   return "half";

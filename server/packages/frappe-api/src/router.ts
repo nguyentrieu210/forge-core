@@ -434,6 +434,8 @@ function fieldFromOp(entry: JsonObject): JsonObject {
   if (typeof entry.label === "string") field.label = entry.label;
   if (typeof entry.options === "string") field.options = entry.options;
   if (typeof entry.form_width === "string") field.form_width = entry.form_width;
+  if (typeof entry.form_region === "string") field.form_region = entry.form_region;
+  if (typeof entry.form_control_width === "string") field.form_control_width = entry.form_control_width;
   // The builder speaks Frappe's `reqd` (0/1); the kernel's field metadata uses a
   // boolean `required`.
   if (entry.reqd !== undefined) field.required = entry.reqd === 1 || entry.reqd === true;
@@ -705,6 +707,7 @@ async function createDocument(doctype: string, args: FrappeArgs, context: Frappe
     action: "create", expectedVersion: null, document: payload,
     ...(amendedFrom ? { amendedFrom } : {}),
   }));
+  await syncCustomerAsSupplier(doctype, name, payload, context);
   return toFrappeDoc(await loadReadable(doctype, name, context));
 }
 
@@ -786,15 +789,71 @@ async function saveDocument(doctype: string, name: string, args: FrappeArgs, con
     tenantId: context.tenantId, actor: context.actor, doctype, name,
     action: "save", expectedVersion: current.version, document: payload,
   }));
+  await syncCustomerAsSupplier(doctype, name, payload, context);
   return toFrappeDoc(await loadReadable(doctype, name, context));
+}
+
+/** A party marked as both roles gets a Supplier master with the same stable id.
+ * Purchase documents continue to link Supplier, while contact data is entered once
+ * on the Customer record that created the counterpart. */
+async function syncCustomerAsSupplier(doctype: string, customerName: string, payload: JsonObject, context: FrappeRouterContext): Promise<void> {
+  if (doctype !== "Customer" || (payload.is_supplier !== true && payload.is_supplier !== 1)) return;
+  const existing = await context.documents.getDocument(context.tenantId, "Supplier", customerName);
+  if (existing) return; // Never overwrite a supplier maintained independently.
+  const supplierMeta = await requireMeta("Supplier", context);
+  const supplier: JsonObject = { supplier_name: customerName };
+  for (const key of ["phone", "email", "address", "tax_id", "payment_terms", "note"]) {
+    if (payload[key] !== undefined) supplier[key] = payload[key];
+  }
+  await context.runCommand(await buildCommand({
+    tenantId: context.tenantId,
+    actor: context.actor,
+    doctype: "Supplier",
+    name: await resolveNewName("Supplier", supplierMeta, supplier, context),
+    action: "create",
+    expectedVersion: null,
+    document: supplier,
+  }));
 }
 
 async function deleteDocument(doctype: string, name: string, context: FrappeRouterContext): Promise<JsonObject> {
   // Frappe has no separate delete permission in this kernel; deleting is a
   // write-class action, matching how the DocPerm rows are reported.
   await loadWritable(doctype, name, context);
+  await assertNoLinkedDocuments(doctype, name, context);
   const deleted = await context.documents.deleteDraftDocument(context.tenantId, doctype, name);
   return { doctype, name, deleted };
+}
+
+/**
+ * Link values live in document JSON rather than database foreign keys.  A raw
+ * delete used to leave records such as Item Price pointing at a Price List that
+ * no longer exists; the list then rendered the old name as if it were a valid
+ * option.  Resolve the relation from DocType metadata, so this stays generic
+ * and no application-specific name or relationship is hard-coded here.
+ */
+async function assertNoLinkedDocuments(doctype: string, name: string, context: FrappeRouterContext): Promise<void> {
+  const sources = await context.metadata.listDocTypes(context.tenantId);
+  const references: string[] = [];
+
+  for (const source of sources) {
+    if (source.is_child) continue;
+    const linkFields = (source.fields ?? []).filter((field) => field.fieldtype === "Link" && field.options === doctype);
+    if (linkFields.length === 0) continue;
+
+    const documents = await context.documents.listDocumentsByDoctype<JsonObject>(context.tenantId, source.name);
+    for (const field of linkFields) {
+      const count = documents.filter((document) =>
+        !(source.name === doctype && document.name === name)
+        && document.data[field.fieldname] === name,
+      ).length;
+      if (count > 0) references.push(`${source.label ?? source.name}.${field.label ?? field.fieldname} (${count})`);
+    }
+  }
+
+  if (references.length > 0) {
+    throw errors.validation(`Không thể xóa ${doctype} ${name}: còn dữ liệu đang liên kết — ${references.join(", ")}`);
+  }
 }
 
 // ---- method dispatch --------------------------------------------------------

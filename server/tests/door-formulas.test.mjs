@@ -40,11 +40,11 @@ test("Cửa Đức: đại lý PB nhựa -0,02; khách lẻ PB ray -0,08", () =>
   const dealer = calculateDoorFormula(policy("Cửa Đức"), {
     door_type: "Cửa Đức", customer_group: "Đại lý",
     measured_width_m: 4, cover_height_m: 3, set_count: 1,
-    actual_purchase_kg: 120, purchase_rate: 50_000, purpose: "all",
+    actual_purchase_kg: 120, purchase_rate: 50_000, selling_rate: 1_250_000, purpose: "all",
   });
   assert.deepEqual(
-    { basis: dealer.width_basis, cut: dealer.cut_width_m, area: dealer.billable_area_sqm, kg: dealer.purchase_kg, amount: dealer.purchase_amount },
-    { basis: "Phủ bì nhựa", cut: 3.98, area: 12, kg: 120, amount: 6_000_000 },
+    { basis: dealer.width_basis, cut: dealer.cut_width_m, area: dealer.billable_area_sqm, salesAmount: dealer.sales_amount, kg: dealer.purchase_kg, amount: dealer.purchase_amount },
+    { basis: "Phủ bì nhựa", cut: 3.98, area: 12, salesAmount: 15_000_000, kg: 120, amount: 6_000_000 },
   );
 
   const retail = calculateDoorFormula(policy("Cửa Đức"), {

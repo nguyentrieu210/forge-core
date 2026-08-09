@@ -65,10 +65,13 @@ export function DoctypeWorkspace(props: DoctypeWorkspaceProps) {
   );
   const bulkPolicy = useMemo(() => titleMeta.data ? resolveBulkRenderPolicy(titleMeta.data) : undefined, [titleMeta.data]);
   const bulkEnabled = Boolean(bulkPolicy?.enabled && !isTree);
-  const isPriceListManager = doctype === "Item Price";
-  const bulkActive = !decoded && !isNew && (isPriceListManager || (bulkEnabled && bridge.get("view") === "bulk"));
+  // A projected create-or-update Bulk source is its own operational screen: its
+  // rows are not the raw Item Price documents, so exposing a parallel List tab
+  // is misleading. Ordinary Bulk policies keep the normal List | Bulk switcher.
+  const bulkOnly = Boolean(bulkPolicy?.rowSource);
+  const bulkActive = !decoded && !isNew && bulkEnabled && (bulkOnly || bridge.get("view") === "bulk");
 
-  const modeTabs = bulkEnabled && !decoded && !isNew && !isPriceListManager ? (
+  const modeTabs = bulkEnabled && !bulkOnly && !decoded && !isNew ? (
     <div className={V3_VIEW_SWITCHER_CLASS} role="navigation" aria-label={t("common.view", "Chế độ xem")}>
       <Button
         variant={bulkActive ? "ghost" : "secondary"}
@@ -224,7 +227,7 @@ export function DoctypeWorkspace(props: DoctypeWorkspaceProps) {
               đang chọn. Chỉ hộp thoại tạo mới dùng mảng đặc; header lưới dòng hàng bên dưới dùng
               bề mặt nhạt khác hẳn (xem `control-styles.ts`). */}
           <DialogHeader className={cn("shrink-0 border-b border-border/70 px-5 py-4", chromeFill, chromeText)}>
-            <DialogTitle className="text-[15px] font-semibold tracking-tight">{t("form.create_title_prefix")} {displayTitle.toLocaleLowerCase("vi")}</DialogTitle>
+            <DialogTitle className="text-xl font-semibold tracking-tight">{t("form.create_title_prefix")} {displayTitle.toLocaleLowerCase("vi")}</DialogTitle>
           </DialogHeader>
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
             <NewFormContainer

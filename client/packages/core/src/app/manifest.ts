@@ -19,7 +19,7 @@
 export type AppBrand =
   | "enterprise" | "graphite" | "red"
   | "zinc" | "blue" | "warm" | "sakura" | "emerald" | "ocean" | "violet"
-  | "indigo" | "teal" | "amber" | "rose" | "aurora" | "sunset";
+  | "indigo" | "teal" | "amber" | "rose" | "aurora" | "sunset" | "orange";
 export type NavKind = "doctype" | "route" | "workspace" | "system" | "experience" | "overview" | "process";
 
 export interface AppNavItem {
@@ -187,7 +187,7 @@ const BRANDS: ReadonlySet<string> = new Set([
   "enterprise", "graphite", "red",
   // Tên cũ — giữ hợp lệ để manifest đã phát hành không hỏng. Xem `AppBrand`.
   "zinc", "blue", "warm", "sakura", "emerald", "ocean", "violet",
-  "indigo", "teal", "amber", "rose", "aurora", "sunset",
+  "indigo", "teal", "amber", "rose", "aurora", "sunset", "orange",
 ]);
 const KINDS: ReadonlySet<string> = new Set(["doctype", "route", "workspace", "system", "experience", "overview", "process"]);
 const DENSITIES: ReadonlySet<string> = new Set(["compact", "comfortable", "touch"]);

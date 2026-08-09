@@ -75,6 +75,7 @@ export interface DoorFormulaInput {
   kg_per_m2?: number;
   actual_purchase_kg?: number;
   purchase_rate?: number;
+  selling_rate?: number;
   purpose?: DoorFormulaPurpose;
 }
 
@@ -93,6 +94,7 @@ export interface DoorFormulaResult {
   sales_height_m?: number;
   area_per_set_sqm?: number;
   billable_area_sqm?: number;
+  sales_amount?: number;
   purchase_formula?: PurchaseFormula;
   purchase_height_basis?: HeightBasis;
   purchase_height_m?: number;
@@ -328,6 +330,9 @@ export function calculateDoorFormula(policy: DoorFormulaPolicy, input: DoorFormu
       sales_height_m: round(coverHeight),
       area_per_set_sqm: round(rawArea),
       billable_area_sqm: round(billable),
+      ...(input.selling_rate == null
+        ? {}
+        : { sales_amount: round(billable * finiteNonNegative(input.selling_rate, "Đơn giá bán")) }),
       explanation: `${result.explanation} Bán: ${round(coverHeight)} × ${round(salesWidth)} × ${round(sets)} = ${round(billable)} m2 (${salesBasis}).`,
     });
   }

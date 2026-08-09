@@ -25,12 +25,19 @@ const platform = {
     const path = decodeURIComponent(url.pathname);
     if (path.endsWith("/resource/Cutting Policy")) return Promise.resolve(Response.json({ data: policies }));
     if (path.endsWith("/resource/Item/CUA-LUOI-TEST")) return Promise.resolve(Response.json({ data: item }));
+    if (path.endsWith("/resource/Customer/CUST-DEALER")) return Promise.resolve(Response.json({ data: { price_group: "Đại lý" } }));
+    if (path.endsWith("/resource/Customer/CUST-RETAIL")) return Promise.resolve(Response.json({ data: { price_group: "Lẻ" } }));
+    if (path.endsWith("/resource/Customer/CUST-NO-GROUP")) return Promise.resolve(Response.json({ data: { price_group: "" } }));
     if (path.endsWith("/resource/Item Color/GS")) return Promise.resolve(Response.json({ data: { color_code: "GS", disabled: false } }));
     return Promise.resolve(Response.json({ message: "not found" }, { status: 404 }));
   },
 };
 
-function request(qty, customerGroup = "Đại lý") {
+function request(
+  qty,
+  customerGroup = "Đại lý",
+  customer = customerGroup ? "CUST-DEALER" : "CUST-NO-GROUP",
+) {
   return new Request("https://app.internal/hooks/validate", {
     method: "POST",
     headers: {
@@ -43,6 +50,7 @@ function request(qty, customerGroup = "Đại lý") {
       name: "NEW-SALES-ORDER",
       action: "submit",
       payload: {
+        customer,
         customer_group: customerGroup,
         items: [{
           item_code: "CUA-LUOI-TEST",
@@ -79,6 +87,13 @@ test("Worker từ chối cửa khi khách chưa có Nhóm giá", async () => {
   assert.match(body.message, /chưa có Nhóm giá/);
 });
 
+test("Worker từ chối Nhóm giá do payload giả khác hồ sơ khách", async () => {
+  const response = await alumdoorWorker.fetch(request(11.91, "Đại lý", "CUST-RETAIL"), { PLATFORM: platform }, {});
+  const body = await response.json();
+  assert.equal(response.status, 422);
+  assert.match(body.message, /phải là "Lẻ" theo hồ sơ khách/);
+});
+
 test("method tính thử trả cùng rộng cắt và m2 với validator", async () => {
   const response = await alumdoorWorker.fetch(new Request("https://app.internal/api/method/alumdoor.door.calculate", {
     method: "POST",
@@ -102,4 +117,77 @@ test("method tính thử trả cùng rộng cắt và m2 với validator", async
   assert.equal(body.cut_width_m, 3.97);
   assert.equal(body.billable_area_sqm, 11.91);
   assert.equal(body.results.find((row) => row.chỉ_tiêu === "Diện tích tính tiền").kết_quả, 11.91);
+});
+
+function salesLineRequest(row) {
+  return new Request("https://app.internal/hooks/validate", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-cloudforge-tenant": "tenant-test",
+      "x-cloudforge-callback": "https://tenant.test/_app/",
+    },
+    body: JSON.stringify({
+      doctype: "Sales Order",
+      name: "NEW-SALES-LINE",
+      action: "save",
+      payload: { customer_group: "Đại lý", items: [row] },
+    }),
+  });
+}
+
+function salesLinePlatform(items) {
+  return {
+    fetch(request) {
+      const path = decodeURIComponent(new URL(request.url).pathname);
+      if (path.endsWith("/resource/Cutting Policy")) return Promise.resolve(Response.json({ data: [] }));
+      const parts = path.split("/").filter(Boolean);
+      const doctype = parts.at(-2);
+      const name = parts.at(-1);
+      if (doctype === "Item" && items[name]) return Promise.resolve(Response.json({ data: items[name] }));
+      if (doctype === "Item Color" && name === "GS") return Promise.resolve(Response.json({ data: { disabled: 0 } }));
+      return Promise.resolve(Response.json({ message: "not found" }, { status: 404 }));
+    },
+  };
+}
+
+test("ray/trục bán Mét bắt buộc qty = chiều dài × số cây", async () => {
+  const env = { PLATFORM: salesLinePlatform({
+    "TRUC-114": {
+      item_code: "TRUC-114",
+      inventory_mode: "Nhôm cây/lá",
+      stock_uom: "Kg",
+      default_sales_uom: "Mét",
+      uom_conversions: [{ uom: "Mét", conversion_factor: 2.1 }],
+      is_sales_item: 1,
+      allowed_colors: [{ color: "GS" }],
+    },
+  }) };
+  const line = {
+    item_code: "TRUC-114", color: "GS", uom: "Mét", length_m: 5.3, qty_bar: 3,
+    qty: 15.9, conversion_factor: 2.1, stock_qty: 33.39,
+  };
+  const accepted = await alumdoorWorker.fetch(salesLineRequest(line), env, {});
+  assert.equal(accepted.status, 200, await accepted.text());
+
+  const rejected = await alumdoorWorker.fetch(salesLineRequest({ ...line, qty: 3, stock_qty: 6.3 }), env, {});
+  const body = await rejected.json();
+  assert.equal(rejected.status, 422);
+  assert.match(body.message, /15\.900000 Mét/);
+});
+
+test("phụ kiện giữ qty trực tiếp theo đúng ĐVT bán", async () => {
+  const env = { PLATFORM: salesLinePlatform({
+    "BO-TU-DUNG": {
+      item_code: "BO-TU-DUNG",
+      inventory_mode: "Hàng thường",
+      stock_uom: "Bộ",
+      default_sales_uom: "Bộ",
+      is_sales_item: 1,
+    },
+  }) };
+  const response = await alumdoorWorker.fetch(salesLineRequest({
+    item_code: "BO-TU-DUNG", uom: "Bộ", qty: 2, conversion_factor: 1, stock_qty: 2,
+  }), env, {});
+  assert.equal(response.status, 200, await response.text());
 });

@@ -1,4 +1,4 @@
-import type { DocField, DocTypeMeta, DocTypeView } from "../types/meta.js";
+import type { BulkRowSource, DocField, DocTypeMeta, DocTypeView } from "../types/meta.js";
 
 const BULK_UNSAFE_FIELD_TYPES = new Set([
   "Section Break", "Column Break", "Tab Break", "Fold", "Heading", "HTML", "Button",
@@ -12,6 +12,8 @@ export interface BulkRenderPolicy {
   allowPaste: boolean;
   allowFillDown: boolean;
   pageSize: number;
+  toolbarFilters: DocField[];
+  rowSource?: BulkRowSource;
 }
 
 function legacyBulkView(meta: DocTypeMeta): DocTypeView | undefined {
@@ -37,13 +39,13 @@ function editableField(field: DocField): boolean {
 export function resolveBulkRenderPolicy(meta: DocTypeMeta): BulkRenderPolicy {
   const view = meta.viewPolicy?.bulk ?? legacyBulkView(meta);
   if (!view?.enabled || view.commitStrategy !== "document_update") {
-    return { enabled: false, columns: [], editable: new Set(), allowPaste: false, allowFillDown: false, pageSize: 100 };
+    return { enabled: false, columns: [], editable: new Set(), allowPaste: false, allowFillDown: false, pageSize: 100, toolbarFilters: [] };
   }
   if (meta.kind && meta.kind !== "master") {
-    return { enabled: false, columns: [], editable: new Set(), allowPaste: false, allowFillDown: false, pageSize: 100 };
+    return { enabled: false, columns: [], editable: new Set(), allowPaste: false, allowFillDown: false, pageSize: 100, toolbarFilters: [] };
   }
   if (meta.istable === 1 || meta.issingle === 1 || meta.is_submittable === 1) {
-    return { enabled: false, columns: [], editable: new Set(), allowPaste: false, allowFillDown: false, pageSize: 100 };
+    return { enabled: false, columns: [], editable: new Set(), allowPaste: false, allowFillDown: false, pageSize: 100, toolbarFilters: [] };
   }
 
   const byName = new Map(meta.fields.map((field) => [field.fieldname, field]));
@@ -52,6 +54,10 @@ export function resolveBulkRenderPolicy(meta: DocTypeMeta): BulkRenderPolicy {
   const columns = columnNames
     .map((name) => byName.get(name))
     .filter((field): field is DocField => Boolean(field) && field!.surface !== "internal" && field!.hidden !== 1);
+  const toolbarFilters = (Array.isArray(view.toolbarFilters) ? view.toolbarFilters : [])
+    .map((name) => byName.get(name))
+    .filter((field): field is DocField => Boolean(field) && ["Link", "Select"].includes(field!.fieldtype));
+  const rowSource = view.rowSource?.kind === "link_uom_expansion" ? view.rowSource : undefined;
   const visibleNames = new Set(columns.map((field) => field.fieldname));
   const editable = new Set(
     [...editableNames].filter((name) => {
@@ -67,5 +73,7 @@ export function resolveBulkRenderPolicy(meta: DocTypeMeta): BulkRenderPolicy {
     allowPaste: view.allowPaste !== false,
     allowFillDown: view.allowFillDown !== false,
     pageSize: Number.isInteger(view.pageSize) ? Math.min(500, Math.max(20, Number(view.pageSize))) : 100,
+    toolbarFilters,
+    ...(rowSource ? { rowSource } : {}),
   };
 }

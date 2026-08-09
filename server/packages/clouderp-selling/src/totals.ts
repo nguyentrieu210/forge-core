@@ -6,6 +6,8 @@ export interface SalesTotalsInput {
   apply_discount_on?: DiscountBasis | undefined;
   additional_discount_percentage?: string | number | undefined;
   discount_amount?: string | number | undefined;
+  /** Chỉ controller đã chạy applyUomConversion mới được bật trục giá server này. */
+  use_priced_quantity?: boolean | undefined;
 }
 
 export interface SalesTotals {
@@ -40,7 +42,12 @@ export function calculateSalesTotals(
 ): SalesTotals {
   if (items.length === 0) throw errors.validation("At least one item is required");
   assertCurrencyScale(currencyScale);
-  const normalizedItems = items.map((item, index) => normalizeItem(item, index, currencyScale));
+  const normalizedItems = items.map((item, index) => normalizeItem(
+    item,
+    index,
+    currencyScale,
+    options.use_priced_quantity === true,
+  ));
   const grossMinor = addMinor(normalizedItems.map((item) => item.amount_minor ?? 0), "gross total");
   const quantityMicros = addMinor(normalizedItems.map((item) => item.qty_micros ?? 0), "quantity total");
 
@@ -136,20 +143,37 @@ export function calculateSalesTotals(
   };
 }
 
-function normalizeItem(item: SalesItem, index: number, currencyScale: number): SalesItem {
+function normalizeItem(
+  item: SalesItem,
+  index: number,
+  currencyScale: number,
+  usePricedQuantity: boolean,
+): SalesItem {
   if (!item.item_code) throw errors.validation(`Item code is required at row ${index + 1}`);
   const qtyMicros = toScaledInt(item.qty, 6, `items[${index}].qty`);
   if (qtyMicros <= 0) throw errors.validation(`Quantity must be greater than zero at row ${index + 1}`);
+  // Default callers may pass raw REST payloads, so hidden priced_qty_micros is untrusted.
+  // Only the sales controllers enable it after UOM core has rebuilt the snapshot from master.
+  const pricedQtyMicros = usePricedQuantity ? item.priced_qty_micros ?? qtyMicros : qtyMicros;
+  if (pricedQtyMicros <= 0) throw errors.validation(`Priced quantity must be greater than zero at row ${index + 1}`);
   // ERPNext rounds the rate at currency precision before multiplying quantity.
   const rateMinor = toScaledInt(item.rate, currencyScale, `items[${index}].rate`);
   if (rateMinor < 0) throw errors.validation(`Rate cannot be negative at row ${index + 1}`);
   const roundedRate = fromScaledInt(rateMinor, currencyScale);
-  const amountMinor = multiplyScaled(item.qty, 6, roundedRate, currencyScale, currencyScale, `items[${index}].amount`);
+  const amountMinor = multiplyScaled(
+    fromScaledInt(pricedQtyMicros, 6),
+    6,
+    roundedRate,
+    currencyScale,
+    currencyScale,
+    `items[${index}].amount`,
+  );
   return {
     ...item,
     qty: fromScaledInt(qtyMicros, 6),
     rate: roundedRate,
     qty_micros: qtyMicros,
+    priced_qty_micros: pricedQtyMicros,
     rate_minor: rateMinor,
     amount_minor: amountMinor,
     amount: fromScaledInt(amountMinor, currencyScale),

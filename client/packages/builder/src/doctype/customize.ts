@@ -17,7 +17,8 @@ export interface CustomFieldOp {
   label?: string;
   options?: string;
   reqd?: 0 | 1;
-  form_width?: "full" | "half" | "third";
+  form_width?: "full" | "two_thirds" | "half" | "third";
+  form_region?: "main" | "aside" | "full";
   /** chèn sau field nào (thứ tự) — Frappe Custom Field.insert_after. */
   insert_after?: string;
 }
@@ -71,7 +72,7 @@ function toCustomField(dt: string, f: DocField, insertAfter?: string): CustomFie
   return {
     op: "custom_field", dt, fieldname: f.fieldname, fieldtype: f.fieldtype,
     label: f.label, options: f.options, reqd: f.reqd,
-    form_width: f.form_width,
+    form_width: f.form_width, form_region: f.form_region,
     ...(insertAfter ? { insert_after: insertAfter } : {}),
   };
 }

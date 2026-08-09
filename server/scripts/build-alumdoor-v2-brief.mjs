@@ -403,6 +403,41 @@ addAfter(pri, "warehouse",
   },
 );
 
+// ────────────────── SALES CHILD GRID ──────────────────
+// Trục tính tiền do metadata của Item/ĐVT quyết định, không theo tên mã hàng:
+// cửa → m² Worker chốt; ray/trục → dài × số cây; phụ kiện → qty trực tiếp theo ĐVT.
+for (const childName of ["Quotation Item", "Sales Order Item"]) {
+  const line = doctype(childName);
+  replaceField(line, "length_m", {
+    fieldname: "length_m",
+    fieldtype: "Float",
+    label: "Dài một cây/đoạn (m)",
+    depends_on: "eval:doc.inventory_mode == 'Nhôm cây/lá' && (doc.uom == 'Mét' || doc.uom == 'M' || doc.uom == 'm' || doc.uom == 'met' || doc.uom == 'meter' || doc.uom == 'metre')",
+    mandatory_depends_on: "eval:doc.inventory_mode == 'Nhôm cây/lá' && (doc.uom == 'Mét' || doc.uom == 'M' || doc.uom == 'm' || doc.uom == 'met' || doc.uom == 'meter' || doc.uom == 'metre')",
+    description: "Chiều dài của một cây/đoạn, không phải tổng số mét.",
+  });
+  replaceField(line, "qty_bar", {
+    fieldname: "qty_bar",
+    fieldtype: "Float",
+    label: "Số cây/đoạn",
+    depends_on: "eval:doc.inventory_mode == 'Nhôm cây/lá' && (doc.uom == 'Mét' || doc.uom == 'M' || doc.uom == 'm' || doc.uom == 'met' || doc.uom == 'meter' || doc.uom == 'metre' || doc.uom == 'Cây' || doc.uom == 'cay' || doc.uom == 'Lá' || doc.uom == 'la' || doc.uom == 'Đoạn' || doc.uom == 'doan')",
+    mandatory_depends_on: "eval:doc.inventory_mode == 'Nhôm cây/lá' && (doc.uom == 'Mét' || doc.uom == 'M' || doc.uom == 'm' || doc.uom == 'met' || doc.uom == 'meter' || doc.uom == 'metre' || doc.uom == 'Cây' || doc.uom == 'cay' || doc.uom == 'Lá' || doc.uom == 'la' || doc.uom == 'Đoạn' || doc.uom == 'doan')",
+    description: "Bán theo Mét: hệ thống lấy chiều dài × số cây. Bán theo Cây/Lá: hệ thống lấy chính số này.",
+  });
+  replaceField(line, "qty", {
+    fieldname: "qty",
+    fieldtype: "Float",
+    label: "SL tính tiền",
+    required: true,
+    read_only_depends_on: "eval:(doc.inventory_mode == 'Thành phẩm theo m2' && (doc.uom == 'm2' || doc.uom == 'M2' || doc.uom == 'm²' || doc.uom == 'Bộ')) || (doc.inventory_mode == 'Nhôm cây/lá' && (doc.uom == 'Mét' || doc.uom == 'M' || doc.uom == 'Cây' || doc.uom == 'Lá'))",
+    description: "Ô máy tính theo quy cách của dòng: cửa = m² đã chốt × số bộ; ray/trục = dài × số cây; phụ kiện = số lượng theo ĐVT bán.",
+  });
+  line.list = [
+    "item_code", "color", "width_m", "height_m", "set_count", "sales_mode", "has_butterfly_bracket",
+    "length_m", "qty_bar", "uom", "availability_status", "qty", "rate", "amount",
+  ];
+}
+
 // ────────────────── BATCH (doctype NỀN TẢNG) ──────────────────
 // KHÔNG dựng doctype lô riêng: nền tảng đã có `Batch` (module Stock, autoname field:batch_id).
 // Bản cũ đẻ `Aluminium Lot` song song — chính là quyển sổ thứ hai. V2 phủ Custom Field lên `Batch`.

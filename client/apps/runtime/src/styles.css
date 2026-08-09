@@ -219,6 +219,7 @@
   }
 }
 
+@media not all {
 /* ── ALUMDOOR AUTHENTICATED PREMIUM SIGNATURE (2026-08-03) ───────────
  * Authenticated shell only. Public landing/login selectors above remain byte-for-byte untouched.
  * Brand-first: original red/black logo on white, deep graphite rail, Alumdoor orange action states.
@@ -374,4 +375,5 @@
 .mf-shell:has(.mf-shell-sidebar [data-alumdoor-logo]) .mf-field :is(input, textarea, button[role="combobox"]):focus-visible {
   border-color: #f45b24;
   box-shadow: 0 0 0 3px rgb(244 91 36 / 0.15), 0 5px 14px rgb(17 24 39 / 0.075);
+}
 }

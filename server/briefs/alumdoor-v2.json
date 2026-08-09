@@ -226,24 +226,19 @@
    "label": "Tính công thức cửa",
    "icon": "calculator",
    "group": "Bán hàng",
-   "description": "Tính cùng lúc rộng cắt, m2 bán và kg mua dự toán theo đúng loại cửa, nhóm khách và tách món/trọn bộ.",
+   "description": "Tính diện tích bán và thành tiền theo đúng loại cửa và nhóm khách.",
    "permission": "Quotation",
    "fields": [
     "item_code:Link(Item)! Mặt hàng cửa",
     "customer_group:Select(Đại lý,Lẻ)! Nhóm giá",
-    "purpose:Select(Bán hàng,Sản xuất,Dự toán mua,Tất cả)!=(Bán hàng) Cần tính",
-    "sales_mode:Select(Trọn bộ,Tách món)!=(Trọn bộ) Cách bán",
-    "ray_type:Select(Ray thường,Ray âm,Ray nghiêng) Loại ray",
-    "has_butterfly_bracket:Check Có bản bướm",
-    "width_m:Float! Rộng khai theo chính sách (m)",
+    "width_pb_ray_m:Float! Rộng PB ray (m)",
+    "width_pb_nhua_m:Float! Rộng PB nhựa (m)",
     "height_m:Float Cao phủ bì (m)",
-    "mesh_height_m:Float Cao lưới (m)",
     "set_count:Int!=(1) Số bộ",
-    "actual_purchase_kg:Float Kg mua thực tế (Cửa Đức)",
-    "purchase_rate:Currency Đơn giá mua / kg"
+    "selling_rate:Currency Đơn giá bán / m2"
    ],
-   "preview": "alumdoor.door.calculate | Tính thử",
-   "commit": "alumdoor.door.calculate | Tính lại",
+   "preview": "alumdoor.door.calculate | Tính tiền",
+   "commit": "alumdoor.door.calculate | Tính tiền",
    "resultTable": "results"
   },
   {
@@ -2442,6 +2437,14 @@
    "title": "item_code",
    "list": [
     "item_code",
+    "color",
+    "width_m",
+    "height_m",
+    "set_count",
+    "sales_mode",
+    "has_butterfly_bracket",
+    "length_m",
+    "qty_bar",
     "uom",
     "availability_status",
     "qty",
@@ -2608,14 +2611,18 @@
     {
      "fieldname": "length_m",
      "fieldtype": "Float",
-     "label": "Dài một cây (m)",
-     "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'"
+     "label": "Dài một cây/đoạn (m)",
+     "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá' && (doc.uom == 'Mét' || doc.uom == 'M' || doc.uom == 'm' || doc.uom == 'met' || doc.uom == 'meter' || doc.uom == 'metre')",
+     "mandatory_depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá' && (doc.uom == 'Mét' || doc.uom == 'M' || doc.uom == 'm' || doc.uom == 'met' || doc.uom == 'meter' || doc.uom == 'metre')",
+     "description": "Chiều dài của một cây/đoạn, không phải tổng số mét."
     },
     {
      "fieldname": "qty_bar",
      "fieldtype": "Float",
-     "label": "Số cây/lá",
-     "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'"
+     "label": "Số cây/đoạn",
+     "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá' && (doc.uom == 'Mét' || doc.uom == 'M' || doc.uom == 'm' || doc.uom == 'met' || doc.uom == 'meter' || doc.uom == 'metre' || doc.uom == 'Cây' || doc.uom == 'cay' || doc.uom == 'Lá' || doc.uom == 'la' || doc.uom == 'Đoạn' || doc.uom == 'doan')",
+     "mandatory_depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá' && (doc.uom == 'Mét' || doc.uom == 'M' || doc.uom == 'm' || doc.uom == 'met' || doc.uom == 'meter' || doc.uom == 'metre' || doc.uom == 'Cây' || doc.uom == 'cay' || doc.uom == 'Lá' || doc.uom == 'la' || doc.uom == 'Đoạn' || doc.uom == 'doan')",
+     "description": "Bán theo Mét: hệ thống lấy chiều dài × số cây. Bán theo Cây/Lá: hệ thống lấy chính số này."
     },
     "uom:Link(UOM)! ĐVT bán",
     {
@@ -2623,7 +2630,8 @@
      "fieldtype": "Float",
      "label": "SL tính tiền",
      "required": true,
-     "read_only_depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2' && (doc.uom == 'm2' || doc.uom == 'M2' || doc.uom == 'm²')"
+     "read_only_depends_on": "eval:(doc.inventory_mode == 'Thành phẩm theo m2' && (doc.uom == 'm2' || doc.uom == 'M2' || doc.uom == 'm²' || doc.uom == 'Bộ')) || (doc.inventory_mode == 'Nhôm cây/lá' && (doc.uom == 'Mét' || doc.uom == 'M' || doc.uom == 'Cây' || doc.uom == 'Lá'))",
+     "description": "Ô máy tính theo quy cách của dòng: cửa = m² đã chốt × số bộ; ray/trục = dài × số cây; phụ kiện = số lượng theo ĐVT bán."
     },
     "conversion_factor:Float~- Hệ số về ĐVT tồn",
     "stock_qty:Float~- SL quy đổi tồn",
@@ -2770,6 +2778,14 @@
    "title": "item_code",
    "list": [
     "item_code",
+    "color",
+    "width_m",
+    "height_m",
+    "set_count",
+    "sales_mode",
+    "has_butterfly_bracket",
+    "length_m",
+    "qty_bar",
     "uom",
     "availability_status",
     "qty",
@@ -2936,14 +2952,18 @@
     {
      "fieldname": "length_m",
      "fieldtype": "Float",
-     "label": "Dài một cây (m)",
-     "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'"
+     "label": "Dài một cây/đoạn (m)",
+     "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá' && (doc.uom == 'Mét' || doc.uom == 'M' || doc.uom == 'm' || doc.uom == 'met' || doc.uom == 'meter' || doc.uom == 'metre')",
+     "mandatory_depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá' && (doc.uom == 'Mét' || doc.uom == 'M' || doc.uom == 'm' || doc.uom == 'met' || doc.uom == 'meter' || doc.uom == 'metre')",
+     "description": "Chiều dài của một cây/đoạn, không phải tổng số mét."
     },
     {
      "fieldname": "qty_bar",
      "fieldtype": "Float",
-     "label": "Số cây/lá",
-     "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'"
+     "label": "Số cây/đoạn",
+     "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá' && (doc.uom == 'Mét' || doc.uom == 'M' || doc.uom == 'm' || doc.uom == 'met' || doc.uom == 'meter' || doc.uom == 'metre' || doc.uom == 'Cây' || doc.uom == 'cay' || doc.uom == 'Lá' || doc.uom == 'la' || doc.uom == 'Đoạn' || doc.uom == 'doan')",
+     "mandatory_depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá' && (doc.uom == 'Mét' || doc.uom == 'M' || doc.uom == 'm' || doc.uom == 'met' || doc.uom == 'meter' || doc.uom == 'metre' || doc.uom == 'Cây' || doc.uom == 'cay' || doc.uom == 'Lá' || doc.uom == 'la' || doc.uom == 'Đoạn' || doc.uom == 'doan')",
+     "description": "Bán theo Mét: hệ thống lấy chiều dài × số cây. Bán theo Cây/Lá: hệ thống lấy chính số này."
     },
     "uom:Link(UOM)! ĐVT bán",
     {
@@ -2951,7 +2971,8 @@
      "fieldtype": "Float",
      "label": "SL tính tiền",
      "required": true,
-     "read_only_depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2' && (doc.uom == 'm2' || doc.uom == 'M2' || doc.uom == 'm²')"
+     "read_only_depends_on": "eval:(doc.inventory_mode == 'Thành phẩm theo m2' && (doc.uom == 'm2' || doc.uom == 'M2' || doc.uom == 'm²' || doc.uom == 'Bộ')) || (doc.inventory_mode == 'Nhôm cây/lá' && (doc.uom == 'Mét' || doc.uom == 'M' || doc.uom == 'Cây' || doc.uom == 'Lá'))",
+     "description": "Ô máy tính theo quy cách của dòng: cửa = m² đã chốt × số bộ; ray/trục = dài × số cây; phụ kiện = số lượng theo ĐVT bán."
     },
     "conversion_factor:Float~- Hệ số về ĐVT tồn",
     "stock_qty:Float~- SL quy đổi tồn",

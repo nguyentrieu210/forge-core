@@ -66,7 +66,7 @@ function allowedUoms(master: JsonObject | null): Set<string> {
 }
 
 function normalizedUom(value: string | undefined): string {
-  return String(value ?? "").trim().toLocaleLowerCase("vi");
+  return String(value ?? "").normalize("NFC").trim().toLocaleLowerCase("vi");
 }
 
 function usesDynamicSquareMetreToSet(master: JsonObject | null, uom: string): boolean {
@@ -79,23 +79,18 @@ function dynamicSetStockQtyMicros(
   line: UomLine,
   master: JsonObject | null,
   uom: string,
-  qtyMicros: number,
+  _qtyMicros: number,
   index: number,
 ): number | undefined {
   if (!usesDynamicSquareMetreToSet(master, uom)) return undefined;
   const setsMicros = toScaledInt(line.set_count ?? 1, 6, `items[${index}].set_count`);
   if (setsMicros <= 0) throw errors.validation(`Số bộ phải lớn hơn 0 (dòng ${index + 1})`);
-  const width = Number(line.width_m);
-  const height = Number(line.height_m);
-  if (!Number.isFinite(width) || width <= 0 || !Number.isFinite(height) || height <= 0) {
-    throw errors.validation(`Hàng tính m² phải có rộng và cao lớn hơn 0 (dòng ${index + 1})`);
-  }
-  const minimumArea = Math.max(0, Number(master?.min_area_sqm) || 0);
-  const setCount = Number(fromScaledInt(setsMicros, 6));
-  const expectedQty = toScaledInt(Math.max(width * height, minimumArea) * setCount, 6, `items[${index}].qty`);
-  if (Math.abs(expectedQty - qtyMicros) > 1) {
-    throw errors.validation(`Số lượng m² không khớp kích thước, số bộ và diện tích tối thiểu của Item (dòng ${index + 1})`);
-  }
+  /**
+   * UOM core chỉ đổi trục m² thương mại sang số Bộ tồn kho. Nó không được tự quyết m² bán:
+   * cửa có thể dùng PB ray, PB nhựa hoặc rộng cắt theo policy/nhóm khách, nên `width × height`
+   * ở tầng dùng chung vừa trùng luật vừa có thể mâu thuẫn với app validator. App/runtime policy
+   * chịu trách nhiệm chốt transaction qty trước khi đi tới đây; stock snapshot chỉ là số bộ.
+   */
   return setsMicros;
 }
 
@@ -142,20 +137,32 @@ function applyRateUnit<T extends UomLine>(
   qtyMicros: number,
   index: number,
 ): Partial<UomLine> {
-  const weightMicros = item.actual_weight_micros
-    ?? (item.actual_weight_kg === undefined
-      ? undefined
-      : toScaledInt(item.actual_weight_kg, 6, `items[${index}].actual_weight_kg`));
+  // Hidden micros are server snapshots returned by REST. A normal edit keeps them in the row,
+  // so trusting them would make a changed decimal value bill/post the old quantity. Always
+  // rebuild from the visible canonical value on every mutation.
+  const weightMicros = item.actual_weight_kg === undefined
+    || item.actual_weight_kg === null
+    || item.actual_weight_kg === ""
+    ? undefined
+    : toScaledInt(item.actual_weight_kg, 6, `items[${index}].actual_weight_kg`);
   const weightPart = weightMicros === undefined
     ? {}
     : { actual_weight_micros: weightMicros, actual_weight_kg: fromScaledInt(weightMicros, 6) };
 
   const lineUom = uom ?? stockUomOf(master);
   const rateUom = item.rate_uom;
-  if (!rateUom || rateUom === lineUom) return { ...weightPart, priced_qty_micros: qtyMicros };
+  if (!rateUom || rateUom === lineUom) {
+    return { ...weightPart, ...(lineUom ? { rate_uom: lineUom } : {}), priced_qty_micros: qtyMicros };
+  }
 
   const weightUom = itemText(master, "weight_uom");
+  const hasCatchWeight = master?.has_catch_weight === true || master?.has_catch_weight === 1;
   if (rateUom === weightUom) {
+    if (!hasCatchWeight) {
+      throw errors.validation(
+        `Mặt hàng ${item.item_code} (dòng ${index + 1}) không được cấu hình cân theo kiện; không thể tính giá theo "${rateUom}".`,
+      );
+    }
     if (weightMicros === undefined) {
       throw errors.validation(
         `Mặt hàng ${item.item_code} (dòng ${index + 1}): đơn giá tính theo "${rateUom}" nhưng chưa cân.`
@@ -163,7 +170,7 @@ function applyRateUnit<T extends UomLine>(
       );
     }
     if (weightMicros <= 0) throw errors.validation(`Khối lượng thực phải lớn hơn 0 (dòng ${index + 1})`);
-    return { ...weightPart, priced_qty_micros: weightMicros };
+    return { ...weightPart, rate_uom: weightUom, priced_qty_micros: weightMicros };
   }
 
   throw errors.validation(
@@ -187,7 +194,8 @@ export async function applyUomConversion<T extends UomLine>(
     const master = masters.get(item.item_code) ?? null;
     const transactionKind = options.transactionKind ?? "stock";
     const uom = transactionUomOf(item, master, transactionKind);
-    const qtyMicros = item.qty_micros ?? toScaledInt(item.qty, 6, `items[${index}].qty`);
+    // `qty_micros` có thể là snapshot cũ từ lần GET trước; qty hiện tại luôn là nguồn thật.
+    const qtyMicros = toScaledInt(item.qty, 6, `items[${index}].qty`);
     const purchaseStockQtyField = transactionKind === "purchase" ? itemText(master, "purchase_stock_qty_field") : "";
     if (purchaseStockQtyField && !SAFE_FIELDNAME.test(purchaseStockQtyField)) {
       throw errors.validation(`Mặt hàng ${item.item_code}: purchase_stock_qty_field không hợp lệ`);
@@ -242,8 +250,25 @@ export async function applyUomConversion<T extends UomLine>(
     if (purchaseAllocationQtyField && !SAFE_FIELDNAME.test(purchaseAllocationQtyField)) {
       throw errors.validation(`Mặt hàng ${item.item_code}: purchase_allocation_qty_field không hợp lệ`);
     }
-    return {
-      ...item,
+    // Drop every client/persisted integer snapshot before rebuilding it below. Keeping a stale
+    // key with `undefined` is not enough under exact optional types and is easy to serialize
+    // inconsistently; omitting it makes the authority boundary explicit.
+    const {
+      qty_micros: _clientQtyMicros,
+      conversion_factor_micros: _clientFactorMicros,
+      stock_qty_micros: _clientStockQtyMicros,
+      priced_qty_micros: _clientPricedQtyMicros,
+      actual_weight_micros: _clientWeightMicros,
+      purchase_stock_qty_field: _clientPurchaseStockQtyField,
+      purchase_allocation_qty_field: _clientPurchaseAllocationQtyField,
+      purchase_allocation_uom: _clientPurchaseAllocationUom,
+      ...canonicalItem
+    } = item;
+    const normalized: UomLine = {
+      ...canonicalItem,
+      item_code: item.item_code,
+      qty: fromScaledInt(qtyMicros, 6),
+      qty_micros: qtyMicros,
       ...(uom ? { uom } : {}),
       conversion_factor: fromScaledInt(factorMicros, 6),
       conversion_factor_micros: factorMicros,
@@ -252,9 +277,9 @@ export async function applyUomConversion<T extends UomLine>(
       stock_qty_micros: stockQty,
       ...applyRateUnit(item, master, uom, qtyMicros, index),
       // Quantity-axis authority is master data. Always overwrite/clear client-supplied descriptors.
-      purchase_stock_qty_field: purchaseStockQtyField || undefined,
-      purchase_allocation_qty_field: purchaseAllocationQtyField || undefined,
-      purchase_allocation_uom: purchaseAllocationUom || undefined,
+      ...(purchaseStockQtyField ? { purchase_stock_qty_field: purchaseStockQtyField } : {}),
+      ...(purchaseAllocationQtyField ? { purchase_allocation_qty_field: purchaseAllocationQtyField } : {}),
+      ...(purchaseAllocationUom ? { purchase_allocation_uom: purchaseAllocationUom } : {}),
       ...(master ? {
         inventory_mode: inventoryMode,
         measurement_profile: measurementProfile,
@@ -262,6 +287,9 @@ export async function applyUomConversion<T extends UomLine>(
         ...(typeof master.weight_uom === "string" ? { weight_uom: master.weight_uom } : {}),
       } : {}),
     };
+    // `canonicalItem` preserves every caller-specific child-row property; this function only
+    // replaces the shared UOM snapshots declared by UomLine.
+    return normalized as T;
   });
 }
 

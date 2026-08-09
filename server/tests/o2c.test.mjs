@@ -192,6 +192,95 @@ test("square-metre doors bill by area but deduct an exact number of sets", async
   assert.equal(order.data.delivered_percentage, "100.00");
 });
 
+test("UOM core preserves app-policy door area instead of replacing it with width × height", async () => {
+  const { store, kernel } = setup();
+  store.seedMaster("Item", "ITEM-001", "demo", {
+    stock_uom: "Bộ",
+    default_sales_uom: "m2",
+    inventory_mode: "Thành phẩm theo m2",
+  });
+  // Cutting Policy may sell by rộng cắt/PB ray, so 11.91 is authoritative although the
+  // raw measured rectangle is 4 × 3 = 12. UOM core owns only m² -> Bộ conversion.
+  const door = {
+    row_id: "1", item_code: "ITEM-001", uom: "m2", qty: "11.91", rate: "100",
+    width_m: "4", height_m: "3", set_count: "1",
+  };
+  await createAndSubmit(kernel, {
+    doctype: "Sales Order", name: "SO-DOOR-POLICY-M2",
+    document: { ...orderDocument("11.91", "100"), items: [door] },
+  });
+  const order = await store.getDocument("demo", "Sales Order", "SO-DOOR-POLICY-M2");
+  assert.equal(order.data.items[0].qty, "11.910000");
+  assert.equal(order.data.items[0].stock_qty, "1.000000");
+  assert.equal(order.data.items[0].amount, "1191.00");
+});
+
+test("visible sales quantity overwrites stale or injected quantity snapshots", async () => {
+  const { store, kernel } = setup();
+  await mutate(kernel, {
+    commandId: "so-stale-quantity-create",
+    doctype: "Sales Order",
+    name: "SO-STALE-QUANTITY",
+    action: "create",
+    expectedVersion: null,
+    document: {
+      ...orderDocument("4", "100"),
+      taxes: [],
+      items: [{
+        row_id: "SOI-1", item_code: "ITEM-001", qty: "4", rate: "100",
+        qty_micros: 3_000_000,
+        stock_qty: "3.000000", stock_qty_micros: 3_000_000,
+        priced_qty_micros: 3_000_000,
+      }],
+    },
+  });
+
+  const order = await store.getDocument("demo", "Sales Order", "SO-STALE-QUANTITY");
+  assert.equal(order.data.items[0].qty, "4.000000");
+  assert.equal(order.data.items[0].qty_micros, 4_000_000);
+  assert.equal(order.data.items[0].stock_qty, "4.000000");
+  assert.equal(order.data.items[0].stock_qty_micros, 4_000_000);
+  assert.equal(order.data.items[0].priced_qty_micros, 4_000_000);
+  assert.equal(order.data.items[0].amount, "400.00");
+});
+
+test("sales catch-weight prices by the server-authorized weight UOM", async () => {
+  const { store, kernel } = setup();
+  store.seedMaster("Item", "ITEM-001", "demo", {
+    stock_uom: "Cây",
+    default_sales_uom: "Cây",
+    has_catch_weight: 1,
+    weight_uom: "Kg",
+  });
+  store.seedMaster("Item Price", "BANG-GIA:ITEM-001:Kg", "demo", {
+    item_code: "ITEM-001", price_list: "BANG-GIA", uom: "Kg", currency: "USD", rate: "100",
+  });
+  await mutate(kernel, {
+    commandId: "so-catch-weight-create",
+    doctype: "Sales Order",
+    name: "SO-CATCH-WEIGHT",
+    action: "create",
+    expectedVersion: null,
+    document: {
+      ...orderDocument("2", "1"),
+      selling_price_list: "BANG-GIA",
+      taxes: [],
+      items: [{
+        row_id: "SOI-1", item_code: "ITEM-001", qty: "2", uom: "Cây",
+        actual_weight_kg: "1200", actual_weight_micros: 1_100_000_000,
+        rate_uom: "Kg", rate: "1",
+      }],
+    },
+  });
+
+  const order = await store.getDocument("demo", "Sales Order", "SO-CATCH-WEIGHT");
+  assert.equal(order.data.items[0].rate_uom, "Kg");
+  assert.equal(order.data.items[0].actual_weight_micros, 1_200_000_000);
+  assert.equal(order.data.items[0].priced_qty_micros, 1_200_000_000);
+  assert.equal(order.data.items[0].rate, "100.00");
+  assert.equal(order.data.items[0].amount, "120000.00");
+});
+
 test("Delivery Note inherits inventory and COGS accounts from the nearest Item Group", async () => {
   const { store, kernel } = setup();
   store.seedMaster("Account", "Stock - Aluminium");

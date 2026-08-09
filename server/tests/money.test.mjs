@@ -22,6 +22,32 @@ test("sales totals are canonical decimal strings backed by minor integers", () =
   assert.equal(totals.grand_total, "0.54");
 });
 
+test("sales amount uses the server-priced quantity axis", () => {
+  const totals = calculateSalesTotals([{
+    row_id: "1",
+    item_code: "CATCH-WEIGHT",
+    qty: "3",
+    priced_qty_micros: 15_900_000,
+    rate: "140000",
+  }], [], 0, { use_priced_quantity: true });
+  assert.equal(totals.items[0].qty, "3.000000");
+  assert.equal(totals.items[0].amount, "2226000");
+  assert.equal(totals.grand_total, "2226000");
+});
+
+test("raw callers cannot inject a hidden priced quantity", () => {
+  const totals = calculateSalesTotals([{
+    row_id: "1",
+    item_code: "NORMAL",
+    qty: "4",
+    priced_qty_micros: 3_000_000,
+    rate: "100",
+  }], [], 2);
+  assert.equal(totals.items[0].qty, "4.000000");
+  assert.equal(totals.items[0].priced_qty_micros, 4_000_000);
+  assert.equal(totals.items[0].amount, "400.00");
+});
+
 test("advanced tax matrix matches pinned ERPNext oracle examples", () => {
   const item = [{ row_id: "1", item_code: "A", qty: "1", rate: "500" }];
   const multi = calculateSalesTotals(item, [

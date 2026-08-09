@@ -363,8 +363,20 @@ function FieldProps({ field, onPatch }: { field: DocField; onPatch: (p: Partial<
             <SelectContent>
               <SelectItem value="auto">Tự động theo loại field</SelectItem>
               <SelectItem value="full">Toàn hàng (1 ô/hàng)</SelectItem>
+              <SelectItem value="two_thirds">Hai phần ba hàng</SelectItem>
               <SelectItem value="half">Nửa hàng (2 ô/hàng)</SelectItem>
               <SelectItem value="third">Một phần ba (3 ô/hàng)</SelectItem>
+            </SelectContent>
+          </Select>
+        </Row>
+        <Row label="Vùng trên form">
+          <Select value={field.form_region ?? "flow"} onValueChange={(value) => onPatch({ form_region: value === "flow" ? undefined : value as DocField["form_region"] })}>
+            <SelectTrigger><SelectValue placeholder="Tự chảy theo lưới" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="flow">Tự chảy theo lưới</SelectItem>
+              <SelectItem value="main">Khối chính bên trái</SelectItem>
+              <SelectItem value="aside">Cột phụ bên phải</SelectItem>
+              <SelectItem value="full">Trọn chiều ngang, dưới các cột</SelectItem>
             </SelectContent>
           </Select>
         </Row>

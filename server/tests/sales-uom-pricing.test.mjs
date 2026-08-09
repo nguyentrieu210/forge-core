@@ -10,7 +10,11 @@ function context(masters, rules = []) {
         return masters.get(`${doctype}:${name}`) ?? null;
       },
       async listMasterRecordData(_tenant, doctype) {
-        return doctype === "Pricing Rule" ? rules : [];
+        if (doctype === "Pricing Rule") return rules;
+        const prefix = `${doctype}:`;
+        return [...masters.entries()]
+          .filter(([key]) => key.startsWith(prefix))
+          .map(([key, data]) => ({ name: key.slice(prefix.length), data }));
       },
     },
   };
@@ -72,4 +76,56 @@ test("typed legacy Item Price requires an explicit matching sales UOM", async ()
     resolveServerPrice(context(masters), base(undefined)),
     /document row must provide a matching selling UOM/,
   );
+});
+
+test("missing exact UOM price converts from the Item sales UOM", async () => {
+  const masters = new Map([
+    currency,
+    ["Item:ITEM-1", {
+      name: "ITEM-1", stock_uom: "Mét", default_sales_uom: "Mét",
+      uom_conversions: [{ uom: "Cây", conversion_factor: 5.85 }],
+    }],
+    ["Item Price:BANG-GIA:ITEM-1:Mét", {
+      item_code: "ITEM-1", price_list: "BANG-GIA", uom: "Mét", currency: "VND", rate: "120000",
+    }],
+  ]);
+  const result = await resolveServerPrice(context(masters), base("Cây"));
+  assert.equal(result.rate, "702000.00");
+  assert.equal(result.uom, "Cây");
+  assert.equal(result.source_uom, "Mét");
+});
+
+test("exact UOM price overrides the automatically converted price", async () => {
+  const masters = new Map([
+    currency,
+    ["Item:ITEM-1", {
+      name: "ITEM-1", stock_uom: "Mét", default_sales_uom: "Mét",
+      uom_conversions: [{ uom: "Cây", conversion_factor: 5.85 }],
+    }],
+    ["Item Price:BANG-GIA:ITEM-1:Mét", {
+      item_code: "ITEM-1", price_list: "BANG-GIA", uom: "Mét", currency: "VND", rate: "120000",
+    }],
+    ["Item Price:BANG-GIA:ITEM-1:Cây", {
+      item_code: "ITEM-1", price_list: "BANG-GIA", uom: "Cây", currency: "VND", rate: "650000",
+    }],
+  ]);
+  const result = await resolveServerPrice(context(masters), base("Cây"));
+  assert.equal(result.rate, "650000.00");
+  assert.equal(result.item_price, "BANG-GIA:ITEM-1:Cây");
+  assert.equal(result.source_uom, undefined);
+});
+
+test("exact UOM record overrides a compatible legacy record", async () => {
+  const masters = new Map([
+    currency,
+    ["Item Price:BANG-GIA:ITEM-1", {
+      item_code: "ITEM-1", price_list: "BANG-GIA", uom: "Cây", currency: "VND", rate: "700000",
+    }],
+    ["Item Price:BANG-GIA:ITEM-1:Cây", {
+      item_code: "ITEM-1", price_list: "BANG-GIA", uom: "Cây", currency: "VND", rate: "650000",
+    }],
+  ]);
+  const result = await resolveServerPrice(context(masters), base("Cây"));
+  assert.equal(result.rate, "650000.00");
+  assert.equal(result.item_price, "BANG-GIA:ITEM-1:Cây");
 });

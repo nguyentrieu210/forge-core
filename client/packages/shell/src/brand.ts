@@ -19,7 +19,7 @@
  */
 import { useCallback, useEffect, useState } from "react";
 
-export type BrandMode = "enterprise" | "graphite" | "red";
+export type BrandMode = "enterprise" | "graphite" | "red" | "orange";
 
 
 const KEY = "metaforge-brand";
@@ -29,6 +29,7 @@ export const BRANDS: { id: BrandMode; label: string; swatch: string }[] = [
   { id: "enterprise", label: "Doanh nghiệp", swatch: "#1e40af" },
   { id: "graphite", label: "Than chì", swatch: "#374151" },
   { id: "red", label: "Đỏ doanh nghiệp", swatch: "#991b1b" },
+  { id: "orange", label: "Cam doanh nghiệp", swatch: "#c2410c" },
 ];
 
 export const BRAND_COLOR_COUNT = BRANDS.length;
@@ -42,7 +43,7 @@ export const BRAND_COLOR_COUNT = BRANDS.length;
  * bản kế nhiệm (zinc = brand trung tính cũ → graphite); 11 bảng màu trang trí không có, nên rơi
  * về mặc định.
  */
-const LEGACY_BRAND_ALIASES: Record<string, BrandMode> = { zinc: "graphite" };
+const LEGACY_BRAND_ALIASES: Record<string, BrandMode> = { zinc: "graphite", warm: "orange" };
 
 export function isBrandMode(value: unknown): value is BrandMode {
   return BRANDS.some((brand) => brand.id === value);

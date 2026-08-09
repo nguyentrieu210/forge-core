@@ -490,13 +490,51 @@ export function FormView(props: FormViewProps) {
           {tab?.sections.map((section, si) => {
             if (section.hidden) return null;
             const sectionFields = section.columns.flatMap((col) => col.fields);
+            const mainFields = sectionFields.filter((field) => field.field.form_region !== "aside" && field.field.form_region !== "full");
+            const asideFields = sectionFields.filter((field) => field.field.form_region === "aside");
+            const fullFields = sectionFields.filter((field) => field.field.form_region === "full");
+            const renderFields = (fields: typeof sectionFields, region?: "main" | "aside" | "full") => groupCheckFields(fields).map((entry, groupIndex) =>
+              Array.isArray(entry) ? (
+                <div key={`checks-${groupIndex}`} className="mf-check-group">
+                  {entry.map((rf) => (
+                    <Field
+                      key={rf.field.fieldname}
+                      id={fieldDomId(rf.field.fieldname)}
+                      rf={rf}
+                      width={region === "aside" || region === "full" ? "full" : region === "main" && !rf.field.form_width ? "half" : "third"}
+                      form={form}
+                      registry={registry}
+                      services={services}
+                      docName={String(doc.name)}
+                      parentDoctype={meta.name}
+                      roles={roles}
+                      values={values}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <Field
+                  key={entry.field.fieldname}
+                  id={fieldDomId(entry.field.fieldname)}
+                  rf={entry}
+                  width={region === "aside" || region === "full" ? "full" : region === "main" && !entry.field.form_width ? "half" : resolveFormFieldWidth(entry.field, meta.title_field)}
+                  form={form}
+                  registry={registry}
+                  services={services}
+                  docName={String(doc.name)}
+                  parentDoctype={meta.name}
+                  roles={roles}
+                  values={values}
+                />
+              ),
+            );
             return (
               <section key={si} className="mf-form-section py-3">
                 <div className="mf-section-heading mb-3 flex items-center gap-3">
                   <h3 className="shrink-0 text-[15px] font-semibold tracking-[-0.01em] text-foreground">
                     {section.label || t("form.section_general", "Thông tin chung")}
                   </h3>
-                  <span className="h-px min-w-8 flex-1 bg-border/40" aria-hidden="true" />
+                  <span className="h-0.5 min-w-8 flex-1 bg-border/80" aria-hidden="true" />
                 </div>
                 {/* gap-y-2.5 thay vì 4, gap-x-5 thay vì 6 — mật độ dày kiểu ERP, đọc được cả form
                     trong 1 màn thay vì phải cuộn. */}
@@ -506,43 +544,19 @@ export function FormView(props: FormViewProps) {
                 {/* Flex-wrap, KHÔNG phải lưới: field tự chảy theo bề rộng của chính nó và tự
                     xuống dòng khi hết chỗ. Lưới cấp khe đều nhau nên ô ngắn nằm giữa khe rộng,
                     hở hai bên — đó là gốc của cảm giác "form quá rộng, kích cỡ không hợp lý". */}
-                <div className="mf-form-grid grid items-start gap-x-3 gap-y-3">
-                  {groupCheckFields(sectionFields).map((entry, groupIndex) =>
-                    Array.isArray(entry) ? (
-                      <div key={`checks-${groupIndex}`} className="mf-check-group">
-                        {entry.map((rf) => (
-                          <Field
-                            key={rf.field.fieldname}
-                            id={fieldDomId(rf.field.fieldname)}
-                            rf={rf}
-                            width="third"
-                            form={form}
-                            registry={registry}
-                            services={services}
-                            docName={String(doc.name)}
-                            parentDoctype={meta.name}
-                            roles={roles}
-                            values={values}
-                          />
-                        ))}
-                      </div>
-                    ) : (
-                      <Field
-                        key={entry.field.fieldname}
-                        id={fieldDomId(entry.field.fieldname)}
-                        rf={entry}
-                        width={resolveFormFieldWidth(entry.field, meta.title_field)}
-                        form={form}
-                        registry={registry}
-                        services={services}
-                        docName={String(doc.name)}
-                        parentDoctype={meta.name}
-                        roles={roles}
-                        values={values}
-                      />
-                    ),
-                  )}
-                </div>
+                {asideFields.length ? (
+                  <>
+                    <div className="mf-form-split">
+                      <div className="mf-form-grid mf-form-grid-main grid items-start gap-x-3 gap-y-3">{renderFields(mainFields, "main")}</div>
+                      <aside className="mf-form-split-aside">
+                        <div className="mf-form-grid mf-form-grid-aside grid items-start gap-y-3">{renderFields(asideFields, "aside")}</div>
+                      </aside>
+                    </div>
+                    {fullFields.length ? <div className="mf-form-grid mt-3 grid items-start gap-y-3">{renderFields(fullFields, "full")}</div> : null}
+                  </>
+                ) : (
+                  <div className="mf-form-grid grid items-start gap-x-3 gap-y-3">{renderFields(sectionFields)}</div>
+                )}
               </section>
             );
           })}
@@ -656,6 +670,7 @@ function Field({ id, rf, width, form, registry, services, docName, parentDoctype
           "min-w-0",
           isCheck && "mf-field-check",
           `mf-field-width-${width}`,
+          field.form_control_width === "compact" && "mf-field-control-compact",
           rf.state && `mf-state-${rf.state}`,
           rf.readOnly && "mf-field-readonly",
           fieldState.error && "mf-field-error",

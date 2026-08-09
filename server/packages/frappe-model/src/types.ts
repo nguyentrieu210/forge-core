@@ -92,7 +92,9 @@ export interface DocFieldMeta extends JsonObject {
   permlevel?: number;
   description?: string;
   /** Độ rộng field trên lưới form 3 ô; chỉ ảnh hưởng trình bày. */
-  form_width?: "full" | "half" | "third";
+  form_width?: "full" | "two_thirds" | "half" | "third";
+  form_region?: "main" | "aside" | "full";
+  form_control_width?: "compact";
   /** Immutable after the first save — enforced by the generic controller. */
   set_only_once?: boolean;
   /** Refuses a negative value. */
@@ -119,6 +121,18 @@ export interface DocFieldMeta extends JsonObject {
 export type DocTypeKind = "transaction" | "master" | "child_table" | "single" | "tree" | "virtual" | "system";
 export type BulkCommitStrategy = "document_update";
 
+export interface BulkRowSource extends JsonObject {
+  kind: "link_uom_expansion";
+  doctype: string;
+  identityField: string;
+  uomFields: string[];
+  uomTable?: string;
+  uomTableField?: string;
+  filterFields?: string[];
+  targetLinkField: string;
+  targetUomField: string;
+}
+
 export interface DocTypeView extends JsonObject {
   enabled: boolean;
   fields?: string[];
@@ -131,6 +145,10 @@ export interface DocTypeView extends JsonObject {
   allowPaste?: boolean;
   allowFillDown?: boolean;
   pageSize?: number;
+  /** Link/Select fields rendered as a contextual filter above Bulk Grid, not as a grid column. */
+  toolbarFilters?: string[];
+  /** Declarative parent × UOM source for create-or-update bulk grids. */
+  rowSource?: BulkRowSource;
   reasonRequiredOn?: string[];
 }
 

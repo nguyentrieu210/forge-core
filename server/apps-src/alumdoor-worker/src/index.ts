@@ -540,8 +540,13 @@ async function validationDocument(
 type TransactionSide = "purchase" | "sales";
 
 function normalizedUom(value: unknown): string {
-  return String(value ?? "").trim().toLocaleLowerCase("vi");
+  return String(value ?? "").normalize("NFC").trim().toLocaleLowerCase("vi");
 }
+
+const SALES_AREA_UOMS = new Set(["m2", "m²", "sqm"]);
+const SALES_METRE_UOMS = new Set(["m", "mét", "met", "meter", "metre"]);
+const SALES_SET_UOMS = new Set(["bộ", "bo", "set"]);
+const SALES_PIECE_UOMS = new Set(["cây", "cay", "lá", "la", "đoạn", "doan"]);
 
 function nearlyEqual(left: number, right: number): boolean {
   return Math.abs(left - right) <= Math.max(0.000001, Math.abs(right) * 0.000001);
@@ -572,15 +577,33 @@ async function validateTransactionLines(
    * Item, bộ chính sách và hồ sơ khách độc lập nên đọc song song. Validator có ngân sách hai
    * giây; xếp ba lượt này nối đuôi sẽ biến một phép kiểm đúng thành timeout trên đơn nhiều dòng.
    */
-  const [pairs, doorPolicies, customer] = await Promise.all([
+  const [pairs, doorPolicies, customer, persistedDocument] = await Promise.all([
     Promise.all(codes.map(async (code) => [code, await readMaster(call, "Item", code) as InventoryItem | null] as const)),
     side === "sales" ? readDoorPolicies(call) : Promise.resolve([]),
-    side === "sales" && !declaredCustomerGroup && customerName
+    side === "sales" && customerName
       ? readMaster(call, "Customer", customerName)
+      : Promise.resolve(null),
+    side === "sales" && subject.action !== "create"
+      ? readMaster(call, subject.doctype, subject.name)
       : Promise.resolve(null),
   ]);
   const items = new Map(pairs);
-  const customerGroup = declaredCustomerGroup || String(customer?.price_group ?? "").trim();
+  const persistedCustomer = String(persistedDocument?.customer ?? "").trim();
+  const persistedCustomerGroup = String(persistedDocument?.customer_group ?? "").trim();
+  const masterCustomerGroup = String(customer?.price_group ?? "").trim();
+  // Cùng khách trên chứng từ cũ thì giữ snapshot lịch sử. Tạo mới hoặc đổi khách phải lấy
+  // master hiện tại. Payload không được tự chọn group vì nó đổi cả giá lẫn PB ray/PB nhựa.
+  const customerGroup = persistedCustomer === customerName && persistedCustomerGroup
+    ? persistedCustomerGroup
+    : masterCustomerGroup;
+  if (side === "sales" && customerName) {
+    if (!customer) return refuse(`Khách hàng ${customerName} không tồn tại hoặc đã ngừng dùng.`);
+    if (declaredCustomerGroup !== customerGroup) {
+      return refuse(
+        `Nhóm giá trên chứng từ phải là "${customerGroup || "(trống)"}" theo hồ sơ khách ${customerName}; không được chọn tay.`,
+      );
+    }
+  }
 
   for (let index = 0; index < rows.length; index += 1) {
     const row = rows[index]!;
@@ -605,8 +628,8 @@ async function validateTransactionLines(
       return refuse(`${line}: nhôm cây/lá phải nhập theo Kg; số cây và chiều dài chỉ là quy cách đối chiếu.`);
     }
     const dynamicSquareMetreToSet = mode === "Thành phẩm theo m2"
-      && ["m2", "m²", "sqm"].includes(selected)
-      && ["bộ", "bo", "set"].includes(normalizedUom(stockUom));
+      && SALES_AREA_UOMS.has(selected)
+      && SALES_SET_UOMS.has(normalizedUom(stockUom));
     const factors = new Map<string, number>();
     if (stockUom) factors.set(stockUom, 1);
     for (const conversion of item.uom_conversions ?? []) {
@@ -630,7 +653,7 @@ async function validateTransactionLines(
     if (mode === "Thành phẩm theo m2") {
       const sets = Number(row.set_count ?? 1);
       if (!Number.isFinite(sets) || sets <= 0) return refuse(`${line}: Số cái/bộ phải lớn hơn 0.`);
-      if (["m2", "m²", "sqm"].includes(selected)) {
+      if (SALES_AREA_UOMS.has(selected)) {
         const width = Number(row.width_m);
         const height = Number(row.height_m);
         if (!Number.isFinite(width) || width <= 0 || !Number.isFinite(height) || height <= 0) {
@@ -687,8 +710,30 @@ async function validateTransactionLines(
           expectedFactor = sets / quantity;
           expectedStockQuantity = sets;
         }
-      } else if (["bộ", "bo", "set"].includes(selected) && !nearlyEqual(quantity, sets)) {
+      } else if (SALES_SET_UOMS.has(selected) && !nearlyEqual(quantity, sets)) {
         return refuse(`${line}: bán theo Bộ thì số lượng tính tiền phải bằng số bộ.`);
+      }
+    }
+    if (side === "sales" && mode === "Nhôm cây/lá" && SALES_METRE_UOMS.has(selected)) {
+      const length = Number(row.length_m);
+      const pieces = Number(row.qty_bar);
+      if (!Number.isFinite(length) || length <= 0) {
+        return refuse(`${line}: bán theo Mét phải nhập chiều dài một cây/đoạn lớn hơn 0.`);
+      }
+      if (!Number.isFinite(pieces) || pieces <= 0) {
+        return refuse(`${line}: bán theo Mét phải nhập số cây/đoạn lớn hơn 0.`);
+      }
+      const billableLength = length * pieces;
+      if (!nearlyEqual(quantity, billableLength)) {
+        return refuse(`${line}: SL tính tiền phải là ${billableLength.toFixed(6)} Mét = chiều dài × số cây/đoạn.`);
+      }
+    } else if (side === "sales" && mode === "Nhôm cây/lá" && SALES_PIECE_UOMS.has(selected)) {
+      const pieces = Number(row.qty_bar);
+      if (!Number.isFinite(pieces) || pieces <= 0) {
+        return refuse(`${line}: bán theo ${uom} phải nhập số cây/lá/đoạn lớn hơn 0.`);
+      }
+      if (!nearlyEqual(quantity, pieces)) {
+        return refuse(`${line}: SL tính tiền theo ${uom} phải bằng số cây/lá/đoạn (${pieces}).`);
       }
     }
     /**
@@ -3018,6 +3063,7 @@ async function calculateDoor(call: PlatformCall, args: Record<string, unknown>):
       ...(item.purchase_kg_per_m2 == null ? {} : { kg_per_m2: Number(item.purchase_kg_per_m2) }),
       ...(args.actual_purchase_kg == null || args.actual_purchase_kg === "" ? {} : { actual_purchase_kg: Number(args.actual_purchase_kg) }),
       ...(args.purchase_rate == null || args.purchase_rate === "" ? {} : { purchase_rate: Number(args.purchase_rate) }),
+      ...(args.selling_rate == null || args.selling_rate === "" ? {} : { selling_rate: Number(args.selling_rate) }),
     });
     return answer({
       ...result,
@@ -3027,6 +3073,7 @@ async function calculateDoor(call: PlatformCall, args: Record<string, unknown>):
         { chỉ_tiêu: "Cơ sở rộng", kết_quả: result.width_basis, đơn_vị: "" },
         { chỉ_tiêu: "Rộng cắt lá", kết_quả: result.cut_width_m, đơn_vị: "m" },
         ...(result.billable_area_sqm == null ? [] : [{ chỉ_tiêu: "Diện tích tính tiền", kết_quả: result.billable_area_sqm, đơn_vị: "m2" }]),
+        ...(result.sales_amount == null ? [] : [{ chỉ_tiêu: "Thành tiền bán", kết_quả: result.sales_amount, đơn_vị: "VND" }]),
         ...(result.purchase_kg == null ? [] : [{ chỉ_tiêu: "Khối lượng mua dự toán", kết_quả: result.purchase_kg, đơn_vị: "Kg" }]),
         ...(result.purchase_amount == null ? [] : [{ chỉ_tiêu: "Tiền mua dự toán", kết_quả: result.purchase_amount, đơn_vị: "VND" }]),
       ],

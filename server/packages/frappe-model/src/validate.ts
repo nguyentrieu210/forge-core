@@ -161,8 +161,16 @@ function parseField(value: unknown, index: number): DocFieldMeta {
   const length = input.length === undefined ? undefined : safeInt(input.length, `fields[${index}].length`, 1, 1_000_000);
   const permlevel = input.permlevel === undefined ? 0 : safeInt(input.permlevel, `fields[${index}].permlevel`, 0, 9);
   const formWidth = input.form_width === undefined ? undefined : text(input.form_width, `fields[${index}].form_width`, 16);
-  if (formWidth !== undefined && !["full", "half", "third"].includes(formWidth)) {
-    throw errors.validation(`fields[${index}].form_width must be full, half, or third`);
+  if (formWidth !== undefined && !["full", "two_thirds", "half", "third"].includes(formWidth)) {
+    throw errors.validation(`fields[${index}].form_width must be full, two_thirds, half, or third`);
+  }
+  const formRegion = input.form_region === undefined ? undefined : text(input.form_region, `fields[${index}].form_region`, 16);
+  if (formRegion !== undefined && !["main", "aside", "full"].includes(formRegion)) {
+    throw errors.validation(`fields[${index}].form_region must be main, aside, or full`);
+  }
+  const formControlWidth = input.form_control_width === undefined ? undefined : text(input.form_control_width, `fields[${index}].form_control_width`, 16);
+  if (formControlWidth !== undefined && formControlWidth !== "compact") {
+    throw errors.validation(`fields[${index}].form_control_width must be compact`);
   }
   const valueSource = input.valueSource === undefined ? undefined : text(input.valueSource, `fields[${index}].valueSource`, 24);
   const editMode = input.editMode === undefined ? undefined : text(input.editMode, `fields[${index}].editMode`, 32);
@@ -207,7 +215,9 @@ function parseField(value: unknown, index: number): DocFieldMeta {
     ...(input.read_only_depends_on === undefined ? {} : { read_only_depends_on: text(input.read_only_depends_on, `fields[${index}].read_only_depends_on`, 500) }),
     permlevel,
     ...(input.description === undefined ? {} : { description: text(input.description, `fields[${index}].description`, 2000) }),
-    ...(formWidth === undefined ? {} : { form_width: formWidth as "full" | "half" | "third" }),
+    ...(formWidth === undefined ? {} : { form_width: formWidth as "full" | "two_thirds" | "half" | "third" }),
+    ...(formRegion === undefined ? {} : { form_region: formRegion as "main" | "aside" | "full" }),
+    ...(formControlWidth === undefined ? {} : { form_control_width: "compact" as const }),
     ...(valueSource ? { valueSource: valueSource as NonNullable<DocFieldMeta["valueSource"]> } : {}),
     ...(editMode ? { editMode: editMode as NonNullable<DocFieldMeta["editMode"]> } : {}),
     ...(surface ? { surface: surface as NonNullable<DocFieldMeta["surface"]> } : {}),

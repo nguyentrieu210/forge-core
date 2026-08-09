@@ -13,6 +13,21 @@ function platform(records, report = []) {
         headers: { "content-type": "application/json" },
       });
     }
+    const listMatch = /^resource\/([^/?]+)\?(.*)$/.exec(path);
+    if (listMatch) {
+      const doctype = decodeURIComponent(listMatch[1]);
+      const query = new URLSearchParams(listMatch[2]);
+      const filters = JSON.parse(query.get("filters") ?? "[]");
+      const prefix = `${doctype}:`;
+      const data = [...records.entries()]
+        .filter(([key]) => key.startsWith(prefix))
+        .map(([key, value]) => ({ name: key.slice(prefix.length), ...value }))
+        .filter((row) => filters.every((filter) => row[filter[1]] === filter[3]));
+      return new Response(JSON.stringify({ data }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }
     const match = /^resource\/([^/]+)\/(.+)$/.exec(path);
     if (!match) return new Response(JSON.stringify({ message: "not found" }), { status: 404 });
     const doctype = decodeURIComponent(match[1]);
@@ -69,6 +84,76 @@ test("sales item context returns exact UOM price and converted warehouse stock",
   assert.equal(result.body.price_missing, false);
   assert.match(result.body.availability_status, /Còn 3,5 Thùng/);
   assert.match(result.body.availability_status, /Giá Thùng: 1\.200\.000 VND/);
+});
+
+test("sales item context converts the base sales price when exact UOM price is absent", async () => {
+  const records = new Map([
+    ["Item:ITEM-1", item({
+      stock_uom: "Mét",
+      default_sales_uom: "Mét",
+      uom_conversions: [{ uom: "Cây", conversion_factor: 5.85 }],
+    })],
+    ["Item Price:BẢNG GIÁ:ITEM-1:Mét", {
+      item_code: "ITEM-1", price_list: "BẢNG GIÁ", uom: "Mét", currency: "VND", rate: "120000",
+    }],
+  ]);
+  const result = await read(await salesItemContext(platform(records), {
+    item_code: "ITEM-1", uom: "Cây", price_list: "BẢNG GIÁ", currency: "VND",
+  }));
+  assert.equal(result.status, 200);
+  assert.equal(result.body.rate, 702000);
+  assert.equal(result.body.price_missing, false);
+  assert.equal(result.body.item_price, "BẢNG GIÁ:ITEM-1:Mét");
+});
+
+test("door sold by m² remains selectable when stock is managed by Bộ", async () => {
+  const records = new Map([
+    ["Item:CUA-DUC", item({
+      inventory_mode: "Thành phẩm theo m2",
+      stock_uom: "Bộ",
+      default_sales_uom: "m2",
+      uom_conversions: [],
+    })],
+    ["Item Price:BẢNG GIÁ:CUA-DUC:m2", {
+      item_code: "CUA-DUC", price_list: "BẢNG GIÁ", uom: "m2", currency: "VND", rate: "350000",
+    }],
+  ]);
+  const result = await read(await salesItemContext(platform(records, [{
+    item_code: "CUA-DUC", warehouse: "Kho A", actual_qty: 4,
+  }]), {
+    item_code: "CUA-DUC", uom: "m2", warehouse: "Kho A", price_list: "BẢNG GIÁ", currency: "VND",
+  }));
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.body.allowed_uoms, ["Bộ", "m2"]);
+  assert.equal(result.body.conversion_factor, null);
+  assert.equal(result.body.rate, 350000);
+  assert.equal(result.body.available_stock_qty, 4);
+  assert.equal(result.body.available_qty, null);
+  assert.match(result.body.availability_status, /quy đổi theo kích thước dòng/);
+});
+
+test("sales item context prefers an exact UOM price over conversion", async () => {
+  const records = new Map([
+    ["Item:ITEM-1", item({
+      stock_uom: "Mét",
+      default_sales_uom: "Mét",
+      uom_conversions: [{ uom: "Cây", conversion_factor: 5.85 }],
+    })],
+    ["Item Price:BẢNG GIÁ:ITEM-1:Mét", {
+      item_code: "ITEM-1", price_list: "BẢNG GIÁ", uom: "Mét", currency: "VND", rate: "120000",
+    }],
+    ["Item Price:BẢNG GIÁ:ITEM-1", {
+      item_code: "ITEM-1", price_list: "BẢNG GIÁ", uom: "Cây", currency: "VND", rate: "700000",
+    }],
+    ["Item Price:BẢNG GIÁ:ITEM-1:Cây", {
+      item_code: "ITEM-1", price_list: "BẢNG GIÁ", uom: "Cây", currency: "VND", rate: "650000",
+    }],
+  ]);
+  const result = await read(await salesItemContext(platform(records), {
+    item_code: "ITEM-1", uom: "Cây", price_list: "BẢNG GIÁ", currency: "VND",
+  }));
+  assert.equal(result.body.rate, 650000);
+  assert.equal(result.body.item_price, "BẢNG GIÁ:ITEM-1:Cây");
 });
 
 test("sales item context skips empty stock columns before using the populated balance", async () => {

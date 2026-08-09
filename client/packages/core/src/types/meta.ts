@@ -40,7 +40,11 @@ export interface DocField {
    *
    * Không khai báo thì FormView tự suy theo fieldtype và vai trò của field.
    */
-  form_width?: "full" | "half" | "third";
+  form_width?: "full" | "two_thirds" | "half" | "third";
+  /** Vùng bố cục cố định trong section: khối chính hoặc cột phụ bên phải. */
+  form_region?: "main" | "aside" | "full";
+  /** Giới hạn riêng bề ngang control, vẫn giữ vùng bố cục của field. */
+  form_control_width?: "compact";
   valueSource?: "user" | "default" | "link" | "formula" | "system" | "workflow";
   editMode?: "editable" | "readonly" | "set_once" | "immutable_after_submit" | "hidden";
   surface?: "quick" | "expanded" | "internal";
@@ -80,6 +84,24 @@ export interface RuntimeAssets {
 
 export type BulkCommitStrategy = "document_update";
 
+/**
+ * Optional read model for a Bulk grid that must expose every valid combination
+ * of a parent record and its configured units (for example price overrides by
+ * Item × UOM).  The target document is still saved through normal CRUD; this
+ * only describes how blank, creatable rows are projected.
+ */
+export interface BulkRowSource {
+  kind: "link_uom_expansion";
+  doctype: string;
+  identityField: string;
+  uomFields: string[];
+  uomTable?: string;
+  uomTableField?: string;
+  filterFields?: string[];
+  targetLinkField: string;
+  targetUomField: string;
+}
+
 /** Canonical policy for one renderer. Extra app-owned hints remain passthrough metadata. */
 export interface DocTypeView {
   enabled: boolean;
@@ -95,6 +117,10 @@ export interface DocTypeView {
   allowPaste?: boolean;
   allowFillDown?: boolean;
   pageSize?: number;
+  /** Link/Select fields rendered as a contextual filter above Bulk Grid, not as a grid column. */
+  toolbarFilters?: string[];
+  /** Declarative parent × UOM source for create-or-update bulk grids. */
+  rowSource?: BulkRowSource;
   /** Workflow transitions that require an operator reason, e.g. backward/cancel. */
   reasonRequiredOn?: string[];
   [k: string]: unknown;

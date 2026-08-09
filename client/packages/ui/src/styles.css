@@ -331,6 +331,36 @@
  *
  * `--info` vẫn XANH, không đổi theo brand: "thông tin" là trạng thái, không phải màu thương hiệu.
  */
+/* Cam là một brand chung: dùng cùng token/layout với mọi app, không cần CSS riêng theo khách hàng. */
+[data-brand="orange"] {
+  color-scheme: light;
+  --primary: #f97316;
+  --primary-foreground: #ffffff;
+  --primary-hover: #c2410c;
+  --primary-active: #9a3412;
+  --accent: #ffedd5;
+  --accent-foreground: #9a3412;
+  --ring: #f97316;
+  --header-foreground: #c2410c;
+  --sidebar-accent: var(--primary);
+  --sidebar-rail: var(--primary);
+  --chart-1: var(--primary);
+}
+[data-brand="orange"][data-theme="dark"] {
+  color-scheme: dark;
+  --primary: #fb923c;
+  --primary-foreground: #1c1008;
+  --primary-hover: #fdba74;
+  --primary-active: #fed7aa;
+  --accent: #402313;
+  --accent-foreground: #fed7aa;
+  --ring: #fb923c;
+  --header-foreground: #fed7aa;
+  --sidebar-accent: #3d2419;
+  --sidebar-rail: #fb923c;
+  --chart-1: var(--primary);
+}
+
 [data-brand="red"] {
   color-scheme: light;
   --background: #f5f6f8;
@@ -339,16 +369,16 @@
   --card-foreground: #111827;
   --popover: #ffffff;
   --popover-foreground: #111827;
-  --primary: #991b1b;
+  --primary: #ef4444;
   --primary-foreground: #ffffff;
-  --primary-hover: #7f1d1d;
-  --primary-active: #641414;
+  --primary-hover: #b91c1c;
+  --primary-active: #991b1b;
   --secondary: #f1f3f5;
   --secondary-foreground: #111827;
   --muted: #f8f9fb;
   --muted-foreground: #4b5563;
   --accent: #fbeaea;
-  --accent-foreground: #991b1b;
+  --accent-foreground: #b91c1c;
   --destructive: #dc2626;
   --destructive-foreground: #ffffff;
   --success: #16a34a;
@@ -358,7 +388,7 @@
   --destructive-text: #b91c1c;
   --border: #e1e5ea;
   --input: #cdd3da;
-  --ring: #991b1b;
+  --ring: #ef4444;
   --subtle: #5b6472;
   --info: #1e40af;
   --info-text: #1e3a8a;
@@ -369,7 +399,7 @@
   --chart-3: #b45309;
   --chart-4: #6d28d9;
   --chart-5: #1e40af;
-  --header-foreground: #991b1b;
+  --header-foreground: #b91c1c;
   /* Sidebar graphite ám ấm — cùng độ tối với hai brand kia, chỉ lệch sắc để không chỏi với đỏ. */
   --sidebar: #201819;
   --sidebar-foreground: #ece2e2;
@@ -688,20 +718,17 @@
     letter-spacing: -0.03em;
   }
 
-  /* Raster brand artwork has a white source canvas. Blend it into the active
-     surface so light/dark themes do not leave a mismatched white rectangle. */
-  .mf-alumdoor-logo {
-    background: transparent;
+  /* A raster wordmark has its own approved colours. Keep it on a neutral card
+     instead of blending/inverting it when the user changes the application palette. */
+  .mf-shell-brand:has(.mf-alumdoor-logo) {
+    margin: 0.5rem;
+    width: calc(100% - 1rem);
+    border: 1px solid color-mix(in srgb, #ffffff 72%, transparent);
+    border-radius: var(--mf-control-radius);
+    background: #ffffff;
   }
-
-  .mf-alumdoor-logo-image {
-    mix-blend-mode: multiply;
-  }
-
-  :is([data-theme="dark"], .dark) .mf-alumdoor-logo-image {
-    filter: invert(1) hue-rotate(180deg);
-    mix-blend-mode: screen;
-  }
+  .mf-alumdoor-logo { background: #ffffff; }
+  .mf-alumdoor-logo-image { mix-blend-mode: normal; }
   .mf-shell-nav-group-label {
     padding: 0.35rem 0.625rem 0.3rem;
     color: var(--muted-foreground);
@@ -965,13 +992,37 @@
    */
   @container (min-width: 26rem) {
     .mf-form-grid > .mf-field-width-full { grid-column: span 6; }
+    .mf-form-grid > .mf-field-width-two_thirds { grid-column: span 4; }
     .mf-form-grid > .mf-field-width-half,
     .mf-form-grid > .mf-field-width-third { grid-column: span 3; }
     .mf-check-group { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   }
   @container (min-width: 64rem) {
+    .mf-form-grid > .mf-field-width-two_thirds { grid-column: span 4; }
     .mf-form-grid > .mf-field-width-half,
     .mf-form-grid > .mf-field-width-third { grid-column: span 2; }
+  }
+  /* Metadata có `form_region: aside` tạo hai vùng cố định: phần chính 2/3 ở
+     trái chứa hai cột, phần phụ 1/3 ở phải. Không dùng auto-flow giữa hai vùng. */
+  .mf-form-split {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(15rem, 1fr);
+    gap: 1rem;
+  }
+  .mf-form-split-aside {
+    min-width: 0;
+    border-left: 2px solid var(--border);
+    padding-left: 1rem;
+  }
+  .mf-form-grid-main { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mf-form-grid-main > .mf-field { grid-column: span 1 !important; }
+  .mf-form-grid-main > .mf-field-width-full { grid-column: 1 / -1 !important; }
+  .mf-form-grid-aside { grid-template-columns: minmax(0, 1fr); }
+  .mf-form-grid-aside > .mf-field { grid-column: 1 / -1 !important; }
+  .mf-field-control-compact { max-width: 10rem; }
+  @media (max-width: 44rem) {
+    .mf-form-split { grid-template-columns: minmax(0, 1fr); }
+    .mf-form-split-aside { border-left: 0; border-top: 2px solid var(--border); padding-left: 0; padding-top: 1rem; }
   }
   .mf-form-section {
     border-radius: 0;
@@ -1017,6 +1068,21 @@
   }
   .mf-grid-excel td:last-child,
   .mf-grid-excel th:last-child { border-right: 0; }
+  .mf-child-grid-table :is(th, td) {
+    border-right: 1px solid var(--border) !important;
+  }
+  .mf-child-grid-table :is(th, td):last-child { border-right: 0; }
+  .mf-child-grid-table thead th {
+    border-top: 1px solid var(--border) !important;
+    border-bottom: 1px solid var(--border) !important;
+  }
+  .mf-child-grid-table {
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+  }
+  .mf-child-grid-table > :is(thead, tbody) > tr > :is(th, td) {
+    box-shadow: inset -1px -1px 0 #cbd5e1;
+  }
   .mf-grid-excel input,
   .mf-grid-excel button {
     height: 1.75rem;
@@ -1497,6 +1563,27 @@
 .mf-shell .mf-shell-sidebar .mf-shell-nav-item[data-active="true"] svg {
   color: currentColor;
   opacity: 1;
+}
+
+/* The navigation rail is a neutral, stable frame. Brand colours belong to the active
+   destination and actions, never to the sidebar background itself. */
+.mf-shell {
+  --sidebar: #101010;
+  --sidebar-foreground: #f5f5f5;
+  --sidebar-item: #e8e8e8;
+  --sidebar-muted: #b8b8b8;
+  --sidebar-border: #292929;
+  --sidebar-hover: #242424;
+}
+.mf-shell .mf-shell-sidebar {
+  background-color: #101010 !important;
+}
+.mf-shell .mf-shell-sidebar .mf-shell-nav-item:hover {
+  background-color: var(--primary) !important;
+  color: var(--primary-foreground) !important;
+}
+.mf-shell .mf-shell-sidebar .mf-shell-nav-item:hover svg {
+  color: currentColor !important;
 }
 /* Header bảng: bề mặt graphite nhạt + VẠCH navy 2px trên đỉnh + chữ tiêu đề navy — không phải
    mảng đen đảo màu (#111827 cũ) biến mỗi bảng thành một khối nặng.

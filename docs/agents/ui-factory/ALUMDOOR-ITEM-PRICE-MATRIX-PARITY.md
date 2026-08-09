@@ -93,6 +93,12 @@ The fixture's `genericMatrixMapping` is a **UI04 semantic reference shape**, not
 56. When no item is selected, the matrix shows an instructional empty state.
 57. When all Price List columns are hidden, the matrix shows an explicit recovery hint.
 
+### Bulk spreadsheet entry
+
+58. Item Price uses the canonical metadata-driven Bulk runtime (`viewPolicy.bulk`), not a doctype-specific screen.
+59. The existing Item Price policy controls visible columns, editable fields, paste/fill-down behavior and page size.
+60. Pricing resolution first uses an active exact-UOM Item Price. If none exists, it converts the active price in the Item's default sales/stock UOM using `target_factor / source_factor`; a missing or invalid Item conversion factor is an explicit validation error.
+
 ## 3. Reference dataset
 
 The JSON fixture intentionally combines a small human-readable business specimen with a deterministic synthetic tail:

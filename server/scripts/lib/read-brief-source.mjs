@@ -64,7 +64,7 @@ function applyPermissionSidecar(brief, extension, source, briefSource) {
   return { ...brief, ...(extension.version ? { version: extension.version } : {}), doctypes };
 }
 
-const BULK_VIEW_KEYS = new Set(["enabled", "columns", "editableFields", "commitStrategy", "allowPaste", "allowFillDown", "pageSize"]);
+const BULK_VIEW_KEYS = new Set(["enabled", "columns", "editableFields", "commitStrategy", "allowPaste", "allowFillDown", "pageSize", "toolbarFilters", "rowSource"]);
 
 function validateBulkView(view, source, doctype) {
   if (!view || typeof view !== "object" || Array.isArray(view)) throw new Error(`${source}: views.${doctype}.bulk phải là object.`);
@@ -79,6 +79,13 @@ function validateBulkView(view, source, doctype) {
     if ((view.commitStrategy ?? "document_update") !== "document_update") throw new Error(`${source}: views.${doctype}.bulk.commitStrategy hiện chỉ nhận document_update.`);
   }
   if (view.pageSize !== undefined && (!Number.isInteger(view.pageSize) || view.pageSize < 20 || view.pageSize > 500)) throw new Error(`${source}: views.${doctype}.bulk.pageSize chỉ nhận số nguyên 20–500.`);
+  if (view.toolbarFilters !== undefined && (!Array.isArray(view.toolbarFilters) || !view.toolbarFilters.every((field) => typeof field === "string" && field))) throw new Error(`${source}: views.${doctype}.bulk.toolbarFilters must be a field array.`);
+  if (view.rowSource !== undefined) {
+    const sourceConfig = view.rowSource;
+    if (!sourceConfig || typeof sourceConfig !== "object" || Array.isArray(sourceConfig) || sourceConfig.kind !== "link_uom_expansion") throw new Error(`${source}: views.${doctype}.bulk.rowSource must be a link_uom_expansion object.`);
+    for (const key of ["doctype", "identityField", "targetLinkField", "targetUomField"]) if (typeof sourceConfig[key] !== "string" || !sourceConfig[key]) throw new Error(`${source}: views.${doctype}.bulk.rowSource.${key} is required.`);
+    if (!Array.isArray(sourceConfig.uomFields) || !sourceConfig.uomFields.length || !sourceConfig.uomFields.every((field) => typeof field === "string" && field)) throw new Error(`${source}: views.${doctype}.bulk.rowSource.uomFields must be a non-empty field array.`);
+  }
   return {
     enabled: view.enabled !== false,
     ...(view.columns ? { columns: [...view.columns] } : {}),
@@ -87,6 +94,8 @@ function validateBulkView(view, source, doctype) {
     ...(view.allowPaste === undefined ? {} : { allowPaste: Boolean(view.allowPaste) }),
     ...(view.allowFillDown === undefined ? {} : { allowFillDown: Boolean(view.allowFillDown) }),
     ...(view.pageSize === undefined ? {} : { pageSize: view.pageSize }),
+    ...(view.toolbarFilters ? { toolbarFilters: [...view.toolbarFilters] } : {}),
+    ...(view.rowSource ? { rowSource: structuredClone(view.rowSource) } : {}),
   };
 }
 

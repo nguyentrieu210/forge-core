@@ -12,12 +12,13 @@ import type { DocFieldMeta, DocTypeView } from "./types.js";
 export function parseBulkViewPolicy(value: unknown, fields: DocFieldMeta[]): DocTypeView {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw errors.validation("viewPolicy.bulk must be an object");
   const input = value as Record<string, unknown>;
-  const allowed = new Set(["enabled", "columns", "editableFields", "commitStrategy", "allowPaste", "allowFillDown", "pageSize"]);
+  const allowed = new Set(["enabled", "columns", "editableFields", "commitStrategy", "allowPaste", "allowFillDown", "pageSize", "toolbarFilters", "rowSource"]);
   for (const key of Object.keys(input)) if (!allowed.has(key)) throw errors.validation(`viewPolicy.bulk has unknown property: ${key}`);
 
   const known = new Map(fields.map((field) => [field.fieldname, field]));
   const columns = names(input.columns, "viewPolicy.bulk.columns", known);
   const editableFields = names(input.editableFields, "viewPolicy.bulk.editableFields", known);
+  const toolbarFilters = names(input.toolbarFilters, "viewPolicy.bulk.toolbarFilters", known);
   const columnSet = new Set(columns ?? []);
   for (const fieldname of editableFields ?? []) {
     if (!columnSet.has(fieldname)) throw errors.validation(`viewPolicy.bulk.editableFields must be a subset of columns: ${fieldname}`);
@@ -29,6 +30,13 @@ export function parseBulkViewPolicy(value: unknown, fields: DocFieldMeta[]): Doc
       throw errors.validation(`viewPolicy.bulk.editableFields targets unsafe editMode: ${fieldname}`);
     }
   }
+  for (const fieldname of toolbarFilters ?? []) {
+    const field = known.get(fieldname)!;
+    if (!["Link", "Select"].includes(field.fieldtype)) {
+      throw errors.validation(`viewPolicy.bulk.toolbarFilters must target Link or Select field: ${fieldname}`);
+    }
+  }
+  const rowSource = parseRowSource(input.rowSource, known);
 
   let commitStrategy;
   if (input.commitStrategy !== undefined) {
@@ -44,6 +52,44 @@ export function parseBulkViewPolicy(value: unknown, fields: DocFieldMeta[]): Doc
     ...(input.allowPaste === undefined ? {} : { allowPaste: boolean(input.allowPaste, "viewPolicy.bulk.allowPaste", false) }),
     ...(input.allowFillDown === undefined ? {} : { allowFillDown: boolean(input.allowFillDown, "viewPolicy.bulk.allowFillDown", false) }),
     ...(input.pageSize === undefined ? {} : { pageSize: integer(input.pageSize, "viewPolicy.bulk.pageSize", 20, 500) }),
+    ...(toolbarFilters ? { toolbarFilters } : {}),
+    ...(rowSource ? { rowSource } : {}),
+  };
+}
+
+function parseRowSource(value: unknown, targetFields: Map<string, DocFieldMeta>): DocTypeView["rowSource"] | undefined {
+  if (value === undefined) return undefined;
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw errors.validation("viewPolicy.bulk.rowSource must be an object");
+  const source = value as Record<string, unknown>;
+  const allowed = new Set(["kind", "doctype", "identityField", "uomFields", "uomTable", "uomTableField", "filterFields", "targetLinkField", "targetUomField"]);
+  for (const key of Object.keys(source)) if (!allowed.has(key)) throw errors.validation(`viewPolicy.bulk.rowSource has unknown property: ${key}`);
+  if (source.kind !== "link_uom_expansion") throw errors.validation("viewPolicy.bulk.rowSource.kind must be link_uom_expansion");
+  const string = (key: string, required = true) => {
+    const result = typeof source[key] === "string" ? source[key].trim() : "";
+    if (required && !result) throw errors.validation(`viewPolicy.bulk.rowSource.${key} is required`);
+    return result || undefined;
+  };
+  const uomFields = source.uomFields;
+  if (!Array.isArray(uomFields) || !uomFields.length || uomFields.some((field) => typeof field !== "string" || !field.trim())) {
+    throw errors.validation("viewPolicy.bulk.rowSource.uomFields must be a non-empty field array");
+  }
+  const filterFields = source.filterFields;
+  if (filterFields !== undefined && (!Array.isArray(filterFields) || filterFields.some((field) => typeof field !== "string" || !field.trim()))) {
+    throw errors.validation("viewPolicy.bulk.rowSource.filterFields must be a field array");
+  }
+  const targetLinkField = string("targetLinkField")!;
+  const targetUomField = string("targetUomField")!;
+  const uomTable = string("uomTable", false);
+  const uomTableField = string("uomTableField", false);
+  if (!targetFields.has(targetLinkField) || !targetFields.has(targetUomField)) throw errors.validation("viewPolicy.bulk.rowSource target fields must exist on the target DocType");
+  return {
+    kind: "link_uom_expansion",
+    doctype: string("doctype")!, identityField: string("identityField")!,
+    uomFields: uomFields.map((field) => field.trim()),
+    ...(filterFields ? { filterFields: filterFields.map((field) => field.trim()) } : {}),
+    ...(uomTable ? { uomTable } : {}),
+    ...(uomTableField ? { uomTableField } : {}),
+    targetLinkField, targetUomField,
   };
 }
 

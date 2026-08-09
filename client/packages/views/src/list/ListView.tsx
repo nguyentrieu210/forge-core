@@ -8,12 +8,13 @@
 import { Fragment, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { getCoreRowModel, useReactTable, type ColumnDef, type VisibilityState } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { ArrowUp, ArrowDown, ChevronsUpDown, ChevronDown, ChevronLeft, ChevronRight, Trash2, Download, Inbox, SearchX, AlertCircle, RefreshCw, Camera, Loader2 } from "lucide-react";
+import { ArrowUp, ArrowDown, ChevronsUpDown, ChevronDown, ChevronLeft, ChevronRight, Trash2, Download, Inbox, SearchX, AlertCircle, RefreshCw, Camera, Loader2, Filter, Check } from "lucide-react";
 import type { DocTypeMeta, Doc, BoundFormatters } from "@metaforge/core";
 import {
   Button, Badge, Checkbox, Skeleton, Separator, FileButton, cn, useT,
   Table, TableHeader, TableBody, TableFooter, TableRow, TableHead, TableCell,
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
+  Popover, PopoverTrigger, PopoverContent, Input,
 } from "@metaforge/ui";
 import { deriveColumns, type ListColumn } from "./columns.js";
 import { renderCell, RowAvatar, formatValue } from "./cells.js";
@@ -70,11 +71,11 @@ export interface ListViewProps {
 
 const PAGE_SIZES = [20, 50, 100];
 
-/** Checkbox và STT là hai cột cố định độc lập. 44px của SELECT_W khớp chính xác `left-11` của STT. */
+/** Checkbox và STT là hai cột cố định độc lập. */
 const STICKY_SELECT = "sticky left-0 z-20 bg-inherit";
-const STICKY_INDEX = "sticky left-11 z-20 bg-inherit shadow-[inset_-1px_0_0_var(--border)]";
-const SELECT_W = "w-11 min-w-11 max-w-11";
-const INDEX_W = "w-14 min-w-14 max-w-14";
+const STICKY_INDEX = "sticky left-10 z-20 bg-inherit shadow-[inset_-1px_0_0_var(--border)]";
+const SELECT_W = "w-10 min-w-10 max-w-10";
+const INDEX_W = "w-12 min-w-12 max-w-12";
 
 export function ListView(props: ListViewProps) {
   const t = useT();
@@ -213,6 +214,11 @@ export function ListView(props: ListViewProps) {
   const columnsByName = useMemo(() => new Map(derivedColumns.map((column) => [column.fieldname, column])), [derivedColumns]);
   const allColumns = columnModel.getAllLeafColumns().map((column) => columnsByName.get(column.id)).filter((column): column is ListColumn => Boolean(column));
   const columns = columnModel.getVisibleLeafColumns().map((column) => columnsByName.get(column.id)).filter((column): column is ListColumn => Boolean(column));
+  const headerValues = useMemo(() => Object.fromEntries(columns.map((column) => [
+    column.fieldname,
+    Array.from(new Set(rows.map((row) => String(row[column.fieldname] ?? "")).filter(Boolean)))
+      .sort((a, b) => a.localeCompare(b, "vi")),
+  ])), [columns, rows]);
 
   /** Cột tiêu đề luôn có default/min width riêng; cột đệm cuối nhận phần ngang còn thừa. */
   const titleField = useMemo(() => columns.find((c) => c.isTitle)?.fieldname, [columns]);
@@ -438,12 +444,12 @@ export function ListView(props: ListViewProps) {
         tabIndex={onRowClick ? (focusedRow === name || (!focusedRow && index === 0) ? 0 : -1) : undefined}
         aria-label={onRowClick ? `${t("common.open", "Mở")} ${name}` : undefined}
       >
-        <TableCell className={cn("px-3 text-center", SELECT_W, STICKY_SELECT, compact && "py-1")}>
+        <TableCell className={cn("border-r border-input px-0 text-center", SELECT_W, STICKY_SELECT, compact && "py-1")} style={{ width: 40 }}>
           <span onClick={(event) => event.stopPropagation()}>
             <Checkbox checked={selected} onCheckedChange={() => toggleRow(name)} aria-label={`${t("list.select_row")} ${name}`} />
           </span>
         </TableCell>
-        <TableCell className={cn("px-3 text-right text-xs tabular-nums text-muted-foreground", INDEX_W, STICKY_INDEX, compact && "py-1")}>
+        <TableCell className={cn("border-r border-input px-0 text-center text-xs tabular-nums text-muted-foreground", INDEX_W, STICKY_INDEX, compact && "py-1")} style={{ width: 48 }}>
           {pageStart + index + 1}
         </TableCell>
         {columns.map((c) => {
@@ -618,8 +624,8 @@ export function ListView(props: ListViewProps) {
             Hai cột này không chứa dữ liệu người dùng nên không có gì để nới — chốt cứng luôn.
           */}
           <colgroup>
-            <col className={SELECT_W} />
-            <col className={INDEX_W} />
+            <col style={{ width: 40, minWidth: 40, maxWidth: 40 }} />
+            <col style={{ width: 48, minWidth: 48, maxWidth: 48 }} />
             {columns.map((c) => (
               <col
                 key={c.fieldname}
@@ -642,10 +648,10 @@ export function ListView(props: ListViewProps) {
           <TableHeader>
             <TableRow ref={headRowRef} className="hover:bg-transparent">
               {/* Checkbox và STT là hai cột độc lập đúng contract: cố định, không resize/ẩn/đổi chỗ. */}
-              <TableHead className={cn("top-0 px-3 text-center", SELECT_W, STICKY_SELECT, "z-40 bg-muted", compact && "h-7")}>
+              <TableHead className={cn("top-0 border-r border-input px-0 text-center", SELECT_W, STICKY_SELECT, "z-40 bg-muted", compact && "h-7")} style={{ width: 40 }}>
                 <Checkbox checked={allPageSelected} onCheckedChange={toggleAllPage} aria-label={t("list.select_all_page")} />
               </TableHead>
-              <TableHead className={cn("top-0 px-3 text-right tabular-nums", INDEX_W, STICKY_INDEX, "z-40 bg-muted", compact && "h-7")}>
+              <TableHead className={cn("top-0 border-r border-input px-0 text-center tabular-nums", INDEX_W, STICKY_INDEX, "z-40 bg-muted", compact && "h-7")} style={{ width: 48 }}>
                 #
               </TableHead>
               {columns.map((c) => (
@@ -668,6 +674,9 @@ export function ListView(props: ListViewProps) {
                   onMoveLeft={() => moveColumnByKeyboard(c.fieldname, -1)}
                   onMoveRight={() => moveColumnByKeyboard(c.fieldname, 1)}
                   pinnedLeft={pinnedOffsets.get(c.fieldname)}
+                  filterValue={state.filters[c.fieldname] ?? ""}
+                  filterValues={headerValues[c.fieldname] ?? []}
+                  onFilterChange={(value) => onStateChange({ filters: { ...state.filters, [c.fieldname]: value }, page: 1, selected: [] })}
                 />
               ))}
               {props.onDelete ? (
@@ -745,8 +754,8 @@ export function ListView(props: ListViewProps) {
               {/* Hàng tổng cũng phải có ĐÚNG số ô như các hàng khác, nếu không cột lệch hẳn một
                   nhịp và mọi con số tổng rơi sai cột. */}
               <TableRow className="bg-card hover:bg-transparent">
-                <TableCell aria-hidden className={cn("px-3", SELECT_W, STICKY_SELECT)} />
-                <TableCell className={cn("px-3 text-right text-xs text-muted-foreground", INDEX_W, STICKY_INDEX)} title="Tổng hợp trên trang hiện tại">Σ trang</TableCell>
+                <TableCell aria-hidden className={cn("border-r border-input px-0", SELECT_W, STICKY_SELECT)} style={{ width: 40 }} />
+                <TableCell className={cn("border-r border-input px-0 text-center text-xs text-muted-foreground", INDEX_W, STICKY_INDEX)} style={{ width: 48 }} title="Tổng hợp trên trang hiện tại">Σ trang</TableCell>
                 {columns.map((c) => {
                   const pinnedLeft = pinnedOffsets.get(c.fieldname);
                   return (
@@ -819,9 +828,44 @@ function LinkCell({ doctype, value, displayValues }: { doctype: string; value: u
 }
 
 // ── Sort header ───────────────────────────────────────────────────────────────
+function HeaderValueFilter({ label, values, value, onChange }: { label: string; values: string[]; value: string; onChange?: (value: string) => void }) {
+  const [query, setQuery] = useState("");
+  const visible = values.filter((item) => item.toLocaleLowerCase("vi").includes(query.toLocaleLowerCase("vi")));
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className={cn("absolute right-3 top-1 z-20 size-7", value ? "text-primary" : "text-muted-foreground")}
+          aria-label={`Lọc ${label}`}
+          title={`Lọc ${label}`}
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <Filter className="size-3.5" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-60 p-2" onClick={(event) => event.stopPropagation()}>
+        <Input className="h-8" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Lọc ${label}…`} />
+        <div className="mt-2 max-h-56 overflow-auto">
+          {visible.length ? visible.map((item) => (
+            <Button key={item} type="button" variant="ghost" size="sm" className="flex h-8 w-full justify-start gap-2 px-2 font-normal" onClick={() => onChange?.(item === value ? "" : item)}>
+              <span className={cn("flex size-4 shrink-0 items-center justify-center rounded border", item === value ? "border-primary bg-primary text-primary-foreground" : "border-input")}>{item === value ? <Check className="size-3" /> : null}</span>
+              <span className="truncate">{item}</span>
+            </Button>
+          )) : <div className="px-2 py-4 text-center text-xs text-muted-foreground">Không có giá trị</div>}
+        </div>
+        {value ? <Button type="button" variant="ghost" size="sm" className="mt-2" onClick={() => onChange?.("")}>Xóa lọc</Button> : null}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function SortHeader({
   col, active, dir, onClick, compact, dragOver, onDragStart, onDragOverCol, onDragLeaveCol, onDropCol,
-  width, onResize, onResizeStart, onAutoFit, onMoveLeft, onMoveRight, pinnedLeft,
+  width, onResize, onResizeStart, onAutoFit, onMoveLeft, onMoveRight, pinnedLeft, filterValue, filterValues, onFilterChange,
 }: {
   col: ListColumn; active: boolean; dir?: string; onClick: () => void; compact?: boolean;
   dragOver?: boolean;
@@ -840,6 +884,9 @@ function SortHeader({
   onMoveLeft?: () => void;
   onMoveRight?: () => void;
   pinnedLeft?: number;
+  filterValue?: string;
+  filterValues?: string[];
+  onFilterChange?: (value: string) => void;
 }) {
   const Icon = active ? (dir === "asc" ? ArrowUp : ArrowDown) : ChevronsUpDown;
   const thRef = useRef<HTMLTableCellElement>(null);
@@ -915,7 +962,7 @@ function SortHeader({
         // Cột tiêu đề nuốt hết phần dư, các cột khác co sát nội dung. Trước đây mọi cột chia đều
         // bề ngang nên bảng ít cột bị kéo dãn, chữ nằm rời rạc cách nhau cả gang tay.
         // Bề rộng do người dùng đặt thì THẮNG các lớp co/giãn tự động ở trên.
-        "sticky top-0 z-30 whitespace-nowrap bg-muted",
+        "relative sticky top-0 z-30 whitespace-nowrap bg-muted",
         pinnedLeft !== undefined && "z-40 shadow-[inset_-1px_0_0_var(--border)]",
         "group/th",
         onDropCol && "cursor-grab active:cursor-grabbing",
@@ -932,12 +979,18 @@ function SortHeader({
           if (event.key === "ArrowRight") { event.preventDefault(); onMoveRight?.(); }
         }}
         title="Sắp xếp; Alt + ←/→ để đổi vị trí cột"
-        className={cn("-ml-2 h-7 max-w-full gap-1 truncate px-2 font-medium data-[active=true]:text-foreground", col.align === "right" && "ml-0")}
+        className={cn("-ml-2 h-7 max-w-full gap-1 truncate px-2 pr-8 font-medium data-[active=true]:text-foreground", col.align === "right" && "ml-0")}
         data-active={active}
       >
         <span className="truncate">{col.label}</span>
         <Icon className={cn("size-3.5 shrink-0", active ? "opacity-100" : "opacity-40")} />
       </Button>
+      <HeaderValueFilter
+        label={col.label}
+        values={filterValues ?? []}
+        value={filterValue ?? ""}
+        onChange={onFilterChange}
+      />
       {onResize ? (
         <span
           onPointerDown={startResize}
@@ -1125,7 +1178,7 @@ function ListSummaryStrip({ total, rows, columns, fmt, loading }: {
 }) {
   const numeric = columns.filter((column) => ["Currency", "Float", "Int", "Percent"].includes(column.fieldtype)).slice(0, 2);
   return (
-    <div className="grid shrink-0 grid-cols-2 border-y bg-muted/25 sm:grid-cols-4" aria-label="Tổng nhanh danh sách">
+    <div className={cn("grid shrink-0 grid-cols-2 border-y bg-muted/25", numeric.length === 0 ? "sm:grid-cols-2" : numeric.length === 1 ? "sm:grid-cols-3" : "sm:grid-cols-4")} aria-label="Tổng nhanh danh sách">
       <div className="min-w-0 border-r px-3 py-2">
         <div className="text-[11px] text-muted-foreground">Tổng bản ghi</div>
         <div className="mt-0.5 font-semibold tabular-nums">{loading ? "…" : total.toLocaleString("vi-VN")}</div>
@@ -1139,9 +1192,6 @@ function ListSummaryStrip({ total, rows, columns, fmt, loading }: {
           <div className="truncate text-[11px] text-muted-foreground" title={`Tổng ${column.label} trên trang hiện tại`}>Tổng {column.label} · trang</div>
           <div className="mt-0.5 truncate font-semibold tabular-nums">{loading ? "…" : formatValue(aggregateColumn(rows, column), column, fmt)}</div>
         </div>
-      ))}
-      {Array.from({ length: Math.max(0, 2 - numeric.length) }).map((_, index) => (
-        <div key={`summary-empty-${index}`} className="hidden border-r px-3 py-2 sm:block"><div className="text-[11px] text-muted-foreground">Dữ liệu trang</div><div className="mt-0.5 font-semibold text-muted-foreground">—</div></div>
       ))}
     </div>
   );
