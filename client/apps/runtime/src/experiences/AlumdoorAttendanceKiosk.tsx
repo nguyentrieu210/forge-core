@@ -2,8 +2,10 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { CheckCircle2, Clock3, Loader2, RefreshCw, ScanLine, TriangleAlert } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import qrcode from "qrcode-generator";
+import { LinkCombobox } from "@metaforge/controls";
+import { adapterServices } from "@metaforge/views";
 import { useMetaForge } from "@metaforge/views/provider";
-import { Button, Input, Label, toast } from "@metaforge/ui";
+import { Button } from "@metaforge/ui";
 
 interface AttendanceChallenge {
   station: string;
@@ -164,6 +166,7 @@ function KioskNotice({ children, tone = "neutral" }: { children: ReactNode; tone
 
 function AttendanceKiosk() {
   const { adapter } = useMetaForge();
+  const linkServices = useMemo(() => adapterServices(adapter), [adapter]);
   const [params, setParams] = useSearchParams();
   const stationFromUrl = params.get("station")?.trim() ?? "";
   const [stationDraft, setStationDraft] = useState(() => stationFromUrl || savedStation());
@@ -228,15 +231,19 @@ function AttendanceKiosk() {
     return () => window.clearInterval(timer);
   }, [challenge?.expires_at]);
 
-  const openStation = useCallback(() => {
-    const next = stationDraft.trim();
-    if (!next) {
-      setFailure("Nhập mã trạm QR trước khi bật màn chấm công.");
+  const chooseStation = useCallback((next: string) => {
+    const selected = next.trim();
+    setStationDraft(selected);
+    if (!selected) {
+      setParams({}, { replace: true });
+      setStation("");
+      setChallenge(undefined);
+      setFailure("");
       return;
     }
-    rememberStation(next);
-    setParams({ station: next }, { replace: true });
-  }, [setParams, stationDraft]);
+    rememberStation(selected);
+    setParams({ station: selected }, { replace: true });
+  }, [setParams]);
 
   const changeStation = useCallback(() => {
     setParams({}, { replace: true });
@@ -261,17 +268,17 @@ function AttendanceKiosk() {
           {!station ? (
             <div className="mt-7 max-w-md space-y-3">
               <div>
-                <Label htmlFor="attendance-station">Mã trạm QR</Label>
-                <Input
+                <p className="mb-1.5 text-sm font-medium">Trạm QR</p>
+                <LinkCombobox
                   id="attendance-station"
                   value={stationDraft}
-                  onChange={(event) => setStationDraft(event.target.value)}
-                  onKeyDown={(event) => { if (event.key === "Enter") openStation(); }}
-                  placeholder="Ví dụ: CONG-A"
-                  autoComplete="off"
+                  target="AlumDoor QR Station"
+                  label="Trạm QR"
+                  search={linkServices.searchLink!}
+                  resolveDisplay={linkServices.resolveDisplay}
+                  onChange={chooseStation}
                 />
               </div>
-              <Button type="button" onClick={openStation}><ScanLine className="size-4" /> Bật QR chấm công</Button>
               {failure ? <KioskNotice tone="error">{failure}</KioskNotice> : <KioskNotice>Chỉ dùng mã của Trạm QR đã tạo và gắn Chính sách ca đang được duyệt.</KioskNotice>}
             </div>
           ) : (
