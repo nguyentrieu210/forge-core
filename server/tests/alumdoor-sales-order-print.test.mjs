@@ -22,13 +22,19 @@ const fixture = {
   version: 1,
   data: {
     customer: "CÔNG TY MINH PHÁT",
+    phone: "0901234567",
     transaction_date: "2026-08-01T00:00:00.000Z",
     delivery_date: "2026-08-08T00:00:00.000Z",
     against_quotation: "BG-2026-0012",
     customer_group: "Đại lý",
     install_address: "12 Nguyễn Văn A, TP.HCM",
     currency: "VND",
-    grand_total: 15_400_000,
+    total_amount: 15_400_000,
+    discount_amount: 2_205_000,
+    vat_rate: 0,
+    vat_amount: 0,
+    surcharge_amount: 0,
+    grand_total: 13_195_000,
     note: "Giao buổi sáng, gọi khách trước 30 phút.",
     items: [
       {
@@ -43,6 +49,8 @@ const fixture = {
         uom: "Cái",
         rate: 350_000,
         amount: 700_000,
+        discount_percentage: 0,
+        discount_amount: 0,
         motor_model: "",
         accessories: "",
         install_note: "Giao kèm bộ cửa",
@@ -59,6 +67,8 @@ const fixture = {
         uom: "m2",
         rate: 1_250_000,
         amount: 14_700_000,
+        discount_percentage: 15,
+        discount_amount: 2_205_000,
         motor_model: "MOTOR-500KG",
         accessories: "2 remote",
         install_note: "Lắp trục cao",
@@ -95,9 +105,6 @@ function textContent(html) {
 test("Alumdoor Sales Order print keeps the A4 structural contract", () => {
   const css = print.css;
   const html = print.html;
-  const header = cells(section(html, "thead"), "th").map((cell) => cell.text);
-  const widths = [...section(html, "colgroup").matchAll(/<col\b[^>]*width:(\d+(?:\.\d+)?)%/gi)]
-    .map((match) => Number(match[1]));
 
   assert.equal(print.name, "Đơn bán hàng ALUMDOOR");
   assert.match(css, /@page\{size:A4 portrait;margin:0\}/i);
@@ -105,37 +112,28 @@ test("Alumdoor Sales Order print keeps the A4 structural contract", () => {
   assert.match(css, /tr\{[^}]*break-inside:avoid[^}]*page-break-inside:avoid/);
   assert.match(css, /th,td\{[^}]*text-align:center/);
   assert.match(css, /\.n,\.c\{[^}]*text-align:center/);
-  assert.match(css, /\.total-value\{[^}]*text-align:center/);
+  assert.match(css, /\.discount-row td\{[^}]*border:1px solid #777!important[^}]*text-align:center/);
+  assert.match(css, /\.summary-value\{[^}]*text-align:center!important/);
   assert.match(html, /class="brand-logo" src="\/alumdoor-order-logo\.png"/);
   assert.match(html, /class="company-header-img" src="\/alumdoor-company-header\.png"/);
   assert.ok(html.indexOf("class=\"letterhead\"") < html.indexOf("class=\"title\""));
 
-  assert.deepEqual(header, [
-    "STT",
-    "Mã hàng",
-    "Tên hàng",
-    "Màu sắc",
-    "Rộng (m)",
-    "Cao (m)",
-    "Số bộ",
-    "Số lượng",
-    "ĐVT",
-    "Đơn giá",
-    "Thành tiền",
-    "Mô tơ / phụ kiện",
-    "Ghi chú lắp đặt",
-  ]);
-  assert.equal(widths.length, header.length, "mỗi cột tiêu đề phải có một độ rộng");
-  assert.equal(widths.reduce((sum, width) => sum + width, 0), 100, "tổng độ rộng cột phải bằng 100%");
+  assert.match(html, /\{\{#ifAny items\.mesh_height_m\}\}/);
+  assert.doesNotMatch(html, /Mô tơ \/ phụ kiện|Ghi chú lắp đặt/i, "các trường vận hành không được in");
+  assert.doesNotMatch(html, /Nhóm giá/i, "nhóm giá không được in");
+  assert.match(html, /SĐT:/);
 });
 
 test("Alumdoor Sales Order fixture renders door and ordinary rows through the real renderer", () => {
   const rendered = renderPrintFormat(print, fixture, "vi");
-  const rows = [...section(rendered, "tbody").matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)]
+  const header = cells(section(rendered, "thead"), "th").map((cell) => cell.text);
+  assert.deepEqual(header, ["STT", "Mã hàng", "Tên hàng", "Màu", "Rộng (m)", "Cao (m)", "Số lượng", "ĐVT", "Khối lượng", "Đơn giá (VNĐ)", "CK (%)", "Thành tiền (VNĐ)"]);
+  const tbody = section(rendered, "tbody");
+  const rows = [...tbody.matchAll(/<tr\b(?![^>]*discount-row)[^>]*>([\s\S]*?)<\/tr>/gi)]
     .map((match) => cells(match[1], "td"));
 
   assert.equal(rows.length, 2);
-  assert.ok(rows.every((row) => row.length === 13), "mọi dòng phải khớp đúng 13 cột tiêu đề");
+  assert.ok(rows.every((row) => row.length === 12), "mọi dòng hàng phải khớp đúng số cột tiêu đề");
   assert.equal(rows[0][0].text, "1");
   assert.equal(rows[0][1].text, "CUA-DUC-01", "renderer phải sắp dòng theo idx");
   assert.equal(rows[0][2].text, "Cửa cuốn Đức");
@@ -143,21 +141,35 @@ test("Alumdoor Sales Order fixture renders door and ordinary rows through the re
   assert.equal(rows[0][4].text, "4,2");
   assert.equal(rows[0][5].text, "2,8");
   assert.equal(rows[0][6].text, "1");
-  assert.equal(rows[0][7].text, "11,76");
-  assert.equal(rows[0][8].text, "m2");
-  assert.equal(rows[0][11].text, "MOTOR-500KG 2 remote");
-  assert.equal(rows[0][12].text, "Lắp trục cao");
+  assert.equal(rows[0][7].text, "m2");
+  assert.equal(rows[0][8].text, "11,76");
+  assert.equal(rows[0][9].text, "1.250.000");
+  assert.equal(rows[0][10].text, "", "dòng hàng chính không lặp phần trăm chiết khấu");
+  assert.equal(rows[0][11].text, "14.700.000");
 
   assert.equal(rows[1][0].text, "2");
   assert.equal(rows[1][1].text, "REMOTE-01");
+  assert.equal(rows[1][3].text, "", "hàng thường không được bịa màu");
   assert.equal(rows[1][4].text, "", "hàng thường không được bịa chiều rộng");
   assert.equal(rows[1][5].text, "", "hàng thường không được bịa chiều cao");
   assert.equal(rows[1][6].text, "", "hàng thường không được bịa số bộ");
-  assert.equal(rows[1][7].text, "2,00");
-  assert.equal(rows[1][8].text, "Cái");
-  assert.equal(rows[1][12].text, "Giao kèm bộ cửa");
+  assert.equal(rows[1][7].text, "Cái");
+  assert.equal(rows[1][8].text, "2,00");
+  assert.equal(rows[1][10].text, "");
 
-  assert.match(rendered, /15\.400\.000 VND/);
+  const discountRow = tbody.match(/<tr class="discount-row">([\s\S]*?)<\/tr>/i)?.[1] ?? "";
+  const discountCells = cells(discountRow, "td").map((cell) => cell.text);
+  assert.equal(discountCells[0], "Chiết khấu");
+  assert.equal(discountCells.at(-2), "15%");
+  assert.equal(discountCells.at(-1), "-2.205.000");
+  assert.match(tbody, /class="discount-row"/);
+  assert.doesNotMatch(tbody, />0%<|>-0 VNĐ</, "dòng chiết khấu bằng 0 phải được ẩn");
+
+  assert.match(rendered, /15\.400\.000/);
+  assert.doesNotMatch(rendered, /Tổng tiền VAT/, "dòng VAT bằng 0 phải được ẩn");
+  assert.match(rendered, /-2\.205\.000/);
+  assert.match(rendered, /SĐT:<\/span><span class="meta-value">0901234567/);
+  assert.doesNotMatch(rendered, /Nhóm giá/);
   assert.doesNotMatch(rendered, /{{|}}/, "HTML preview/PDF không được còn placeholder chưa render");
   assert.doesNotMatch(rendered, /<script\b/i, "mẫu in không được chèn script vào iframe preview/PDF");
 });

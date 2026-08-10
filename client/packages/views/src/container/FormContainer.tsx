@@ -164,16 +164,10 @@ export function FormContainer(props: FormContainerProps) {
     if (downloadingPdf) return;
     setDownloadingPdf(true);
     try {
-      const pdf = await adapter.downloadPdf(doctype, name);
-      const href = URL.createObjectURL(pdf);
-      try {
-        const anchor = document.createElement("a");
-        anchor.href = href;
-        anchor.download = `${doctype}-${name}.pdf`;
-        anchor.click();
-      } finally {
-        URL.revokeObjectURL(href);
-      }
+      // Export the same HTML/CSS as the print preview so the PDF cannot drift to
+      // a different server-side layout.
+      const html = await adapter.printHtml(doctype, name);
+      await downloadPrintPdf(html, `${doctype}-${name}.pdf`);
       toast.success("Đã tải PDF");
     } catch (error) {
       try {

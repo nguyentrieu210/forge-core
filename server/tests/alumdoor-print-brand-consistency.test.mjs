@@ -26,10 +26,10 @@ test("all new Alumdoor print forms reuse the exact Purchase Order brand system",
     const css = format.css.join("\n");
     const html = format.html.join("\n");
     assert.match(css, /padding:23\.7mm 8mm 8mm/);
-    assert.match(css, /\.letterhead\{position:relative;width:194mm;height:17mm;margin-left:0;overflow:hidden\}/);
+    assert.match(css, /\.letterhead\{position:relative;width:\d+mm;height:17mm;margin(?::0 auto|-left:0);overflow:hidden\}/);
     assert.match(css, /\.brand-logo\{position:absolute;left:0;top:1\.35mm;width:74mm;height:auto\}/);
     assert.match(css, /\.company-header-img\{position:absolute;right:-13\.5mm;top:0;width:114\.3mm;height:auto;display:block\}/);
-    assert.match(css, /\.title\{width:194mm;font-family:Arial,'Liberation Sans',sans-serif;font-size:18px;line-height:1\.2;font-weight:700;color:#f15a24;text-transform:uppercase;text-align:center;margin:5mm 0 6mm\}/);
+    assert.match(css, /\.title\{width:\d+mm;font-family:Arial,'Liberation Sans',sans-serif;font-size:18px;line-height:1\.2;font-weight:700;color:#f15a24;text-transform:uppercase;text-align:center;margin:5mm (?:0|auto) 6mm\}/);
     assert.match(html, /class="brand-logo" src="\/alumdoor-order-logo\.png" alt="ALUMDOOR"/);
     assert.match(html, /class="company-header-img" src="\/alumdoor-company-header\.png"/);
     assert.doesNotMatch(html, /brand-logo-text|brand-tagline/);

@@ -70,22 +70,10 @@ export function PrintContainer({ doctype, name, format, onFormatChange, onBack }
     if (!selectedFormat || downloading) return;
     setDownloading(true);
     try {
-      // CFMAX-06: PDF is rendered by the trusted tenant Worker through Browser Run.
-      // The server reuses the canonical Print Format permission/redaction path; the
-      // browser no longer rasterises privileged HTML locally with html2canvas/jsPDF.
-      const pdf = await adapter.downloadPdf(doctype, name, selectedFormat);
-      const href = URL.createObjectURL(pdf);
-      try {
-        const anchor = document.createElement("a");
-        anchor.href = href;
-        anchor.download = `${doctype}-${name}.pdf`;
-        anchor.style.display = "none";
-        document.body.appendChild(anchor);
-        anchor.click();
-        anchor.remove();
-      } finally {
-        URL.revokeObjectURL(href);
-      }
+      // Export the exact HTML/CSS already rendered in the preview iframe so the
+      // downloaded PDF keeps the same layout, page size, fonts and discount rows.
+      const html = printQ.data ?? await adapter.printHtml(doctype, name, selectedFormat);
+      await downloadPrintPdf(html, `${doctype}-${name}.pdf`);
       toast.success("Đã tạo file PDF");
     } catch (error) {
       try {

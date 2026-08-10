@@ -415,7 +415,10 @@ export function renderPrintFormat(format: PrintFormatMeta, document: CanonicalDo
     /{{#if\s+([a-zA-Z0-9_.]+)\s*}}([\s\S]*?){{\/if}}/g,
     (_match, path: string, body: string) => {
       const value = resolvePath(scope, path);
-      return value === "" || value === "0" || value === "false" ? "" : body;
+      const trimmed = String(value ?? "").trim();
+      if (!trimmed || trimmed.toLowerCase() === "false") return "";
+      const numeric = Number(trimmed);
+      return Number.isFinite(numeric) && numeric === 0 ? "" : body;
     },
   );
 
@@ -427,7 +430,14 @@ export function renderPrintFormat(format: PrintFormatMeta, document: CanonicalDo
     (_match, kind: string, table: string, field: string, body: string) => {
       const hasValue = (tables.get(table) ?? []).some((row) => {
         const value = row[field];
-        return value !== undefined && value !== null && value !== "" && value !== 0 && value !== false;
+        if (value === undefined || value === null || value === false) return false;
+        if (typeof value === "string") {
+          const trimmed = value.trim();
+          if (!trimmed || trimmed.toLowerCase() === "false") return false;
+          const numeric = Number(trimmed);
+          return Number.isFinite(numeric) ? numeric !== 0 : true;
+        }
+        return value !== 0;
       });
       return (kind === "ifAny" ? hasValue : !hasValue) ? body : "";
     },

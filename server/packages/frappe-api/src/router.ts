@@ -2501,13 +2501,37 @@ async function printView(args: FrappeArgs, context: FrappeRouterContext): Promis
   const format = await context.metadata.getPrintFormat(context.tenantId, doctype, args.text("format"));
   if (!format) throw errors.notFound("No print format is configured for this doctype");
 
+  // Sales Order keeps the customer as a link, so the customer's phone is not
+  // duplicated into every order. Enrich only the print scope, and only when the
+  // actor can also read that Customer, so the paper can show SĐT without widening
+  // the stored order payload or bypassing document permissions.
+  let printableForRender = printable;
+  if (doctype === "Sales Order" && typeof printable.data.customer === "string" && !printable.data.phone) {
+    const customer = await context.documents.getDocument(context.tenantId, "Customer", printable.data.customer);
+    if (customer) {
+      try {
+        await context.permissions.assert({
+          actor: context.actor, tenantId: context.tenantId, doctype: "Customer", name: customer.name,
+          owner: customer.owner, data: customer.data, action: "read",
+        });
+        const phone = customer.data.phone;
+        if (phone !== undefined && phone !== null && String(phone).trim()) {
+          printableForRender = { ...printable, data: { ...printable.data, phone } };
+        }
+      } catch {
+        // The order remains printable; omit the related phone when Customer read
+        // permission is not granted to this actor.
+      }
+    }
+  }
+
   // HTML is returned as a string for the client to sandbox, matching Frappe. The
   // renderer escapes every interpolated value, so document content cannot inject
   // markup into the page.
   // `meta` is passed so `print_hide` is honoured: a field the author marked as not for
   // print — an internal margin, a private note — must not reach the paper the customer
   // is handed.
-  return { html: renderPrintFormat(format, printable, context.actor.locale, meta), style: format.css ?? "" };
+  return { html: renderPrintFormat(format, printableForRender, context.actor.locale, meta), style: format.css ?? "" };
 }
 
 /**
