@@ -583,6 +583,18 @@ export function FormView(props: FormViewProps) {
             const salesOrderOtherInfoFields = isSalesOrderHeader
               ? salesOrderInfoFields.filter((field) => !["customer", "responsible_person"].includes(field.field.fieldname))
               : [];
+            const salesOrderGroupFields = isSalesOrderHeader
+              ? [
+                ...salesOrderOtherInfoFields.filter((field) => field.field.fieldname === "customer_group"),
+                ...salesOrderOtherInfoFields.filter((field) => field.field.fieldname === "selling_price_list"),
+              ]
+              : [];
+            const salesOrderAddressFields = isSalesOrderHeader
+              ? salesOrderOtherInfoFields.filter((field) => field.field.fieldname === "install_address")
+              : [];
+            const salesOrderRemainingInfoFields = isSalesOrderHeader
+              ? salesOrderOtherInfoFields.filter((field) => !["customer_group", "selling_price_list", "install_address"].includes(field.field.fieldname))
+              : [];
             const salesOrderRemainderFields = isSalesOrderHeader
               ? sectionFields.filter((field) => !salesOrderHeaderNames.includes(field.field.fieldname))
               : [];
@@ -654,7 +666,11 @@ export function FormView(props: FormViewProps) {
                           {renderFields(salesOrderCustomerFields)}
                           {renderFields(salesOrderResponsibleFields)}
                         </div>
-                        <div className="mf-form-grid mt-3 grid items-start gap-x-3 gap-y-3">{renderFields(salesOrderOtherInfoFields)}</div>
+                        <div className="mt-3 grid grid-cols-1 items-start gap-x-3 gap-y-3 md:grid-cols-2">{renderFields(salesOrderGroupFields)}</div>
+                        <div className="mt-3 grid grid-cols-1 items-start gap-y-3">{renderFields(salesOrderAddressFields)}</div>
+                        {salesOrderRemainingInfoFields.length ? (
+                          <div className="mf-form-grid mt-3 grid items-start gap-x-3 gap-y-3">{renderFields(salesOrderRemainingInfoFields)}</div>
+                        ) : null}
                       </div>
                       <div className="min-w-0 border-t pt-4 md:border-l md:border-t-0 md:pl-5 md:pt-0">
                         <div className="mf-form-grid grid w-full max-w-[11rem] items-start gap-y-2">{renderFields(salesOrderDateFields, "aside")}</div>
@@ -722,6 +738,9 @@ interface FieldProps {
 
 function Field({ id, rf, width, form, registry, services, docName, parentDoctype, roles, values }: FieldProps) {
   const { field } = rf;
+  const displayLabel = parentDoctype === "Sales Order" && field.fieldname === "customer_group"
+    ? "Nhóm khách hàng"
+    : field.label ?? field.fieldname;
   // Bảng con có thể dùng `parent.foo` ở metadata của CHÍNH DocType con, điều mà FormView cha
   // không biết để đưa vào danh sách watch chọn lọc. Chỉ Field Table theo dõi toàn doc; các field
   // thường vẫn render cục bộ qua Controller nên không kéo cả form render lại mỗi phím gõ.
@@ -759,7 +778,7 @@ function Field({ id, rf, width, form, registry, services, docName, parentDoctype
             error={fieldState.error?.message}
             describedBy={fieldState.error ? `${id}-error` : undefined}
             required={rf.required}
-            label={field.label ?? field.fieldname}
+            label={displayLabel}
             services={services}
             docname={docName}
             linkTarget={linkTarget}
@@ -770,7 +789,7 @@ function Field({ id, rf, width, form, registry, services, docName, parentDoctype
         );
         const label = (
           <>
-            {field.label ?? field.fieldname}
+            {displayLabel}
             {rf.required ? <span className="mf-required ml-0.5 text-destructive" aria-hidden="true">*</span> : null}
           </>
         );
