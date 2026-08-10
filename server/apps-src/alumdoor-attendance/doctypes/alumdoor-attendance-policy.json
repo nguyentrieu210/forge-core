@@ -1,0 +1,35 @@
+{
+  "name": "AlumDoor Attendance Policy",
+  "module": "AlumDoor",
+  "kind": "master",
+  "is_submittable": true,
+  "autoname": "ATP-.YYYY.-#####",
+  "title_field": "policy_name",
+  "search_fields": ["policy_name", "policy_status"],
+  "sort_field": "effective_from",
+  "sort_order": "DESC",
+  "track_changes": true,
+  "fields": [
+    { "fieldname": "policy_name", "label": "Tên chính sách", "fieldtype": "Data", "required": true, "in_list_view": true, "search_index": true },
+    { "fieldname": "company", "label": "Công ty", "fieldtype": "Link", "options": "Company", "required": true, "in_list_view": true, "in_standard_filter": true },
+    { "fieldname": "timezone", "label": "Múi giờ", "fieldtype": "Data", "required": true, "default": "Asia/Ho_Chi_Minh", "in_list_view": true },
+    { "fieldname": "shift1_start_minute", "label": "Ca 1 bắt đầu (phút)", "fieldtype": "Int", "required": true, "default": 420, "non_negative": true },
+    { "fieldname": "shift1_end_minute", "label": "Ca 1 kết thúc (phút)", "fieldtype": "Int", "required": true, "default": 690, "non_negative": true },
+    { "fieldname": "shift2_start_minute", "label": "Ca 2 bắt đầu (phút)", "fieldtype": "Int", "required": true, "default": 780, "non_negative": true },
+    { "fieldname": "shift2_end_minute", "label": "Ca 2 kết thúc (phút)", "fieldtype": "Int", "required": true, "default": 1020, "non_negative": true },
+    { "fieldname": "shift3_start_minute", "label": "Ca 3 bắt đầu (phút)", "fieldtype": "Int", "required": true, "default": 1050, "non_negative": true },
+    { "fieldname": "shift3_latest_out_minute", "label": "Ca 3 ra muộn nhất (phút)", "fieldtype": "Int", "required": true, "default": 1439, "non_negative": true },
+    { "fieldname": "regular_daily_cap_minutes", "label": "Giới hạn phút công thường", "fieldtype": "Int", "required": true, "default": 480, "non_negative": true },
+    { "fieldname": "qr_ttl_seconds", "label": "Chu kỳ QR (giây)", "fieldtype": "Int", "required": true, "default": 15, "non_negative": true },
+    { "fieldname": "effective_from", "label": "Hiệu lực từ", "fieldtype": "Date", "required": true, "in_list_view": true, "in_standard_filter": true },
+    { "fieldname": "effective_to", "label": "Hiệu lực đến", "fieldtype": "Date", "in_standard_filter": true },
+    { "fieldname": "policy_status", "label": "Trạng thái", "fieldtype": "Select", "options": "draft\napproved\nretired", "required": true, "default": "draft", "in_list_view": true, "in_standard_filter": true }
+  ],
+  "permissions": [
+    { "role": "AlumDoor QR System", "read": true },
+    { "role": "AlumDoor Attendance Manager", "read": true, "write": true, "create": true, "submit": true, "cancel": true, "report": true, "export": true },
+    { "role": "HR Manager", "read": true, "write": true, "create": true, "submit": true, "cancel": true, "report": true, "export": true },
+    { "role": "System Manager", "read": true, "write": true, "create": true, "submit": true, "cancel": true, "report": true, "export": true, "share": true }
+  ],
+  "revision": 1
+}

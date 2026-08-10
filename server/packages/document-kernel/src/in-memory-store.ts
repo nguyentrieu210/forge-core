@@ -43,6 +43,27 @@ class KeyedMutex {
   }
 }
 
+interface BundleCheckpoint {
+  documents: Array<[string, CanonicalDocument]>;
+  receipts: Array<[string, MutationReceipt]>;
+  glEntriesLength: number;
+  voucherGlEntriesLength: number;
+  stockEntriesLength: number;
+  voucherStockEntriesLength: number;
+  paymentEntriesLength: number;
+  fulfillmentEntriesLength: number;
+  procurementEntriesLength: number;
+  stockBundleUsagesLength: number;
+  returnEntriesLength: number;
+  manufacturingEntriesLength: number;
+  assetDepreciationEntriesLength: number;
+  assetLifecycleEntriesLength: number;
+  projectTimeEntriesLength: number;
+  posSalesEntriesLength: number;
+  bankReconciliationEntriesLength: number;
+  eventsLength: number;
+}
+
 export class InMemoryMutationStore implements MutationStore {
   private readonly documents = new Map<string, CanonicalDocument>();
   private readonly receipts = new Map<string, MutationReceipt>();
@@ -394,87 +415,187 @@ export class InMemoryMutationStore implements MutationStore {
   }
 
   async execute<T extends JsonObject>(plan: MutationPlan<T>): Promise<MutationReceipt> {
+    const [receipt] = await this.executeBundle([plan]);
+    return receipt!;
+  }
+
+  async executeBundle(plans: readonly MutationPlan[]): Promise<MutationReceipt[]> {
+    this.assertBundlePlans(plans);
+    // The in-memory adapter models one transactional database.  Keep the lock
+    // over the complete ordered bundle so tests retain the same aggregate and
+    // cross-aggregate race behaviour as one D1 batch.
+    return this.mutex.run("__database__", async () => {
+      const replayed = this.resolveBundleReceipts(plans);
+      if (replayed) return replayed;
+
+      const checkpoint = this.captureBundleCheckpoint();
+      try {
+        const receipts: MutationReceipt[] = [];
+        for (const plan of plans) {
+          this.assertPlanCanCommit(plan);
+          receipts.push(this.commitPlan(plan));
+        }
+        return receipts.map((receipt) => structuredClone(receipt));
+      } catch (error) {
+        this.restoreBundleCheckpoint(checkpoint);
+        throw error;
+      }
+    });
+  }
+
+  private assertBundlePlans(plans: readonly MutationPlan[]): void {
+    if (!Array.isArray(plans) || plans.length === 0) {
+      throw errors.validation("Mutation bundle must contain at least one plan");
+    }
+    const tenantId = plans[0]!.command.tenant_id;
+    const commandIds = new Set<string>();
+    for (const plan of plans) {
+      const command = plan.command;
+      if (command.tenant_id !== tenantId) throw errors.validation("Mutation bundle plans must belong to one tenant");
+      if (commandIds.has(command.command_id)) throw errors.validation("Mutation bundle command_id values must be unique");
+      commandIds.add(command.command_id);
+    }
+  }
+
+  private resolveBundleReceipts(plans: readonly MutationPlan[]): MutationReceipt[] | null {
+    const receipts = plans.map((plan) => this.receipts.get(this.receiptKey(plan.command.tenant_id, plan.command.command_id)) ?? null);
+    const committedCount = receipts.filter((receipt) => receipt !== null).length;
+    if (committedCount === 0) return null;
+    for (let index = 0; index < plans.length; index += 1) {
+      const receipt = receipts[index];
+      if (!receipt) continue;
+      const command = plans[index]!.command;
+      if (receipt.payload_hash !== command.payload_hash || receipt.actor_user_id !== command.actor.user_id) {
+        throw errors.idempotency();
+      }
+    }
+    if (committedCount !== plans.length) {
+      throw errors.validation("Mutation bundle has an incomplete receipt set; it cannot be replayed safely");
+    }
+    return receipts.map((receipt) => structuredClone(receipt!));
+  }
+
+  private assertPlanCanCommit<T extends JsonObject>(plan: MutationPlan<T>): void {
     const command = plan.command;
     const key = this.docKey(command.tenant_id, command.aggregate.doctype, command.aggregate.name);
-    // The in-memory adapter models a single transactional database. Serializing commit
-    // validation globally prevents tests from hiding cross-aggregate races that D1
-    // resolves with database triggers.
-    return this.mutex.run("__database__", async () => {
-      const receiptKey = this.receiptKey(command.tenant_id, command.command_id);
-      const previousReceipt = this.receipts.get(receiptKey);
-      if (previousReceipt) {
-        if (previousReceipt.payload_hash !== command.payload_hash || previousReceipt.actor_user_id !== command.actor.user_id) throw errors.idempotency();
-        return structuredClone(previousReceipt);
-      }
-      const current = this.documents.get(key);
-      if (command.expected_version === null) {
-        if (current) throw errors.exists();
-      } else {
-        if (!current) throw errors.notFound();
-        if (current.version !== command.expected_version) throw errors.version(current.version);
-      }
+    const current = this.documents.get(key);
+    if (command.expected_version === null) {
+      if (current) throw errors.exists();
+    } else {
+      if (!current) throw errors.notFound();
+      if (current.version !== command.expected_version) throw errors.version(current.version);
+    }
 
-      this.assertStockInvariants(plan);
-      this.assertFulfillmentInvariants(plan);
-      this.assertOutstandingInvariants(plan);
-      this.assertProcurementInvariants(plan);
-      this.assertStockBundleInvariants(plan);
-      this.assertReturnInvariants(plan);
-      this.assertManufacturingInvariants(plan);
-      this.assertAssetDepreciationInvariants(plan);
-      this.assertSuiteBreadthInvariants(plan);
-      this.assertBankReconciliationInvariants(plan);
-      this.assertAmendChain(command);
+    this.assertStockInvariants(plan);
+    this.assertFulfillmentInvariants(plan);
+    this.assertOutstandingInvariants(plan);
+    this.assertProcurementInvariants(plan);
+    this.assertStockBundleInvariants(plan);
+    this.assertReturnInvariants(plan);
+    this.assertManufacturingInvariants(plan);
+    this.assertAssetDepreciationInvariants(plan);
+    this.assertSuiteBreadthInvariants(plan);
+    this.assertBankReconciliationInvariants(plan);
+    this.assertAmendChain(command);
+  }
 
-      // Attribution is stamped by the store, not the controller, so the in-memory
-      // adapter must match D1 exactly or tests would pass against behaviour that
-      // does not exist in production.
-      this.documents.set(key, {
-        ...structuredClone(plan.document),
-        modified_by: command.actor.user_id,
-        ...(command.amended_from ? { amended_from: command.amended_from } : {}),
-      });
-      this.glEntries.push(...structuredClone(plan.gl_entries));
-      this.voucherGlEntries.push(...plan.gl_entries.map((line) => ({
-        tenant_id: command.tenant_id,
-        voucher_type: command.aggregate.doctype,
-        voucher_no: command.aggregate.name,
-        voucher_revision: plan.document.version,
-        line: structuredClone(line),
-      })));
-      this.stockEntries.push(...structuredClone(plan.stock_entries));
-      this.voucherStockEntries.push(...plan.stock_entries.map((line) => ({
-        tenant_id: command.tenant_id,
-        voucher_type: command.aggregate.doctype,
-        voucher_no: command.aggregate.name,
-        voucher_revision: plan.document.version,
-        line: structuredClone(line),
-      })));
-      this.paymentEntries.push(...structuredClone(plan.payment_entries));
-      this.fulfillmentEntries.push(...structuredClone(plan.fulfillment_entries));
-      this.procurementEntries.push(...structuredClone(plan.procurement_entries ?? []));
-      this.stockBundleUsages.push(...structuredClone(plan.stock_bundle_usages ?? []));
-      this.returnEntries.push(...structuredClone(plan.return_entries ?? []));
-      this.manufacturingEntries.push(...structuredClone(plan.manufacturing_entries ?? []));
-      this.assetDepreciationEntries.push(...structuredClone(plan.asset_depreciation_entries ?? []));
-      this.assetLifecycleEntries.push(...structuredClone(plan.asset_lifecycle_entries ?? []));
-      this.projectTimeEntries.push(...structuredClone(plan.project_time_entries ?? []));
-      this.posSalesEntries.push(...structuredClone(plan.pos_sales_entries ?? []));
-      this.bankReconciliationEntries.push(...structuredClone(plan.bank_reconciliation_entries ?? []));
-      this.events.push(...structuredClone(plan.events));
-      const receipt: MutationReceipt = {
-        command_id: command.command_id,
-        tenant_id: command.tenant_id,
-        actor_user_id: command.actor.user_id,
-        aggregate: command.aggregate,
-        aggregate_version: plan.document.version,
-        payload_hash: command.payload_hash,
-        committed_at: plan.document.modified_at,
-        result: structuredClone(plan.result),
-      };
-      this.receipts.set(receiptKey, receipt);
-      return structuredClone(receipt);
+  private commitPlan<T extends JsonObject>(plan: MutationPlan<T>): MutationReceipt {
+    const command = plan.command;
+    const key = this.docKey(command.tenant_id, command.aggregate.doctype, command.aggregate.name);
+    // Attribution is stamped by the store, not the controller, so the in-memory
+    // adapter must match D1 exactly or tests would pass against behaviour that
+    // does not exist in production.
+    this.documents.set(key, {
+      ...structuredClone(plan.document),
+      modified_by: command.actor.user_id,
+      ...(command.amended_from ? { amended_from: command.amended_from } : {}),
     });
+    this.glEntries.push(...structuredClone(plan.gl_entries));
+    this.voucherGlEntries.push(...plan.gl_entries.map((line) => ({
+      tenant_id: command.tenant_id,
+      voucher_type: command.aggregate.doctype,
+      voucher_no: command.aggregate.name,
+      voucher_revision: plan.document.version,
+      line: structuredClone(line),
+    })));
+    this.stockEntries.push(...structuredClone(plan.stock_entries));
+    this.voucherStockEntries.push(...plan.stock_entries.map((line) => ({
+      tenant_id: command.tenant_id,
+      voucher_type: command.aggregate.doctype,
+      voucher_no: command.aggregate.name,
+      voucher_revision: plan.document.version,
+      line: structuredClone(line),
+    })));
+    this.paymentEntries.push(...structuredClone(plan.payment_entries));
+    this.fulfillmentEntries.push(...structuredClone(plan.fulfillment_entries));
+    this.procurementEntries.push(...structuredClone(plan.procurement_entries ?? []));
+    this.stockBundleUsages.push(...structuredClone(plan.stock_bundle_usages ?? []));
+    this.returnEntries.push(...structuredClone(plan.return_entries ?? []));
+    this.manufacturingEntries.push(...structuredClone(plan.manufacturing_entries ?? []));
+    this.assetDepreciationEntries.push(...structuredClone(plan.asset_depreciation_entries ?? []));
+    this.assetLifecycleEntries.push(...structuredClone(plan.asset_lifecycle_entries ?? []));
+    this.projectTimeEntries.push(...structuredClone(plan.project_time_entries ?? []));
+    this.posSalesEntries.push(...structuredClone(plan.pos_sales_entries ?? []));
+    this.bankReconciliationEntries.push(...structuredClone(plan.bank_reconciliation_entries ?? []));
+    this.events.push(...structuredClone(plan.events));
+    const receipt: MutationReceipt = {
+      command_id: command.command_id,
+      tenant_id: command.tenant_id,
+      actor_user_id: command.actor.user_id,
+      aggregate: command.aggregate,
+      aggregate_version: plan.document.version,
+      payload_hash: command.payload_hash,
+      committed_at: plan.document.modified_at,
+      result: structuredClone(plan.result),
+    };
+    this.receipts.set(this.receiptKey(command.tenant_id, command.command_id), receipt);
+    return receipt;
+  }
+
+  private captureBundleCheckpoint(): BundleCheckpoint {
+    return {
+      documents: [...this.documents.entries()].map(([key, document]) => [key, structuredClone(document)]),
+      receipts: [...this.receipts.entries()].map(([key, receipt]) => [key, structuredClone(receipt)]),
+      glEntriesLength: this.glEntries.length,
+      voucherGlEntriesLength: this.voucherGlEntries.length,
+      stockEntriesLength: this.stockEntries.length,
+      voucherStockEntriesLength: this.voucherStockEntries.length,
+      paymentEntriesLength: this.paymentEntries.length,
+      fulfillmentEntriesLength: this.fulfillmentEntries.length,
+      procurementEntriesLength: this.procurementEntries.length,
+      stockBundleUsagesLength: this.stockBundleUsages.length,
+      returnEntriesLength: this.returnEntries.length,
+      manufacturingEntriesLength: this.manufacturingEntries.length,
+      assetDepreciationEntriesLength: this.assetDepreciationEntries.length,
+      assetLifecycleEntriesLength: this.assetLifecycleEntries.length,
+      projectTimeEntriesLength: this.projectTimeEntries.length,
+      posSalesEntriesLength: this.posSalesEntries.length,
+      bankReconciliationEntriesLength: this.bankReconciliationEntries.length,
+      eventsLength: this.events.length,
+    };
+  }
+
+  private restoreBundleCheckpoint(checkpoint: BundleCheckpoint): void {
+    this.documents.clear();
+    for (const [key, document] of checkpoint.documents) this.documents.set(key, document);
+    this.receipts.clear();
+    for (const [key, receipt] of checkpoint.receipts) this.receipts.set(key, receipt);
+    this.glEntries.splice(checkpoint.glEntriesLength);
+    this.voucherGlEntries.splice(checkpoint.voucherGlEntriesLength);
+    this.stockEntries.splice(checkpoint.stockEntriesLength);
+    this.voucherStockEntries.splice(checkpoint.voucherStockEntriesLength);
+    this.paymentEntries.splice(checkpoint.paymentEntriesLength);
+    this.fulfillmentEntries.splice(checkpoint.fulfillmentEntriesLength);
+    this.procurementEntries.splice(checkpoint.procurementEntriesLength);
+    this.stockBundleUsages.splice(checkpoint.stockBundleUsagesLength);
+    this.returnEntries.splice(checkpoint.returnEntriesLength);
+    this.manufacturingEntries.splice(checkpoint.manufacturingEntriesLength);
+    this.assetDepreciationEntries.splice(checkpoint.assetDepreciationEntriesLength);
+    this.assetLifecycleEntries.splice(checkpoint.assetLifecycleEntriesLength);
+    this.projectTimeEntries.splice(checkpoint.projectTimeEntriesLength);
+    this.posSalesEntries.splice(checkpoint.posSalesEntriesLength);
+    this.bankReconciliationEntries.splice(checkpoint.bankReconciliationEntriesLength);
+    this.events.splice(checkpoint.eventsLength);
   }
 
   snapshot(): MutationSnapshot {

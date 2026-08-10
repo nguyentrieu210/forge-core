@@ -1,0 +1,34 @@
+{
+  "name": "AlumDoor Attendance Day",
+  "module": "AlumDoor",
+  "kind": "transaction",
+  "is_submittable": false,
+  "autoname": "AAD-.YYYY.-#####",
+  "title_field": "employee",
+  "search_fields": ["employee", "work_date", "state"],
+  "sort_field": "work_date",
+  "sort_order": "DESC",
+  "track_changes": true,
+  "fields": [
+    { "fieldname": "employee", "label": "Nhân viên", "fieldtype": "Link", "options": "Employee", "required": true, "set_only_once": true, "in_list_view": true, "in_standard_filter": true, "search_index": true },
+    { "fieldname": "company", "label": "Công ty", "fieldtype": "Link", "options": "Company", "required": true, "set_only_once": true, "in_standard_filter": true },
+    { "fieldname": "branch", "label": "Chi nhánh", "fieldtype": "Link", "options": "Branch", "set_only_once": true, "in_list_view": true, "in_standard_filter": true },
+    { "fieldname": "department", "label": "Phòng ban", "fieldtype": "Link", "options": "Department", "set_only_once": true, "in_standard_filter": true },
+    { "fieldname": "work_date", "label": "Ngày công", "fieldtype": "Date", "required": true, "set_only_once": true, "in_list_view": true, "in_standard_filter": true },
+    { "fieldname": "policy", "label": "Chính sách ca", "fieldtype": "Link", "options": "AlumDoor Attendance Policy", "required": true, "set_only_once": true, "in_standard_filter": true },
+    { "fieldname": "state", "label": "Trạng thái", "fieldtype": "Select", "options": "open\ncomplete\nexception\napproved\nlocked", "required": true, "default": "open", "read_only": true, "in_list_view": true, "in_standard_filter": true },
+    { "fieldname": "regular_minutes", "label": "Phút công thường", "fieldtype": "Int", "required": true, "default": 0, "non_negative": true, "read_only": true, "in_list_view": true },
+    { "fieldname": "overtime_minutes", "label": "Phút tăng ca", "fieldtype": "Int", "required": true, "default": 0, "non_negative": true, "read_only": true, "in_list_view": true },
+    { "fieldname": "payable_work_fraction_bp", "label": "Tỷ lệ công phải trả (bp)", "fieldtype": "Int", "required": true, "default": 0, "non_negative": true, "read_only": true, "in_list_view": true },
+    { "fieldname": "calculated_at", "label": "Tính lúc", "fieldtype": "Datetime", "read_only": true, "in_list_view": true },
+    { "fieldname": "segments", "label": "Đoạn ca", "fieldtype": "Table", "options": "AlumDoor Attendance Segment", "read_only": true }
+  ],
+  "permissions": [
+    { "role": "AlumDoor QR System", "read": true, "write": true, "create": true },
+    { "role": "AlumDoor Attendance Viewer", "read": true, "report": true },
+    { "role": "AlumDoor Attendance Manager", "read": true, "report": true, "export": true },
+    { "role": "HR Manager", "read": true, "report": true, "export": true },
+    { "role": "System Manager", "read": true, "report": true, "export": true }
+  ],
+  "revision": 1
+}

@@ -1,14 +1,18 @@
 # AlumDoor — Field Ledger chấm công QR và tính lương
 
 - Ngày: 2026-08-10
-- Trạng thái: Cổng 3, nguồn duy nhất để dịch sang metadata/Zod/UI/controller ở Pha 5
+- Trạng thái: Cổng 3; Slice 1 là nguồn duy nhất để dịch sang metadata/Zod/controller cho QR và công ngày
 - Quy ước: `Owner` gồm Chủ doanh nghiệp/System Manager; `Manager` gồm AlumDoor Attendance Manager/HR Manager đúng branch; `Payroll` gồm AlumDoor Payroll User/Payroll Manager đúng branch; `Employee` luôn chỉ dòng nối `user_id` của mình.
 
 ## 0. Cột hệ thống và quy ước vật lý
 
-Mọi document dùng cột hệ thống chuẩn của Forge: `name/id`, tenant từ database/session, `created_at`, `modified/updated_at`, `owner/created_by`, `docstatus`, version và audit timeline. Document cấu hình nháp có archive/soft-delete; Checkin, Attendance, Request đã xử lý, Payroll Entry và Salary Slip không hard-delete. Child row có `parent`, `parenttype`, `parentfield`, `idx`.
+Mọi document dùng cột hệ thống chuẩn của Forge: `name/id`, tenant từ database/session, `created_at`, `modified/updated_at`, `owner/created_by`, `docstatus`, version và audit timeline. Document cấu hình nháp có archive/soft-delete; `Employee Checkin`, `AlumDoor Attendance Day`, Request đã xử lý, Payroll Entry và Salary Slip không hard-delete. Child row có `parent`, `parenttype`, `parentfield`, `idx`.
 
 Kiểu D1 dưới đây là kiểu logic của payload. Tiền luôn `INTEGER` VND, tỷ lệ/hệ số là `INTEGER` basis points, ngày/giờ là `TEXT` ISO. Metadata dùng Link/Data/Int/Currency tương ứng nhưng server không chuyển nguồn tính sang floating point.
+
+**Ranh giới đã khóa:** `Employee` chỉ cung cấp identity/scope và không có custom field AlumDoor. `Employee Checkin` là log gốc bất biến. `AlumDoor Attendance Day` cùng ba dòng `AlumDoor Attendance Segment` là projection và nguồn công duy nhất cho lương tương lai. `Attendance` chuẩn HRM không được dùng để chạy thuật toán ba ca.
+
+**Slice 1:** chỉ cần các DocType custom Policy, QR Station, Segment, Attendance Day và overlay `alu_*` của `Employee Checkin`. Bốn nhóm overlay chuẩn còn lại (`Attendance` chỉ projection tương thích nếu có, `Attendance Request`, `Payroll Entry`, `Salary Slip`) là phạm vi tương lai, chỉ được thêm sau khi phần ledger tương ứng được duyệt. Như vậy danh sách **năm** DocType chuẩn có thể có custom field là `Employee Checkin`, `Attendance`, `Attendance Request`, `Payroll Entry`, `Salary Slip`; không tính `Employee`.
 
 ## 1. `AlumDoor Attendance Policy`
 
@@ -30,11 +34,9 @@ Kiểu D1 dưới đây là kiểu logic của payload. Tiền luôn `INTEGER` V
 | effective_from | TEXT | NOT NULL ISO date | `z.string().date()` | date `*` | `notPastWhenNew`: "Ngày hiệu lực không hợp lệ" | ngày bắt đầu do Owner chọn | all thấy; Owner sửa draft | Chọn policy theo ngày công |
 | effective_to | TEXT | NULL ISO date | `z.string().date().nullable()` | date | `effectiveRange`: "Ngày kết thúc phải sau ngày bắt đầu" | — | all thấy; Owner sửa draft | Kết thúc version |
 | policy_key | TEXT | UNIQUE NOT NULL | `z.string().min(1)` | text | `derivedPolicyKey`: "Khóa chính sách không khớp" | server từ company/branch/from/version | Owner thấy; không sửa | Unique kỹ thuật |
-| status | TEXT | NOT NULL DEFAULT draft | `z.enum(['draft','approved','retired'])` | select-enum [draft:Nháp,approved:Đã duyệt,retired:Ngừng áp dụng] | `policyState`: "Chuyển trạng thái chính sách không hợp lệ" | draft | all thấy; action-only | Chỉ approved được tính công |
-| approved_by | TEXT | FK→User NULL | `z.string().min(1).nullable()` | link-field→User | `approvalActor`: "Thiếu người duyệt" | actor khi duyệt | Manager+ thấy; không sửa | Dấu duyệt |
-| approved_at | TEXT | NULL ISO datetime | `z.string().datetime().nullable()` | datetime | `approvalTime`: "Thiếu thời điểm duyệt" | server now khi duyệt | Manager+ thấy; không sửa | Dấu thời gian duyệt |
+| policy_status | TEXT | NOT NULL DEFAULT draft | `z.enum(['draft','approved','retired'])` | select-enum [draft:Nháp,approved:Đã duyệt,retired:Ngừng áp dụng] | `policyState`: "Chuyển trạng thái chính sách không hợp lệ" | draft | all thấy; action-only | Chỉ approved được tính công; tránh đụng `status` hệ thống |
 
-State machine: `draft → approved → retired`. Nút: draft `Lưu`, `Duyệt`; approved `Tạo phiên bản mới`, `Ngừng áp dụng`; retired chỉ `Xem`. Approved không update.
+State machine: `draft → approved → retired`. Nút: draft `Lưu`, `Duyệt`; approved `Tạo phiên bản mới`, `Ngừng áp dụng`; retired chỉ `Xem`. Approved không update. Policy Slice 1 không có `approved_by`/`approved_at`; actor, thời gian và before/after của duyệt được lấy từ workflow/audit timeline. Slice 1 chưa chặn policy approved chồng khoảng hiệu lực; đây là validator bắt buộc của pha sau, còn scan hiện chỉ dùng policy mà trạm tham chiếu, ở trạng thái approved và còn hiệu lực.
 
 ## 2. `AlumDoor QR Station`
 
@@ -42,7 +44,6 @@ State machine: `draft → approved → retired`. Nút: draft `Lưu`, `Duyệt`; 
 |---|---|---|---|---|---|---|---|---|
 | station_code | TEXT | UNIQUE NOT NULL | `z.string().regex(/^[A-Z0-9-]{3,30}$/)` | code-auto | `stationCode`: "Mã trạm chỉ gồm chữ hoa, số và dấu gạch" | counter `QR` | Manager+ thấy; không sửa | Định danh trạm |
 | station_name | TEXT | NOT NULL | `z.string().trim().min(3).max(100)` | text `*` | `requiredTrimmed`: "Nhập tên trạm" | — | Manager+ thấy; Owner sửa | Tên hiển thị trên màn QR |
-| company | TEXT | FK→Company NOT NULL | `z.string().min(1)` | link-field→Company `*` | `scopedCompany`: "Công ty không thuộc phạm vi" | company session | Manager+ thấy; Owner sửa | Scope tenant/company |
 | branch | TEXT | FK→Branch NULL | `z.string().min(1).nullable()` | link-field→Branch | `branchOfCompany`: "Chi nhánh không thuộc công ty" | branch user | Manager+ thấy; Owner sửa | Scope nhân viên được quét |
 | policy | TEXT | FK→AlumDoor Attendance Policy NOT NULL | `z.string().min(1)` | link-field→AlumDoor Attendance Policy `*` | `approvedEffectivePolicy`: "Chọn chính sách đã duyệt và còn hiệu lực" | policy approved gần nhất của branch | Manager+ thấy; Owner sửa | Chính sách phát/tính token |
 | secret_version | INTEGER | NOT NULL DEFAULT 1 CHECK >=1 | `z.number().int().min(1)` | number | `secretVersion`: "Phiên bản khóa phải lớn hơn 0" | 1; tăng khi Rotate | Owner thấy; action-only | Thu hồi token cũ trong tối đa TTL |
@@ -60,7 +61,7 @@ Lifecycle: active/inactive không xóa station. Actions Owner: `Mở màn QR`, `
 | branch | TEXT | FK→Branch NOT NULL | `z.string().min(1)` | link-field→Branch `*` | `employeeBranch`: "Chi nhánh không khớp nhân viên" | từ Employee | Employee own/Manager+ thấy; không sửa QR | Scope |
 | time | TEXT | NOT NULL ISO datetime | `z.string().datetime()` | datetime `*` | `serverDatetime`: "Thời điểm quét không hợp lệ" | server now | Employee own/Manager+ thấy; không sửa | Giờ duy nhất tính công |
 | log_type | TEXT | NOT NULL | `z.enum(['IN','OUT'])` | select-enum [IN:Vào,OUT:Ra] `*` | `segmentToggle`: "Chiều quét không khớp trạng thái ca" | server từ segment state | Employee own/Manager+ thấy; không sửa | IN/OUT riêng từng segment |
-| source | TEXT | NOT NULL DEFAULT Mobile | `z.enum(['Mobile','Device','Import','Manual'])` | select-enum [Mobile:Điện thoại,Device:Thiết bị,Import:Nhập,Manual:Thủ công] `*` | `checkinSource`: "Nguồn chấm công không hợp lệ" | QR dùng Mobile | Manager+ thấy; không sửa QR | Giữ enum chuẩn HRM |
+| source | TEXT | NOT NULL DEFAULT Mobile | `z.enum(['Mobile','Device','Import','Manual'])` | select-enum [Mobile:Điện thoại,Device:Thiết bị,Import:Nhập,Manual:Thủ công] `*` | `checkinSource`: "Nguồn chấm công không hợp lệ" | QR trạm dùng `Device` | Manager+ thấy; không sửa QR | Giữ enum chuẩn HRM |
 | external_id | TEXT | UNIQUE NOT NULL với QR | `z.string().min(16).max(160)` | text | `qrExternalId`: "Mã sự kiện QR không hợp lệ" | server hash canonical | Manager+ thấy; không sửa | Idempotency/replay guard |
 | alu_station | TEXT | FK→AlumDoor QR Station NULL | `z.string().min(1).nullable()` | link-field→AlumDoor QR Station | `activeStation`: "Trạm QR không hợp lệ" | từ token | Employee own/Manager+ thấy; không sửa | Trạm nguồn |
 | alu_work_date | TEXT | ISO date NULL | `z.string().date().nullable()` | date | `serverWorkDate`: "Ngày công không hợp lệ" | server theo policy timezone | Employee own/Manager+ thấy; không sửa | Khóa aggregate ngày |
@@ -72,7 +73,7 @@ Lifecycle: active/inactive không xóa station. Actions Owner: `Mở màn QR`, `
 
 Lifecycle QR: tạo + submit trong transaction; không update/cancel/delete. Duplicate `external_id` trả bản ghi đầu tiên.
 
-## 4. `AlumDoor Attendance Segment` — child của Attendance
+## 4. `AlumDoor Attendance Segment` — child của `AlumDoor Attendance Day`
 
 | Field | D1 | Ràng buộc | Zod | UI | Validate | Autofill | Quyền | Nghiệp vụ |
 |---|---|---|---|---|---|---|---|---|
@@ -84,38 +85,34 @@ Lifecycle QR: tạo + submit trong transaction; không update/cancel/delete. Dup
 | actual_minutes | INTEGER | NOT NULL DEFAULT 0 CHECK 0..1110 | `z.number().int().min(0).max(1110)` | number | `derivedMinutes`: "Phút thực tế không khớp" | server overlap | Employee own/Manager+/Payroll thấy; không sửa | Phút giao với khung |
 | regular_minutes | INTEGER | NOT NULL DEFAULT 0 CHECK 0..480 | `z.number().int().min(0).max(480)` | number | `derivedMinutes`: "Phút thường không khớp" | server aggregate | Employee own/Manager+/Payroll thấy; không sửa | Đóng góp phút thường |
 | overtime_minutes | INTEGER | NOT NULL DEFAULT 0 CHECK 0..1110 | `z.number().int().min(0).max(1110)` | number | `derivedMinutes`: "Phút tăng ca không khớp" | server aggregate | Employee own/Manager+/Payroll thấy; không sửa | Đóng góp OT |
-| status | TEXT | NOT NULL | `z.enum(['empty','open','complete','missing_in','missing_out','corrected'])` | select-enum [empty:Chưa quét,open:Đang mở,complete:Đủ,missing_in:Thiếu vào,missing_out:Thiếu ra,corrected:Đã sửa] | `segmentState`: "Trạng thái ca không hợp lệ" | server state | Employee own/Manager+/Payroll thấy; action-only | Chặn/cho phép payroll |
+| state | TEXT | NOT NULL | `z.enum(['empty','open','complete','missing_in','missing_out','corrected'])` | select-enum [empty:Chưa quét,open:Đang mở,complete:Đủ,missing_in:Thiếu vào,missing_out:Thiếu ra,corrected:Đã sửa] | `segmentState`: "Trạng thái ca không hợp lệ" | server state | Employee own/Manager+/Payroll thấy; action-only | Chặn/cho phép payroll |
 | calculation_version | INTEGER | NOT NULL DEFAULT 1 | `z.number().int().min(1)` | number | `positiveVersion`: "Phiên bản tính không hợp lệ" | tăng khi recompute | Manager+/Payroll thấy; không sửa | Truy vết công thức |
-| correction_request | TEXT | FK→Attendance Request NULL | `z.string().min(1).nullable()` | link-field→Attendance Request | `requiredWhenCorrected`: "Ca đã sửa phải có phiếu nguồn" | review correction | Employee own/Manager+/Payroll thấy; không sửa | Nguồn sửa |
+| correction_request | TEXT | FK→Attendance Request NULL | `z.string().min(1).nullable()` | link-field→Attendance Request | `requiredWhenCorrected`: "Ca đã sửa phải có phiếu nguồn" | review correction | Employee own/Manager+/Payroll thấy; không sửa | Pha sau; không cài ở Slice 1 |
 
 State machine: `empty → open → complete`; `open → missing_out`; correction approved → `corrected`. Không thao tác trực tiếp trong grid.
 
-## 5. `Attendance` — trường chuẩn và customization AlumDoor
+## 5. `AlumDoor Attendance Day` — projection ngày và nguồn công
+
+Đây là Custom DocType AlumDoor, không phải `Attendance` chuẩn HRM. Sau mỗi scan, server tạo/cập nhật đúng một document theo `employee + work_date`, đồng thời tính lại đủ ba child row. Bất cứ tính lương tương lai nào đều đọc document này, không đọc `Attendance` chuẩn.
 
 | Field | D1 | Ràng buộc | Zod | UI | Validate | Autofill | Quyền | Nghiệp vụ |
 |---|---|---|---|---|---|---|---|---|
-| company | TEXT | FK→Company NOT NULL | `z.string().min(1)` | link-field→Company `*` | `employeeCompany`: "Công ty không khớp nhân viên" | từ Employee | own/Manager+/Payroll thấy; không sửa QR | Scope |
-| branch | TEXT | FK→Branch NOT NULL | `z.string().min(1)` | link-field→Branch `*` | `employeeBranch`: "Chi nhánh không khớp nhân viên" | từ Employee | own/Manager+/Payroll thấy; không sửa QR | Scope |
-| department | TEXT | FK→Department NOT NULL | `z.string().min(1)` | link-field→Department `*` | `employeeDepartment`: "Phòng ban không khớp" | từ Employee | own/Manager+/Payroll thấy; không sửa QR | Scope/report |
 | employee | TEXT | FK→Employee NOT NULL | `z.string().min(1)` | link-field→Employee `*` | `activeEmployee`: "Nhân viên không hoạt động" | từ actor/scan | own/Manager+/Payroll thấy; không sửa | Unique cùng ngày |
-| attendance_date | TEXT | ISO date NOT NULL | `z.string().date()` | date `*` | `employmentDate`: "Ngày công ngoài thời gian làm việc" | policy timezone | own/Manager+/Payroll thấy; không sửa | Ngày công |
-| attendance_status | TEXT | NOT NULL DEFAULT Có mặt | `z.enum(['Có mặt','Vắng','Nửa ngày','Nghỉ phép','Làm việc từ xa'])` | select-enum [Có mặt:Có mặt,Vắng:Vắng,Nửa ngày:Nửa ngày,Nghỉ phép:Nghỉ phép,Làm việc từ xa:Làm việc từ xa] `*` | `attendanceStatus`: "Trạng thái công không hợp lệ" | server từ minutes/leave | own/Manager+/Payroll thấy; Manager action-only | Trạng thái HRM chuẩn |
-| working_minutes | INTEGER | NOT NULL DEFAULT 0 | `z.number().int().min(0).max(480)` | number | `derivedMinutes`: "Phút làm thường không khớp" | = alu_regular_minutes | own/Manager+/Payroll thấy; không sửa | Tương thích HRM |
-| overtime_minutes | INTEGER | NOT NULL DEFAULT 0 | `z.number().int().min(0).max(3330)` | number | `derivedMinutes`: "Phút tăng ca không khớp" | = alu_overtime_minutes | own/Manager+/Payroll thấy; không sửa | Tương thích Payroll |
-| source | TEXT | NOT NULL | `z.enum(['Manual','Device','Import','Correction'])` | select-enum [Manual:Thủ công,Device:Thiết bị,Import:Nhập,Correction:Điều chỉnh] `*` | `attendanceSource`: "Nguồn tổng công không hợp lệ" | Device cho QR; Correction sau sửa | Manager+/Payroll thấy; không sửa QR | Nguồn chuẩn |
-| alu_policy | TEXT | FK→AlumDoor Attendance Policy NULL | `z.string().min(1).nullable()` | link-field→AlumDoor Attendance Policy | `approvedEffectivePolicy`: "Không có chính sách hiệu lực" | policy theo ngày/branch | own/Manager+/Payroll thấy; không sửa | Khóa version ca |
-| alu_segments | TEXT | child rows NOT NULL | `z.array(z.object({segment_code:z.enum(['SHIFT1','SHIFT2','SHIFT3'])})).length(3)` | link-field→AlumDoor Attendance Segment | `threeUniqueSegments`: "Ngày công phải có đủ ba ca" | transaction tạo/tính | own/Manager+/Payroll thấy; không sửa grid | Ba đoạn ca |
-| alu_regular_minutes | INTEGER | NOT NULL DEFAULT 0 CHECK 0..480 | `z.number().int().min(0).max(480)` | number | `derivedMinutes`: "Tổng phút thường không khớp" | sum formula | own/Manager+/Payroll thấy; không sửa | Nguồn lương thường |
-| alu_overtime_minutes | INTEGER | NOT NULL DEFAULT 0 | `z.number().int().min(0).max(3330)` | number | `derivedMinutes`: "Tổng phút tăng ca không khớp" | sum formula | own/Manager+/Payroll thấy; không sửa | Nguồn lương OT |
-| alu_payable_work_fraction_bp | INTEGER | NOT NULL DEFAULT 0 CHECK 0..10000 | `z.number().int().min(0).max(10000)` | number | `derivedWorkFraction`: "Tỷ lệ ngày công không khớp" | round regular/480 | own/Manager+/Payroll thấy; không sửa | 10000 = 1 ngày |
-| alu_state | TEXT | NOT NULL DEFAULT open | `z.enum(['open','complete','exception','approved','locked'])` | select-enum [open:Đang chấm,complete:Đủ công,exception:Cần xử lý,approved:Đã duyệt,locked:Đã khóa lương] | `attendanceState`: "Chuyển trạng thái công không hợp lệ" | server state | own/Manager+/Payroll thấy; action-only | Workflow ngày |
-| alu_exception_code | TEXT | NULL | `z.enum(['MISSING_IN','MISSING_OUT','OUTSIDE_WINDOW','CROSS_DAY','POLICY_MISSING']).nullable()` | select-enum [MISSING_IN:Thiếu vào,MISSING_OUT:Thiếu ra,OUTSIDE_WINDOW:Ngoài giờ,CROSS_DAY:Qua ngày,POLICY_MISSING:Thiếu chính sách] | `exceptionMatchesSegment`: "Mã ngoại lệ không khớp" | aggregate | own/Manager+/Payroll thấy; không sửa | Lọc queue/chặn lương |
-| alu_approved_by | TEXT | FK→User NULL | `z.string().min(1).nullable()` | link-field→User | `approvalActor`: "Thiếu người duyệt công" | correction reviewer | Manager+/Payroll thấy; không sửa | Audit |
-| alu_approved_at | TEXT | NULL ISO datetime | `z.string().datetime().nullable()` | datetime | `approvalTime`: "Thiếu thời điểm duyệt công" | server now | Manager+/Payroll thấy; không sửa | Audit |
-| alu_payroll_entry | TEXT | FK→Payroll Entry NULL | `z.string().min(1).nullable()` | link-field→Payroll Entry | `lockedPayrollLink`: "Ngày đã khóa phải có kỳ lương" | approve payroll | own/Manager+/Payroll thấy; không sửa | Khóa vào kỳ |
-| alu_calculated_at | TEXT | ISO datetime NOT NULL | `z.string().datetime()` | datetime | `serverDatetime`: "Thời điểm tính công không hợp lệ" | server now | own/Manager+/Payroll thấy; không sửa | Projection freshness |
+| company | TEXT | FK→Company NOT NULL | `z.string().min(1)` | link-field→Company `*` | `employeeCompany`: "Công ty không khớp nhân viên" | từ Employee | own/Manager+/Payroll thấy; không sửa QR | Scope |
+| branch | TEXT | FK→Branch NULL | `z.string().min(1).nullable()` | link-field→Branch | `employeeBranch`: "Chi nhánh không khớp nhân viên" | từ Employee | own/Manager+/Payroll thấy; không sửa QR | Scope |
+| department | TEXT | FK→Department NULL | `z.string().min(1).nullable()` | link-field→Department | `employeeDepartment`: "Phòng ban không khớp" | từ Employee | own/Manager+/Payroll thấy; không sửa QR | Scope/report |
+| work_date | TEXT | ISO date NOT NULL | `z.string().date()` | date `*` | `employmentDate`: "Ngày công ngoài thời gian làm việc" | policy timezone | own/Manager+/Payroll thấy; không sửa | Ngày công |
+| policy | TEXT | FK→AlumDoor Attendance Policy NOT NULL | `z.string().min(1)` | link-field→AlumDoor Attendance Policy `*` | `approvedEffectivePolicy`: "Không có chính sách hiệu lực" | policy theo ngày/branch | own/Manager+/Payroll thấy; không sửa | Khóa version ca |
+| segments | TEXT | child rows, đủ 3 dòng | `z.array(z.object({segment_code:z.enum(['SHIFT1','SHIFT2','SHIFT3'])})).length(3)` | table→AlumDoor Attendance Segment | `threeUniqueSegments`: "Ngày công phải có đủ ba ca" | transaction tạo/tính | own/Manager+/Payroll thấy; không sửa grid | Ba đoạn ca |
+| regular_minutes | INTEGER | NOT NULL DEFAULT 0 CHECK 0..480 | `z.number().int().min(0).max(480)` | number | `derivedMinutes`: "Tổng phút thường không khớp" | sum formula | own/Manager+/Payroll thấy; không sửa | Nguồn lương thường |
+| overtime_minutes | INTEGER | NOT NULL DEFAULT 0 | `z.number().int().min(0).max(3330)` | number | `derivedMinutes`: "Tổng phút tăng ca không khớp" | sum formula | own/Manager+/Payroll thấy; không sửa | Nguồn lương OT |
+| payable_work_fraction_bp | INTEGER | NOT NULL DEFAULT 0 CHECK 0..10000 | `z.number().int().min(0).max(10000)` | number | `derivedWorkFraction`: "Tỷ lệ ngày công không khớp" | round regular/480 | own/Manager+/Payroll thấy; không sửa | 10000 = 1 ngày |
+| state | TEXT | NOT NULL DEFAULT open | `z.enum(['open','complete','exception','approved','locked'])` | select-enum [open:Đang chấm,complete:Đủ công,exception:Cần xử lý,approved:Đã duyệt,locked:Đã khóa lương] | `attendanceDayState`: "Chuyển trạng thái công không hợp lệ" | server state | own/Manager+/Payroll thấy; action-only | Workflow ngày |
+| calculated_at | TEXT | ISO datetime NOT NULL | `z.string().datetime()` | datetime | `serverDatetime`: "Thời điểm tính công không hợp lệ" | server now | own/Manager+/Payroll thấy; không sửa | Projection freshness |
 
 State machine: `open → complete`; `open/complete → exception`; correction → `approved`; payroll approval `complete/approved → locked`. Locked bất biến.
+
+> **Pha sau, không thuộc Slice 1:** các section 6–9 dưới đây là contract đã dự kiến để không phá luồng lương, nhưng chưa được phép cài metadata, custom field hoặc route. Khi triển khai phải mở lại review Field Ledger của section tương ứng.
 
 ## 6. `Attendance Request` — phiếu sửa công
 
@@ -211,9 +208,9 @@ State machine: `draft → calculated → pending_approval → approved → paid`
 | net_pay | INTEGER | NOT NULL DEFAULT 0 | `z.number().int().min(0)` | money | `derivedMoney`: "Thực nhận không khớp" | gross - total deduction | own/Payroll/Owner thấy; không sửa | Số trả |
 | alu_payroll_entry | TEXT | FK→Payroll Entry NOT NULL | `z.string().min(1)` | link-field→Payroll Entry `*` | `activePayrollPeriod`: "Kỳ lương không hợp lệ" | kỳ đang tính | own/Payroll/Owner thấy; không sửa | Aggregate nguồn |
 | alu_pay_profile | TEXT | FK→AlumDoor Pay Profile NOT NULL | `z.string().min(1)` | link-field→AlumDoor Pay Profile `*` | `approvedEffectiveProfile`: "Thiếu hồ sơ lương đã duyệt" | profile hiệu lực | own/Payroll/Owner thấy; không sửa | Khóa giá/hệ số |
-| alu_regular_minutes | INTEGER | NOT NULL DEFAULT 0 | `z.number().int().min(0)` | number | `derivedMinutes`: "Phút thường không khớp" | sum locked Attendance | own/Payroll/Owner thấy; không sửa | Trace công |
-| alu_overtime_minutes | INTEGER | NOT NULL DEFAULT 0 | `z.number().int().min(0)` | number | `derivedMinutes`: "Phút tăng ca không khớp" | sum locked Attendance | own/Payroll/Owner thấy; không sửa | Trace OT |
-| alu_work_fraction_bp | INTEGER | NOT NULL DEFAULT 0 | `z.number().int().min(0).max(310000)` | number | `derivedWorkFraction`: "Ngày công không khớp" | sum Attendance | own/Payroll/Owner thấy; không sửa | Tổng ngày công ×10000 |
+| alu_regular_minutes | INTEGER | NOT NULL DEFAULT 0 | `z.number().int().min(0)` | number | `derivedMinutes`: "Phút thường không khớp" | sum locked AlumDoor Attendance Day | own/Payroll/Owner thấy; không sửa | Trace công |
+| alu_overtime_minutes | INTEGER | NOT NULL DEFAULT 0 | `z.number().int().min(0)` | number | `derivedMinutes`: "Phút tăng ca không khớp" | sum locked AlumDoor Attendance Day | own/Payroll/Owner thấy; không sửa | Trace OT |
+| alu_work_fraction_bp | INTEGER | NOT NULL DEFAULT 0 | `z.number().int().min(0).max(310000)` | number | `derivedWorkFraction`: "Ngày công không khớp" | sum AlumDoor Attendance Day | own/Payroll/Owner thấy; không sửa | Tổng ngày công ×10000 |
 | alu_base_pay_vnd | INTEGER | NOT NULL DEFAULT 0 | `z.number().int().min(0)` | money | `derivedMoney`: "Lương thường không khớp" | fixed-point server | own/Payroll/Owner thấy; không sửa | Lương thường |
 | alu_overtime_pay_vnd | INTEGER | NOT NULL DEFAULT 0 | `z.number().int().min(0)` | money | `derivedMoney`: "Tiền OT không khớp" | fixed-point server | own/Payroll/Owner thấy; không sửa | Tiền OT |
 | alu_allowance_vnd | INTEGER | NOT NULL DEFAULT 0 | `z.number().int().min(0)` | money | `vndNonNegative`: "Phụ cấp không hợp lệ" | profile fixed allowance; Payroll sửa draft | own/Payroll/Owner thấy; Payroll sửa draft | Khoản cộng |
@@ -233,7 +230,7 @@ State machine: đi theo Payroll Entry. Chỉ draft cho Payroll sửa ba khoản 
 - Không thêm thuế/BHXH/BHTN/TNCN vì MVP chưa có nguồn pháp lý đã duyệt.
 - Không thêm giờ client, ảnh QR, token thô, IP/fingerprint thô.
 - Không thêm cờ "tự duyệt" hoặc "bỏ qua ngoại lệ".
-- Không thêm bảng Checkin/Attendance/Salary Slip riêng ngoài DocType chuẩn.
+- Không thêm bảng Checkin hoặc Salary Slip song song với DocType chuẩn. Chỉ có `AlumDoor Attendance Day` là custom projection cần thiết để biểu diễn ba đoạn ca; không tạo/ghi `Attendance` chuẩn cho thuật toán này.
 
 ## 11. Kiểm tra Field Ledger
 

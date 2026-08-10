@@ -48,9 +48,12 @@ import {
   syncPaintJobsFromCut,
   validateProductionRequest,
 } from "./sales-production.js";
+import { attendanceChallenge, attendanceScan } from "./attendance-routes.js";
 
 interface Env {
   INTERNAL_AUTH_SECRET?: string;
+  /** Dedicated HMAC secret for short-lived attendance QR challenges. */
+  ALUMDOOR_ATTENDANCE_QR_SECRET?: string;
   /** Gateway, gọi thẳng script. Xem wrangler.jsonc. */
   PLATFORM?: Fetcher;
   /** Workers AI — chỉ dùng để ĐỌC ẢNH. Không chạm dữ liệu tenant. */
@@ -3108,6 +3111,8 @@ export default {
         }
 
         const call = platformCaller(request, env);
+        if (method === "alumdoor.attendance.challenge") return await attendanceChallenge({ request, call, env, args });
+        if (method === "alumdoor.attendance.scan") return await attendanceScan({ request, call, env, args });
         if (method === "alumdoor.sales.item_context") return await salesItemContext(call, args);
         if (method === "alumdoor.sales.production_line_context") return await calculateSalesProductionLine(call, args);
         if (method === "alumdoor.sales.preview_production") return await previewSalesProduction(call, args);

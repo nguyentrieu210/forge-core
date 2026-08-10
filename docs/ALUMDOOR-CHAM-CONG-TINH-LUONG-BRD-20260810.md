@@ -2,12 +2,12 @@
 
 - Ngày lập: 10/08/2026
 - Phạm vi: tenant/bề mặt AlumDoor; không làm thay đổi trải nghiệm HRM dùng chung của tenant khác
-- Trạng thái: Chờ chủ doanh nghiệp duyệt Cổng 2 trước khi thiết kế kỹ thuật và viết code
+- Trạng thái: Cổng 3 — kiến trúc an toàn đã khóa; Slice 1 đang triển khai metadata, QR và công ngày
 - Mức ưu tiên: nghiệp vụ tiền lương — fail closed, không chốt khi dữ liệu chưa đủ hoặc cấu hình chưa được duyệt
 
 ## 1. Vấn đề
 
-AlumDoor hiện chỉ đưa `Employee` và `Attendance` ra bề mặt vận hành. Hệ thống đã có log check-in, ca và nền lương dùng chung, nhưng cách dùng hiện tại quá nặng so với nhu cầu xưởng và chưa phản ánh đúng lịch làm thực tế:
+AlumDoor hiện chỉ cần dùng `Employee` để nhận diện người quét và `Employee Checkin` để lưu log gốc. `Attendance` chuẩn của HRM chỉ có một cặp giờ vào/ra, vì vậy không thể là nguồn tính cho lịch ba ca của xưởng. Hệ thống đã có log check-in, ca và nền lương dùng chung, nhưng cách dùng hiện tại quá nặng so với nhu cầu xưởng và chưa phản ánh đúng lịch làm thực tế:
 
 - Ca 1: 07:00–11:30.
 - Ca 2: 13:00–17:00.
@@ -74,7 +74,13 @@ Ví dụ đúng:
 
 ## 4. Thực thể dữ liệu và trường
 
-Ghi chú: các tên dưới đây là contract nghiệp vụ. Pha thiết kế kỹ thuật sẽ map vào DocType hiện hữu (`Employee Checkin`, `Attendance`, `Shift Type`, `Salary Slip`) bằng customization riêng tenant AlumDoor khi phù hợp; không sửa base metadata dùng chung nếu không cần.
+Ghi chú kiến trúc đã khóa: `Employee Checkin` là log quét bất biến. `AlumDoor Attendance Day` là bản tổng hợp ngày riêng của AlumDoor, luôn có ba dòng `AlumDoor Attendance Segment`; đây là nguồn công cho lương sau này. Không dùng `Attendance` chuẩn của HRM để chạy thuật toán ba ca hoặc làm nguồn lương. `Employee` chỉ cung cấp định danh/scope nhân viên, không nhận trường `alu_*`.
+
+### Ranh giới Slice 1
+
+Slice 1 chỉ cài bốn DocType AlumDoor (`AlumDoor Attendance Policy`, `AlumDoor QR Station`, `AlumDoor Attendance Segment`, `AlumDoor Attendance Day`) và overlay cần thiết trên `Employee Checkin`. Chưa cài custom field/luồng ghi nào cho `Attendance`, `Attendance Request`, `Payroll Entry` hay `Salary Slip`.
+
+Nếu mở rộng sau Slice 1, năm DocType chuẩn có thể được bổ sung overlay **khi Field Ledger tương ứng được duyệt**: `Employee Checkin`, `Attendance` (chỉ projection tương thích HRM, không chạy công thức ba ca), `Attendance Request`, `Payroll Entry`, `Salary Slip`. `Employee` vẫn chỉ là nguồn identity, không nằm trong danh sách custom field.
 
 ### 4.1 `attendance_policy` — chính sách ca có hiệu lực
 
@@ -94,10 +100,9 @@ Ghi chú: các tên dưới đây là contract nghiệp vụ. Pha thiết kế k
 | `qr_ttl_seconds` | INTEGER | NOT NULL, default 15 | 10–60 | Chu kỳ QR |
 | `effective_from` | TEXT | NOT NULL, ISO date | Ngày hợp lệ | Ngày bắt đầu áp dụng |
 | `effective_to` | TEXT | NULL, ISO date | `>= effective_from` | Ngày kết thúc |
-| `status` | TEXT | NOT NULL | `draft/approved/retired` | Trạng thái chính sách |
-| `approved_by`, `approved_at` | TEXT | NULL | Bắt buộc khi approved | Dấu vết phê duyệt |
+| `policy_status` | TEXT | NOT NULL | `draft/approved/retired` | Trạng thái chính sách |
 
-Chính sách đã `approved` không sửa trực tiếp; thay đổi tạo phiên bản mới theo ngày hiệu lực.
+Chính sách đã `approved` không sửa trực tiếp; thay đổi tạo phiên bản mới theo ngày hiệu lực. Tên trường kỹ thuật dùng trong metadata là `policy_status` để không đụng cột hệ thống `status`. Slice 1 không có cột `approved_by` hay `approved_at` trên Policy: bằng chứng duyệt nằm ở workflow/audit timeline (actor, action, thời gian, before/after).
 
 ### 4.2 `attendance_qr_station` — trạm QR
 
@@ -141,18 +146,18 @@ Unique bảo vệ: cùng `employee_id + token_nonce_hash + segment_code` chỉ g
 | Trường | Kiểu D1 | Khóa/ràng buộc | Validate server | Ý nghĩa |
 |---|---|---|---|---|
 | `id` | TEXT | PK, UUID | UUID | Dòng đoạn ca |
-| `attendance_id` | TEXT | NOT NULL, FK attendance | Cùng tenant | Bản tổng ngày |
-| `segment_code` | TEXT | UNIQUE theo attendance | `SHIFT1/SHIFT2/SHIFT3` | Mỗi đoạn tối đa một dòng |
+| `attendance_day_id` | TEXT | NOT NULL, FK AlumDoor Attendance Day | Cùng tenant | Bản tổng ngày |
+| `segment_code` | TEXT | UNIQUE theo attendance day | `SHIFT1/SHIFT2/SHIFT3` | Mỗi đoạn tối đa một dòng |
 | `in_checkin_id`, `out_checkin_id` | TEXT | NULL, FK checkin | Cùng employee/ngày/đoạn | Nối bằng chứng |
 | `actual_in`, `actual_out` | TEXT | NULL | ISO datetime; out > in | Thời gian thực tế |
 | `actual_minutes` | INTEGER | NOT NULL, default 0 | 0–1110 | Phút có mặt thực tế |
 | `regular_minutes` | INTEGER | NOT NULL, default 0 | 0–480 | Phút thường đóng góp |
 | `overtime_minutes` | INTEGER | NOT NULL, default 0 | 0–1110 | Phút tăng ca đóng góp |
-| `status` | TEXT | NOT NULL | `open/complete/missing_in/missing_out/corrected` | Tình trạng đoạn |
+| `state` | TEXT | NOT NULL | `open/complete/missing_in/missing_out/corrected` | Tình trạng đoạn |
 | `calculation_version` | INTEGER | NOT NULL | `>=1` | Phiên bản công thức |
 | `correction_request_id` | TEXT | NULL, FK correction | Bắt buộc nếu corrected | Nguồn sửa |
 
-### 4.5 `attendance` — tổng hợp ngày
+### 4.5 `attendance_day` — tổng hợp ngày AlumDoor
 
 | Trường | Kiểu D1 | Khóa/ràng buộc | Validate server | Ý nghĩa |
 |---|---|---|---|---|
@@ -164,15 +169,15 @@ Unique bảo vệ: cùng `employee_id + token_nonce_hash + segment_code` chỉ g
 | `regular_minutes` | INTEGER | NOT NULL, default 0 | 0–480 | Tổng phút thường |
 | `overtime_minutes` | INTEGER | NOT NULL, default 0 | `>=0` | Tổng phút tăng ca |
 | `payable_work_fraction_bp` | INTEGER | NOT NULL, default 0 | 0–10000 basis points | Tỷ lệ ngày công, tránh REAL |
-| `status` | TEXT | NOT NULL | `open/complete/exception/approved/locked` | Trạng thái ngày |
+| `state` | TEXT | NOT NULL | `open/complete/exception/approved/locked` | Trạng thái ngày |
 | `exception_code` | TEXT | NULL | Enum đã khai báo | Thiếu vào/ra, ngoài khung... |
 | `approved_by`, `approved_at` | TEXT | NULL | Có khi approved | Duyệt ngày ngoại lệ |
 | `payroll_period_id` | TEXT | NULL, FK period | Có khi locked | Kỳ lương đã dùng |
 | `calculated_at` | TEXT | NOT NULL | Server sinh | Lần tính gần nhất |
 
-Unique: `tenant_id + employee_id + work_date`. State: `open → complete`; nếu lỗi `open/complete → exception`; duyệt sửa `exception → approved`; bảng lương chốt `complete/approved → locked`.
+Triển khai là Custom DocType `AlumDoor Attendance Day`, không phải `Attendance` chuẩn HRM. Unique: `tenant_id + employee_id + work_date`. State: `open → complete`; nếu lỗi `open/complete → exception`; duyệt sửa `exception → approved`; bảng lương chốt `complete/approved → locked`.
 
-### 4.6 `attendance_correction_request` — phiếu sửa công
+### 4.6 `attendance_correction_request` — phiếu sửa công (pha sau)
 
 | Trường | Kiểu D1 | Khóa/ràng buộc | Validate server | Ý nghĩa |
 |---|---|---|---|---|
@@ -190,7 +195,7 @@ Unique: `tenant_id + employee_id + work_date`. State: `open → complete`; nếu
 | `requested_by`, `requested_at` | TEXT | NOT NULL | Theo session/server | Audit |
 | `reviewed_by`, `reviewed_at`, `applied_at` | TEXT | NULL | Tách người gửi | Audit |
 
-### 4.7 `employee_pay_profile` — hồ sơ trả lương có hiệu lực
+### 4.7 `employee_pay_profile` — hồ sơ trả lương có hiệu lực (pha sau)
 
 | Trường | Kiểu D1 | Khóa/ràng buộc | Validate server | Ý nghĩa |
 |---|---|---|---|---|
@@ -206,7 +211,7 @@ Unique: `tenant_id + employee_id + work_date`. State: `open → complete`; nếu
 
 Không đưa số tài khoản ngân hàng vào thực thể này; tiếp tục dùng permlevel của Employee Lite.
 
-### 4.8 `payroll_period` — kỳ lương
+### 4.8 `payroll_period` — kỳ lương (pha sau)
 
 | Trường | Kiểu D1 | Khóa/ràng buộc | Validate server | Ý nghĩa |
 |---|---|---|---|---|
@@ -221,7 +226,7 @@ Không đưa số tài khoản ngân hàng vào thực thể này; tiếp tục 
 | `approved_by`, `approved_at` | TEXT | NULL | Có khi approved | Audit |
 | `paid_by`, `paid_at` | TEXT | NULL | Có khi paid | Audit |
 
-### 4.9 `salary_slip` — phiếu lương
+### 4.9 `salary_slip` — phiếu lương (pha sau)
 
 | Trường | Kiểu D1 | Khóa/ràng buộc | Validate server | Ý nghĩa |
 |---|---|---|---|---|
@@ -323,11 +328,11 @@ Ngoại lệ:
 
 1. Kế toán tạo kỳ, nhập ngày công chuẩn; kỳ mặc định tháng hiện tại nhưng chưa tự chốt.
 2. `Kiểm tra dữ liệu` liệt kê nhân viên thiếu pay profile, hệ số tăng ca, ngày ngoại lệ hoặc phiếu sửa đang chờ.
-3. Chỉ khi không còn lỗi chặn, server tạo/tính lại phiếu nháp từ Attendance.
+3. Chỉ khi không còn lỗi chặn, server tạo/tính lại phiếu nháp từ `AlumDoor Attendance Day` đã khóa dữ liệu đầu vào.
 4. Kế toán có thể thêm phụ cấp, tạm ứng, khấu trừ; khấu trừ thủ công bắt buộc lý do.
 5. `Gửi duyệt` khóa input của lần tính và sinh formula trace.
 6. Chủ doanh nghiệp xem tổng, drill-down từng người và duyệt.
-7. Khi approved, Attendance liên quan chuyển `locked`; phiếu không sửa âm thầm.
+7. Khi approved, `AlumDoor Attendance Day` liên quan chuyển `locked`; phiếu không sửa âm thầm.
 8. `Đánh dấu đã trả` ghi người/thời điểm trả; không tự tạo bút toán kế toán trong MVP.
 
 ### 5.6 Bản in và xuất dữ liệu
@@ -358,14 +363,14 @@ Mọi route áp chuỗi kiểm tra: session hợp lệ → tenant scope → role
 | `POST /api/hr/payroll/periods/:id/validate` | Payroll, Owner | Trả danh sách lỗi chặn; không ghi tiền |
 | `POST /api/hr/payroll/periods/:id/calculate` | Payroll, Owner | Draft/calculated; reject nếu exception/pending correction/missing multiplier; server tính toàn bộ |
 | `POST /api/hr/payroll/periods/:id/submit` | Payroll, Owner | Calculated, không lỗi; freeze trace; audit |
-| `POST /api/hr/payroll/periods/:id/approve` | Owner | Pending approval; người duyệt có quyền; lock attendance cùng transaction |
+| `POST /api/hr/payroll/periods/:id/approve` | Owner | Pending approval; người duyệt có quyền; lock AlumDoor Attendance Day cùng transaction |
 | `POST /api/hr/payroll/periods/:id/mark-paid` | Owner, Payroll được cấp | Approved; ghi paid actor/time; không xóa/sửa phiếu |
 | `GET /api/hr/payroll/slips/:id` | Employee, Payroll, Owner, Viewer được cấp | Employee chỉ phiếu mình; tenant/branch scope |
 | `GET /api/hr/payroll/slips/:id/pdf` | Employee, Payroll, Owner | Cùng row scope; signed response ngắn hạn; audit lần tải |
 | `GET /api/hr/reports/attendance.xlsx` | Manager, Payroll, Owner | Scope + filter server; audit export |
 | `GET /api/hr/reports/payroll.xlsx` | Payroll, Owner | Quyền lương riêng; tenant scope; audit export |
 
-Không cung cấp `DELETE` cho checkin, attendance, correction đã xử lý, period hoặc salary slip. Bản cấu hình nháp chưa dùng có thể archive/soft-delete, không xóa cứng.
+Không cung cấp `DELETE` cho checkin, `AlumDoor Attendance Day`, correction đã xử lý, period hoặc salary slip. Bản cấu hình nháp chưa dùng có thể archive/soft-delete, không xóa cứng.
 
 ## 7. Màn hình MVP
 
@@ -439,7 +444,7 @@ Mọi màn trên có: loading skeleton đúng cấu trúc; chưa có dữ liệu
 | Pay profile — ngày hiệu lực | Có | Không chồng kỳ | Ngày kế tiếp sau profile cũ hoặc hôm nay |
 | Kỳ lương — từ/đến | Có | Không chồng kỳ active | Đầu/cuối tháng hiện tại |
 | Kỳ lương — ngày công chuẩn | Có | >0 và ≤31 | Từ lịch làm việc của kỳ; Payroll xác nhận |
-| Phiếu lương — công, OT, lương thường | Khóa | Chỉ server tính | Attendance + profile hiệu lực |
+| Phiếu lương — công, OT, lương thường | Khóa | Chỉ server tính | AlumDoor Attendance Day + profile hiệu lực |
 | Phiếu lương — phụ cấp | Có | Số nguyên ≥0 | Phụ cấp cố định profile; user sửa khi draft |
 | Phiếu lương — tạm ứng | Có | Số nguyên ≥0 | Tổng tạm ứng đã duyệt nếu module nguồn có; MVP chưa có thì 0 |
 | Phiếu lương — khấu trừ | Có | Số nguyên ≥0; >0 bắt buộc lý do | 0 |
@@ -502,7 +507,7 @@ Chỉ chuyển sang Pha 3 khi chủ doanh nghiệp xác nhận bằng `Duyệt B
 
 ## Phụ lục B — Nguồn nội bộ phải giữ tương thích
 
-- `docs/ALUMDOOR-HR-LITE-20260803.md`: bề mặt AlumDoor hiện chỉ đưa Employee và Attendance ra navigation.
+- `docs/ALUMDOOR-HR-LITE-20260803.md`: bề mặt AlumDoor hiện chỉ đưa Employee và Attendance ra navigation; module mới phải giữ navigation cũ tương thích nhưng không dùng `Attendance` chuẩn làm nguồn ba ca.
 - `docs/ALUMDOOR-EMPLOYEE-LITE-20260803.md`: hồ sơ nhân viên tinh gọn, dữ liệu ngân hàng tiếp tục theo permlevel.
 - `docs/hrm/VN_STATUTORY_PAYROLL_SOURCE_LOCK_2026.md`: tham số pháp lý phải theo hiệu lực, nguồn và phê duyệt; không dùng fixture chưa được promote làm cấu hình production.
 - `server/apps-src/hrm/doctypes/employee-checkin.json`, `attendance.json`, `shift-type.json`, `overtime-request.json`: base DocType dùng chung cần ưu tiên tái sử dụng/customization thay vì sửa phá tenant khác.

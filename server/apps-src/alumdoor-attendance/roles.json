@@ -1,0 +1,5 @@
+[
+  { "role": "AlumDoor Attendance Viewer", "desk_access": true },
+  { "role": "AlumDoor Attendance Manager", "desk_access": true },
+  { "role": "AlumDoor QR System", "desk_access": false }
+]

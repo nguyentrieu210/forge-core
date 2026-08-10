@@ -154,5 +154,11 @@ export interface DomainReader
 export interface MutationStore extends DomainReader {
   getReceipt(tenantId: string, commandId: string): Promise<MutationReceipt | null>;
   execute<T extends JsonObject>(plan: MutationPlan<T>): Promise<MutationReceipt>;
+  /**
+   * Commit ordered plans as one database transaction.  A plan may target the
+   * same aggregate as an earlier plan (for example create then submit); stores
+   * apply that sequence atomically and return receipts in the same order.
+   */
+  executeBundle(plans: readonly MutationPlan[]): Promise<MutationReceipt[]>;
   snapshot?(): MutationSnapshot;
 }

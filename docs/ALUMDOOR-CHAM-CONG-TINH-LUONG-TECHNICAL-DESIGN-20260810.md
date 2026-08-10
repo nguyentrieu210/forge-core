@@ -1,7 +1,7 @@
 # AlumDoor — Thiết kế kỹ thuật chấm công QR và tính lương đơn giản
 
 - Ngày khóa thiết kế: 2026-08-10
-- Trạng thái: Cổng 3 — thiết kế, chưa triển khai code/migration
+- Trạng thái: Cổng 3 — Slice 1 đang triển khai metadata, QR và công ngày; chưa apply tenant metadata
 - BRD nguồn: `docs/ALUMDOOR-CHAM-CONG-TINH-LUONG-BRD-20260810.md`
 - Field Ledger nguồn thi công: `docs/ALUMDOOR-CHAM-CONG-TINH-LUONG-FIELD-LEDGER-20260810.md`
 - Phạm vi: tenant AlumDoor; tái sử dụng HRM/Payroll chuẩn của Forge
@@ -12,8 +12,8 @@ Module không tạo một CRUD chấm công/lương song song. Nó gồm bốn l
 
 1. **Bề mặt AlumDoor tinh gọn**: các màn Experience riêng cho quét QR, công hôm nay, bảng công, ngoại lệ và chạy lương.
 2. **AlumDoor Worker**: phát/xác minh QR 15 giây, điều phối công thức ca và các lệnh nghiệp vụ `alumdoor.attendance.*`, `alumdoor.payroll.*`.
-3. **Lệnh giao dịch nền tảng**: một callback nội bộ, chỉ Worker AlumDoor được gọi, ghi `Employee Checkin` và cập nhật `Attendance` cùng child rows trong một transaction D1. Không ghép nhiều REST write rời rạc ở client.
-4. **DocType chuẩn**: giữ `Employee`, `Employee Checkin`, `Attendance`, `Attendance Request`, `Payroll Entry`, `Salary Slip` làm nguồn chính; chỉ thêm DocType/Custom Field tenant AlumDoor.
+3. **Lệnh giao dịch nền tảng**: một callback nội bộ, chỉ Worker AlumDoor được gọi, ghi `Employee Checkin` và cập nhật `AlumDoor Attendance Day` cùng ba child row trong một transaction D1. Không ghép nhiều REST write rời rạc ở client.
+4. **Ranh giới DocType**: `Employee` chỉ cung cấp identity/scope; `Employee Checkin` là log gốc bất biến; `AlumDoor Attendance Day` là nguồn công ba ca và nguồn lương tương lai. `Attendance` chuẩn HRM không được dùng cho thuật toán ba ca. Các overlay chuẩn khác chỉ là pha sau, có ledger/duyệt riêng.
 
 ```mermaid
 flowchart LR
@@ -21,7 +21,7 @@ flowchart LR
   C["Điện thoại nhân viên"] -->|token QR| B
   B -->|signed callback + actor| D["Forge transaction command"]
   D --> E["Employee Checkin bất biến"]
-  D --> F["Attendance + 3 đoạn ca"]
+  D --> F["AlumDoor Attendance Day + 3 đoạn ca"]
   F --> G["Attendance Request sửa công"]
   F --> H["Payroll Entry kỳ lương"]
   I["AlumDoor Pay Profile"] --> H
@@ -37,14 +37,16 @@ Không thêm D1 binding riêng cho `alumdoor-worker`; Worker tiếp tục không
 | `attendance_policy` | `AlumDoor Attendance Policy` | Custom DocType tenant AlumDoor |
 | `attendance_qr_station` | `AlumDoor QR Station` | Custom DocType tenant AlumDoor |
 | `employee_checkin` | `Employee Checkin` | Tái sử dụng + Custom Fields `alu_*`; log QR submit ngay và bất biến |
-| `attendance_segment` | `AlumDoor Attendance Segment` | Child DocType trong `Attendance` |
-| `attendance` | `Attendance` | Tái sử dụng + Custom Fields/child table `alu_*` |
-| `attendance_correction_request` | `Attendance Request` | Tái sử dụng + Workflow và Custom Fields `alu_*` |
-| `employee_pay_profile` | `AlumDoor Pay Profile` | Custom DocType nhẹ, không bật form Salary Structure Assignment nặng |
-| `payroll_period` | `Payroll Entry` | Tái sử dụng + workflow/custom fields `alu_*` |
-| `salary_slip` | `Salary Slip` | Tái sử dụng + component/trace Custom Fields `alu_*` |
+| `attendance_segment` | `AlumDoor Attendance Segment` | Child DocType trong `AlumDoor Attendance Day` |
+| `attendance_day` | `AlumDoor Attendance Day` | Custom DocType, projection ngày và nguồn công cho lương |
+| `attendance_correction_request` | `Attendance Request` | Pha sau: tái sử dụng + Workflow/Custom Fields `alu_*` |
+| `employee_pay_profile` | `AlumDoor Pay Profile` | Pha sau: Custom DocType nhẹ, không bật form Salary Structure Assignment nặng |
+| `payroll_period` | `Payroll Entry` | Pha sau: tái sử dụng + workflow/custom fields `alu_*` |
+| `salary_slip` | `Salary Slip` | Pha sau: tái sử dụng + component/trace Custom Fields `alu_*` |
 
-`Shift Type` và `Shift Assignment` hiện có vẫn giữ nguyên cho HRM chung. Chính sách AlumDoor khóa ba đoạn ca trong một phiên bản hiệu lực vì controller Attendance chuẩn chỉ có một cặp `in_time/out_time`, không đủ biểu diễn ba đoạn và hai khoảng nghỉ.
+`Shift Type`, `Shift Assignment` và `Attendance` hiện có vẫn giữ nguyên cho HRM chung. Chính sách AlumDoor khóa ba đoạn ca trong một phiên bản hiệu lực vì controller `Attendance` chuẩn chỉ có một cặp `in_time/out_time`, không đủ biểu diễn ba đoạn và hai khoảng nghỉ. Vì vậy không sửa/mở rộng controller chung đó cho đường QR AlumDoor.
+
+**Ranh giới Slice 1:** cài bốn DocType custom (Policy, QR Station, Segment, Attendance Day) cùng overlay `alu_*` trên `Employee Checkin`. `Employee` không có custom field. Nếu mở rộng sau này, năm DocType chuẩn có thể có overlay khi ledger được duyệt: `Employee Checkin`, `Attendance` (chỉ projection tương thích, không là nguồn ba ca), `Attendance Request`, `Payroll Entry`, `Salary Slip`.
 
 ## 3. Quyết định kỹ thuật bắt buộc
 
@@ -68,15 +70,15 @@ Không thêm D1 binding riêng cho `alumdoor-worker`; Worker tiếp tục không
 
 `alumdoor.attendance.scan` không tự tạo nhiều document qua các callback rời. Sau khi xác minh QR, Worker gọi callback nội bộ `metaforge.api.commit_alumdoor_attendance_scan` với app identity đã ký. Callback thực hiện trong một transaction:
 
-1. khóa logic theo `tenant + employee + work_date`;
-2. kiểm tra lại employee/station/policy và trạng thái Attendance;
+1. khóa logic theo `tenant + actor.user_id`; actor được map server-side sang đúng một Employee, nên mọi scan của cùng người được tuần tự hóa trước khi cập nhật `AlumDoor Attendance Day`;
+2. kiểm tra lại employee/station/policy và trạng thái `AlumDoor Attendance Day`;
 3. insert `Employee Checkin` bằng `external_id` unique;
 4. upsert đúng child segment;
-5. tính lại tổng Attendance;
+5. tính lại tổng `AlumDoor Attendance Day`;
 6. ghi audit/outbox;
 7. commit và trả snapshot hôm nay.
 
-Nếu `external_id` đã tồn tại, transaction trả lại kết quả gốc với `idempotent=true`; không đảo IN thành OUT. Attendance đã `locked` trả 409 và hướng dẫn phiếu điều chỉnh kỳ sau.
+Nếu `external_id` đã tồn tại, transaction trả lại kết quả gốc với `idempotent=true`; không đảo IN thành OUT. `AlumDoor Attendance Day` đã `locked` trả 409 và hướng dẫn phiếu điều chỉnh kỳ sau.
 
 ### ADR-ATT-004 — Công thức theo từng đoạn, không toggle toàn ngày
 
@@ -107,11 +109,11 @@ Nền tảng vật lý tiếp tục dùng `documents`, `child_rows`, `doctype_de
 
 | Đối tượng | Unique/index bắt buộc | Cách bảo vệ |
 |---|---|---|
-| Attendance Policy | `company + branch + effective_from + version` | unique field `policy_key`; validator cấm hai policy approved chồng hiệu lực |
+| Attendance Policy | policy được trạm tham chiếu + khoảng hiệu lực | Slice 1 chỉ kiểm tra policy `approved` và còn hiệu lực lúc scan; validator cấm các policy approved chồng hiệu lực là hạng mục pha sau, chưa được controller/metadata hiện tại thực thi |
 | QR Station | `station_code` trong tenant | Custom Field unique; code counter `QR` |
 | Employee Checkin | `external_id` | unique hiện có; QR log không có update/cancel/delete |
-| Attendance | `employee + attendance_date` | trigger/index hiện có từ migration HRM |
-| Segment | `parent Attendance + segment_code` | transaction controller cấm duplicate child row |
+| AlumDoor Attendance Day | `employee + work_date` | custom controller/upsert cấm duplicate ngày |
+| Segment | `parent AlumDoor Attendance Day + segment_code` | transaction controller cấm duplicate child row |
 | Attendance Request | `request_code` | autoname/counter chuẩn `YC`; một request pending cho cùng employee/date/segment |
 | Pay Profile | `employee + effective_from + version` | `profile_key` unique; validator cấm approved overlap |
 | Payroll Entry | `company + branch + start_date + end_date` với state active | `alu_period_key` unique; cancelled có version mới |
@@ -122,15 +124,15 @@ Nền tảng vật lý tiếp tục dùng `documents`, `child_rows`, `doctype_de
 Migration triển khai ở Pha 5 theo thứ tự:
 
 1. đăng ký role `AlumDoor QR Station`, `AlumDoor Attendance Manager`, `AlumDoor Payroll User`, `AlumDoor Payroll Approver`;
-2. tạo ba DocType mới: Policy, QR Station, Pay Profile; tạo child DocType Segment;
-3. thêm Custom Fields `alu_*` vào sáu DocType chuẩn nêu trong Field Ledger;
+2. Slice 1 tạo ba DocType master/transaction: Policy, QR Station, Attendance Day; tạo child DocType Segment;
+3. Slice 1 chỉ thêm Custom Fields `alu_*` vào `Employee Checkin`; không chỉnh `Employee` hoặc `Attendance` chuẩn;
 4. thêm Workflow/Workflow State/Property Setter/Print Format/Workspace shortcut riêng tenant `alu`;
 5. thêm unique/index guard còn thiếu trên JSON payload bằng migration tenant idempotent;
-6. cài một policy nháp đúng bảy mặc định BRD, Owner mở setup và bấm duyệt để lưu actor/time thật;
-7. chạy backfill chỉ để tạo Attendance draft từ checkin cũ khi người vận hành chủ động chọn khoảng; mặc định không tự sửa lịch sử;
+6. cài một policy nháp đúng bảy mặc định BRD, Owner mở setup và bấm duyệt; actor/thời gian/before-after được lưu trên workflow/audit timeline, không tạo cột approval riêng trên Policy;
+7. chạy backfill chỉ để tạo `AlumDoor Attendance Day` draft từ checkin cũ khi người vận hành chủ động chọn khoảng; mặc định không tự sửa lịch sử;
 8. cung cấp script dry-run mặc định và `--apply --tenant alu`; chạy lần hai không tạo bản ghi trùng.
 
-Không sửa base JSON của `Employee`, `Attendance`, `Salary Slip` để tránh làm các tenant khác hiện trường AlumDoor.
+Không sửa base JSON của `Employee`, `Attendance`, `Salary Slip` để tránh làm các tenant khác hiện trường AlumDoor. Nếu cần projection `Attendance` tương thích HRM ở pha sau, nó phải có controller/ledger riêng và không thay thế `AlumDoor Attendance Day`.
 
 ## 5. Thuật toán chấm công
 
@@ -167,9 +169,9 @@ Mốc giây được giữ trong trace nhưng phút công làm tròn xuống the
 | `CROSS_DAY` | OUT khác work_date | Không tính; request |
 | `POLICY_MISSING` | Không có policy approved hiệu lực | Fail closed |
 | `DUPLICATE_TOKEN` | Cùng employee/token/segment | Trả kết quả cũ, không tạo lỗi ngày |
-| `LOCKED_BY_PAYROLL` | Attendance đã dùng trong kỳ approved/paid | Tạo adjustment kỳ sau |
+| `LOCKED_BY_PAYROLL` | AlumDoor Attendance Day đã dùng trong kỳ approved/paid | Tạo adjustment kỳ sau |
 
-Tác vụ cuối ngày chỉ chuyển segment `open → missing_out` và Attendance → `exception`; tuyệt đối không sinh OUT giả.
+Tác vụ cuối ngày chỉ chuyển segment `open → missing_out` và AlumDoor Attendance Day → `exception`; tuyệt đối không sinh OUT giả.
 
 ## 6. Thuật toán lương
 
@@ -181,8 +183,8 @@ Kỳ không được tính nếu có một trong các lỗi:
 - `standard_work_days_bp <= 0`;
 - nhân viên active thiếu Pay Profile approved đúng hiệu lực;
 - profile thiếu `overtime_multiplier_bp`;
-- Attendance `open/exception`, request pending hoặc projection chưa đồng bộ;
-- Attendance đã khóa bởi kỳ khác;
+- AlumDoor Attendance Day `open/exception`, request pending hoặc projection chưa đồng bộ;
+- AlumDoor Attendance Day đã khóa bởi kỳ khác;
 - số tiền/tỷ lệ ngoài giới hạn hoặc trace schema không đúng phiên bản.
 
 ### 6.2 Fixed-point
@@ -230,7 +232,7 @@ Browser dùng adapter chuẩn. Route công khai trong app là `/api/method/<meth
 | `POST alumdoor.payroll.validate_period` | period | blocking/warning rows | Payroll/Owner; read-only |
 | `POST alumdoor.payroll.calculate_period` | period, expected_modified | calculated slips + totals | Payroll/Owner; all server-side |
 | `POST alumdoor.payroll.submit_period` | period, expected_modified | pending_approval + input hash | Payroll/Owner; no blocker |
-| `POST alumdoor.payroll.approve_period` | period, decision note | approved and Attendance locked | Owner/Approver; cannot self-approve when SoD on |
+| `POST alumdoor.payroll.approve_period` | period, decision note | approved and AlumDoor Attendance Day locked | Owner/Approver; cannot self-approve when SoD on |
 | `POST alumdoor.payroll.mark_paid` | period, paid_at, note? | paid snapshot | Owner or delegated Payroll; approved only |
 | `GET alumdoor.payroll.my_slips` | cursor | own slips | Employee own only |
 | `GET alumdoor.payroll.slip_detail` | slip | slip + trace summary | Employee own; Payroll/Owner scoped |
@@ -274,10 +276,10 @@ Audit bắt buộc cho: phát/rotate secret trạm, quét được ghi, import t
 
 `draft → approved → retired`. Approved không sửa; `Tạo phiên bản mới` copy sang draft mới.
 
-### 9.2 Segment và Attendance
+### 9.2 Segment và AlumDoor Attendance Day
 
 - Segment: `empty → open → complete`; cuối ngày `open → missing_out`; request được duyệt → `corrected`.
-- Attendance: `open → complete`; bất kỳ lỗi → `exception`; correction hợp lệ → `approved`; payroll approve → `locked`.
+- AlumDoor Attendance Day: `open → complete`; bất kỳ lỗi → `exception`; correction hợp lệ → `approved`; payroll approve → `locked`.
 - `locked` không quay lại; điều chỉnh đi vào kỳ sau.
 
 ### 9.3 Attendance Request
@@ -371,7 +373,7 @@ Thông báo: thiếu OUT sau cuối ngày; correction mới cho manager; correct
 
 1. **Sáng 06:45**: nhắc trạm/manager nếu trạm inactive hoặc chưa heartbeat; không gửi nhân viên nếu không có cấu hình.
 2. **Tối 23:59**: đánh dấu `missing_out`, tính queue ngoại lệ và gửi báo cáo ngắn cho manager/owner.
-3. **Đêm theo cron nền tảng**: backup tenant D1/R2 và kiểm tra projection Checkin → Attendance; lỗi tạo notification quản trị.
+3. **Đêm theo cron nền tảng**: backup tenant D1/R2 và kiểm tra projection Checkin → AlumDoor Attendance Day; lỗi tạo notification quản trị.
 
 ### 12.3 AI
 
@@ -392,7 +394,7 @@ Không thêm AI vào đường ghi hoặc duyệt lương. Trợ lý AlumDoor hi
 - Không lưu token thô, ảnh QR, IP thô hoặc fingerprint thô.
 - Salary fields và export gắn permlevel payroll; employee chỉ thấy phiếu mình.
 - QR deep link trên phiếu không chứa số lương và vẫn yêu cầu session + row permission.
-- Log, Attendance, phiếu xử lý và payroll không hard delete.
+- Log, AlumDoor Attendance Day, phiếu xử lý và payroll không hard delete.
 
 ## 14. Kế hoạch test cho Pha 6
 
@@ -408,9 +410,9 @@ Không thêm AI vào đường ghi hoặc duyệt lương. Trợ lý AlumDoor hi
 
 - hai request cùng token song song chỉ có một Checkin;
 - hai request khác token cùng thời điểm không tạo hai OUT;
-- transaction scan rollback đầy đủ khi upsert Attendance lỗi;
+- transaction scan rollback đầy đủ khi upsert AlumDoor Attendance Day lỗi;
 - employee không đọc người khác; manager không vượt branch; payroll viewer bị mask;
-- correction không tự duyệt và không sửa Attendance locked;
+- correction không tự duyệt và không sửa AlumDoor Attendance Day locked;
 - input đổi sau submit làm approval fail closed;
 - approval rollback nếu một Salary Slip lỗi;
 - PDF draft/approved, Excel scope và audit export.

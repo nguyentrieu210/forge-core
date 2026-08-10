@@ -1,5 +1,6 @@
 import type {
   CanonicalDocument,
+  ChildRow,
   GeneralLedgerEntry,
   JsonObject,
   MutationPlan,
@@ -683,6 +684,46 @@ export class D1MutationStore implements MutationStore {
   }
 
   async execute<T extends JsonObject>(plan: MutationPlan<T>): Promise<MutationReceipt> {
+    const [receipt] = await this.executeBundle([plan]);
+    return receipt!;
+  }
+
+  async executeBundle(plans: readonly MutationPlan[]): Promise<MutationReceipt[]> {
+    this.assertBundlePlans(plans);
+    const replayed = await this.resolveBundleReceipts(plans);
+    if (replayed) return replayed;
+
+    // `D1Database.batch` runs its statements in order.  Carry the previous
+    // planned child set forward so create -> submit on one aggregate produces
+    // the same child-row replacement semantics as two separate commits, while
+    // still emitting only one atomic batch.
+    const previousChildren = new Map<string, readonly ChildRow[]>();
+    const executions: Array<{ statements: D1PreparedStatement[]; receipt: MutationReceipt }> = [];
+    for (const plan of plans) {
+      const key = documentKey(plan.command.aggregate.doctype, plan.command.aggregate.name);
+      const execution = await this.buildExecution(plan, previousChildren.get(key));
+      previousChildren.set(key, plan.document.children);
+      executions.push(execution);
+    }
+
+    const database = this.writer;
+    try {
+      await database.batch(executions.flatMap((execution) => execution.statements));
+      const bookmark = typeof (database as D1DatabaseSession).getBookmark === "function"
+        ? (database as D1DatabaseSession).getBookmark()
+        : null;
+      return executions.map(({ receipt }) => ({ ...receipt, ...(bookmark ? { bookmark } : {}) }));
+    } catch (error) {
+      const committed = await this.resolveBundleReceipts(plans);
+      if (committed) return committed;
+      throw asCloudForgeError(error);
+    }
+  }
+
+  private async buildExecution<T extends JsonObject>(
+    plan: MutationPlan<T>,
+    existingChildrenOverride?: readonly ChildRow[],
+  ): Promise<{ statements: D1PreparedStatement[]; receipt: MutationReceipt }> {
     const command = plan.command;
     const key = documentKey(command.aggregate.doctype, command.aggregate.name);
     const database = this.writer;
@@ -748,11 +789,11 @@ export class D1MutationStore implements MutationStore {
       ));
     }
 
-    const existingChildren = await database.prepare(
+    const existingChildren = existingChildrenOverride ?? (await database.prepare(
       `SELECT fieldname, row_id FROM document_children WHERE tenant_id=?1 AND parent_key=?2`,
-    ).bind(command.tenant_id, key).all<{ fieldname: string; row_id: string }>();
+    ).bind(command.tenant_id, key).all<{ fieldname: string; row_id: string }>()).results ?? [];
     const desiredChildKeys = new Set(plan.document.children.map((child) => `${child.fieldname}:${child.row_id}`));
-    for (const child of existingChildren.results ?? []) {
+    for (const child of existingChildren) {
       if (desiredChildKeys.has(`${child.fieldname}:${child.row_id}`)) continue;
       statements.push(database.prepare(
         `DELETE FROM document_children WHERE tenant_id=?1 AND parent_key=?2 AND fieldname=?3 AND row_id=?4`,
@@ -926,18 +967,39 @@ export class D1MutationStore implements MutationStore {
     statements.push(database.prepare("DELETE FROM mutation_guard WHERE tenant_id=?1 AND command_id=?2")
       .bind(command.tenant_id, command.command_id));
 
-    try {
-      await database.batch(statements);
-      const bookmark = typeof (database as D1DatabaseSession).getBookmark === "function" ? (database as D1DatabaseSession).getBookmark() : null;
-      return { ...receipt, ...(bookmark ? { bookmark } : {}) };
-    } catch (error) {
-      const committed = await this.getReceipt(command.tenant_id, command.command_id);
-      if (committed) {
-        if (committed.payload_hash !== command.payload_hash || committed.actor_user_id !== command.actor.user_id) throw errors.idempotency();
-        return committed;
-      }
-      throw asCloudForgeError(error);
+    return { statements, receipt };
+  }
+
+  private assertBundlePlans(plans: readonly MutationPlan[]): void {
+    if (!Array.isArray(plans) || plans.length === 0) {
+      throw errors.validation("Mutation bundle must contain at least one plan");
     }
+    const tenantId = plans[0]!.command.tenant_id;
+    const commandIds = new Set<string>();
+    for (const plan of plans) {
+      const command = plan.command;
+      if (command.tenant_id !== tenantId) throw errors.validation("Mutation bundle plans must belong to one tenant");
+      if (commandIds.has(command.command_id)) throw errors.validation("Mutation bundle command_id values must be unique");
+      commandIds.add(command.command_id);
+    }
+  }
+
+  private async resolveBundleReceipts(plans: readonly MutationPlan[]): Promise<MutationReceipt[] | null> {
+    const receipts = await Promise.all(plans.map((plan) => this.getReceipt(plan.command.tenant_id, plan.command.command_id)));
+    const committedCount = receipts.filter((receipt) => receipt !== null).length;
+    if (committedCount === 0) return null;
+    for (let index = 0; index < plans.length; index += 1) {
+      const receipt = receipts[index];
+      if (!receipt) continue;
+      const command = plans[index]!.command;
+      if (receipt.payload_hash !== command.payload_hash || receipt.actor_user_id !== command.actor.user_id) {
+        throw errors.idempotency();
+      }
+    }
+    if (committedCount !== plans.length) {
+      throw errors.validation("Mutation bundle has an incomplete receipt set; it cannot be replayed safely");
+    }
+    return receipts as MutationReceipt[];
   }
 
   private async hydrateDerived<T extends JsonObject>(document: CanonicalDocument<T>): Promise<void> {

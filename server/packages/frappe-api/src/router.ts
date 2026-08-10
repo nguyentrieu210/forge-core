@@ -76,6 +76,17 @@ export interface FrappeRouterContext {
   listService: DocumentListService;
   /** Routes a command through the aggregate Durable Object. */
   runCommand(command: MutationCommand): Promise<MutationReceipt>;
+  /**
+   * The verified app id for an app Worker callback.  This is absent for browser
+   * sessions and development actors; it is gateway-attributed, never request input.
+   */
+  appCallbackAppId?: string;
+  /** AlumDoor-only native attendance scan transaction. */
+  commitAlumdoorAttendanceScan?: (input: {
+    station: string;
+    nonceHash: string;
+    deviceFingerprintHash?: string;
+  }) => Promise<JsonObject>;
   now(): string;
   /** Overlay store for Custom Field / Property Setter. */
   customizations: CustomizationStore;
@@ -948,6 +959,19 @@ async function dispatchMethod(
     case "metaforge.api.set_accounting_period_lock":
       return methodResponse(await setAccountingPeriodLock(args, context));
 
+    // This is deliberately a platform method rather than an AlumDoor app method:
+    // it commits an immutable Employee Checkin and the three-segment daily projection
+    // in one kernel transaction.  An app Worker may reach it only through a gateway
+    // verified callback; a browser cannot manufacture the callback attribution.
+    case "metaforge.api.commit_alumdoor_attendance_scan":
+      return methodResponse(await commitAlumdoorAttendanceScan(args, context));
+
+    // The QR page needs a tiny, non-sensitive station/policy snapshot before it can
+    // verify a short HMAC challenge.  Keep that read here rather than granting every
+    // Employee the right to browse Attendance Policy or QR Station documents.
+    case "metaforge.api.get_alumdoor_attendance_qr_config":
+      return methodResponse(await alumdoorAttendanceQrConfig(args, context));
+
     // The generic client's boot: what to render, from what is installed. Without it
     // every app needs its own compiled bundle.
     case "metaforge.api.get_app_manifest":
@@ -1212,6 +1236,53 @@ async function dispatchMethod(
       throw errors.notFound(`Method is not implemented on this platform: ${methodName}`);
     }
   }
+}
+
+async function commitAlumdoorAttendanceScan(args: FrappeArgs, context: FrappeRouterContext): Promise<JsonObject> {
+  if (context.appCallbackAppId !== "alumdoor" || !context.commitAlumdoorAttendanceScan) {
+    throw errors.permission("AlumDoor attendance scan accepts only the verified AlumDoor app callback.");
+  }
+  const station = args.requireText("station", 160);
+  const nonceHash = args.requireText("nonce_hash", 128);
+  if (!/^[a-f0-9]{64}$/i.test(nonceHash)) throw errors.validation("nonce_hash must be a SHA-256 hex value");
+  const deviceFingerprintHash = args.text("device_fingerprint_hash");
+  if (deviceFingerprintHash && deviceFingerprintHash.length > 128) {
+    throw errors.validation("device_fingerprint_hash must be at most 128 characters");
+  }
+  return context.commitAlumdoorAttendanceScan({
+    station,
+    nonceHash: nonceHash.toLowerCase(),
+    ...(deviceFingerprintHash ? { deviceFingerprintHash } : {}),
+  });
+}
+
+async function alumdoorAttendanceQrConfig(args: FrappeArgs, context: FrappeRouterContext): Promise<JsonObject> {
+  if (context.appCallbackAppId !== "alumdoor") {
+    throw errors.permission("AlumDoor attendance QR configuration accepts only the verified AlumDoor app callback.");
+  }
+  const stationName = args.requireText("station", 160);
+  const station = await context.documents.getMasterRecordData(context.tenantId, "AlumDoor QR Station", stationName);
+  if (!station) throw errors.notFound(`AlumDoor QR Station ${stationName} was not found`);
+  const policyName = typeof station.policy === "string" ? station.policy.trim() : "";
+  if (!policyName) throw errors.reference(`AlumDoor QR Station ${stationName} has no attendance policy`);
+  const policy = await context.documents.getMasterRecordData(context.tenantId, "AlumDoor Attendance Policy", policyName);
+  if (!policy) throw errors.reference(`AlumDoor Attendance Policy ${policyName} was not found`);
+  return {
+    station: {
+      station_code: typeof station.station_code === "string" && station.station_code.trim() ? station.station_code.trim() : stationName,
+      station_name: typeof station.station_name === "string" ? station.station_name : "",
+      policy: policyName,
+      secret_version: station.secret_version ?? null,
+      is_active: station.is_active ?? false,
+    },
+    policy: {
+      policy_status: policy.policy_status ?? "",
+      timezone: policy.timezone ?? "Asia/Ho_Chi_Minh",
+      qr_ttl_seconds: policy.qr_ttl_seconds ?? 15,
+      effective_from: policy.effective_from ?? null,
+      effective_to: policy.effective_to ?? null,
+    },
+  };
 }
 
 async function setAccountingPeriodLock(args: FrappeArgs, context: FrappeRouterContext): Promise<JsonObject> {

@@ -39,6 +39,13 @@ export { AggregateCoordinator };
 
 interface AggregateStub extends DurableObjectStub {
   mutate<T extends JsonObject>(command: MutationCommand<T>): Promise<unknown>;
+  commitAlumDoorAttendanceScan(input: {
+    tenantId: string;
+    actor: Actor;
+    station: string;
+    nonceHash: string;
+    deviceFingerprintHash?: string;
+  }): Promise<JsonObject>;
 }
 
 /**
@@ -1152,6 +1159,7 @@ async function serveFrappeApiInner(
     tenantId,
     actor,
     traceId,
+    ...(appCallback ? { appCallbackAppId: appCallback } : {}),
     metadata,
     permissions,
     documents,
@@ -1194,6 +1202,25 @@ async function serveFrappeApiInner(
       const stub = env.AGGREGATES.getByName(`${tenantId}:${command.aggregate.doctype}:${command.aggregate.name}`) as AggregateStub;
       const result = typeof stub.mutate === "function" ? await stub.mutate(command) : await callDoFetch(stub, command);
       return result as MutationReceipt;
+    },
+    async commitAlumdoorAttendanceScan(input: {
+      station: string;
+      nonceHash: string;
+      deviceFingerprintHash?: string;
+    }): Promise<JsonObject> {
+      // One user has one deterministic QR stream.  This is intentionally narrower
+      // than a tenant-wide coordinator, so two employees can scan at the same time
+      // while one employee cannot race their own IN/OUT toggle.
+      const stub = env.AGGREGATES.getByName(
+        `attendance:${tenantId}:${encodeURIComponent(actor.user_id)}`,
+      ) as AggregateStub;
+      return stub.commitAlumDoorAttendanceScan({
+        tenantId,
+        actor,
+        station: input.station,
+        nonceHash: input.nonceHash,
+        ...(input.deviceFingerprintHash ? { deviceFingerprintHash: input.deviceFingerprintHash } : {}),
+      });
     },
     now,
     csrfToken,

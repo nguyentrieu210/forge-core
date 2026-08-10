@@ -1,0 +1,21 @@
+{
+  "name": "AlumDoor Attendance Segment",
+  "label": "Đoạn ca chấm công",
+  "module": "AlumDoor",
+  "kind": "child_table",
+  "is_child": true,
+  "fields": [
+    { "fieldname": "segment_code", "label": "Ca", "fieldtype": "Select", "options": "SHIFT1\nSHIFT2\nSHIFT3", "required": true, "set_only_once": true, "in_list_view": true },
+    { "fieldname": "in_checkin", "label": "Log vào", "fieldtype": "Link", "options": "Employee Checkin", "read_only": true },
+    { "fieldname": "out_checkin", "label": "Log ra", "fieldtype": "Link", "options": "Employee Checkin", "read_only": true },
+    { "fieldname": "actual_in", "label": "Giờ vào", "fieldtype": "Datetime", "read_only": true, "in_list_view": true },
+    { "fieldname": "actual_out", "label": "Giờ ra", "fieldtype": "Datetime", "read_only": true, "in_list_view": true },
+    { "fieldname": "actual_minutes", "label": "Phút thực tế", "fieldtype": "Int", "default": 0, "non_negative": true, "read_only": true, "in_list_view": true },
+    { "fieldname": "regular_minutes", "label": "Phút thường", "fieldtype": "Int", "default": 0, "non_negative": true, "read_only": true, "in_list_view": true },
+    { "fieldname": "overtime_minutes", "label": "Phút tăng ca", "fieldtype": "Int", "default": 0, "non_negative": true, "read_only": true, "in_list_view": true },
+    { "fieldname": "state", "label": "Trạng thái", "fieldtype": "Select", "options": "empty\nopen\ncomplete\nmissing_in\nmissing_out\ncorrected", "required": true, "default": "empty", "read_only": true, "in_list_view": true },
+    { "fieldname": "calculation_version", "label": "Phiên bản tính", "fieldtype": "Int", "required": true, "default": 1, "non_negative": true, "read_only": true }
+  ],
+  "permissions": [],
+  "revision": 1
+}

@@ -299,6 +299,19 @@ export interface MutationPlan<T extends JsonObject = JsonObject> {
   result: JsonObject;
 }
 
+/**
+ * Ordered commands that must either all commit or none commit.
+ *
+ * Commands intentionally retain their own command_id and receipt: callers can
+ * retry a completed bundle deterministically without introducing a second,
+ * bundle-level idempotency namespace.  A later command may target the same
+ * aggregate as an earlier command (for example draft create then submit), and
+ * is prepared against that earlier command's planned document/version.
+ */
+export interface MutationBundle<T extends JsonObject = JsonObject> {
+  commands: readonly MutationCommand<T>[];
+}
+
 export interface MutationReceipt {
   command_id: string;
   tenant_id: string;

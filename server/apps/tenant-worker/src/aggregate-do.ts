@@ -19,6 +19,10 @@ import { D1DocumentAccessStore, D1MetadataStore, GenericMetadataController, Meta
 import { registerIntegrationHubControllers } from "../../../packages/integration-hub/src/registry.js";
 import { D1OrganizationSecurityGuard } from "../../../packages/organization-security/src/index.js";
 import type { TenantEnv } from "./env.js";
+import {
+  commitAlumDoorAttendanceScan,
+  type AlumDoorAttendanceScanInput,
+} from "./attendance-scan-coordinator.js";
 import { isInventoryCoordinatedCommand, resolveInventoryCoordinatorKey } from "./inventory-coordinator.js";
 import { PurchaseCommandSerialExecutor } from "./purchase-command-retry.js";
 
@@ -26,12 +30,14 @@ interface AggregateStub extends DurableObjectStub {
   mutate<T extends JsonObject>(command: MutationCommand<T>): Promise<MutationReceipt>;
   mutateInventory<T extends JsonObject>(command: MutationCommand<T>): Promise<MutationReceipt>;
   mutatePurchase<T extends JsonObject>(command: MutationCommand<T>): Promise<MutationReceipt>;
+  commitAlumDoorAttendanceScan(input: AlumDoorAttendanceScanInput): Promise<JsonObject>;
 }
 
 const PURCHASE_ALLOCATION_DOCTYPES = new Set(["Purchase Order", "Purchase Receipt"]);
 const INVENTORY_EXECUTORS = new WeakMap<object, MutationSerialExecutor>();
 const PURCHASE_EXECUTORS = new WeakMap<object, PurchaseCommandSerialExecutor>();
 const APP_FACTORY_APPROVAL_EXECUTORS = new WeakMap<object, MutationSerialExecutor>();
+const ATTENDANCE_EXECUTORS = new WeakMap<object, MutationSerialExecutor>();
 
 /**
  * One class serves several logical coordinator roles inside the existing AGGREGATES
@@ -41,6 +47,7 @@ const APP_FACTORY_APPROVAL_EXECUTORS = new WeakMap<object, MutationSerialExecuto
  * - inventory key: inventory:tenant:company for stock posting, cutting,
  *   reconciliation and reservation read-check-write mutations;
  * - purchase key: purchase:tenant:company:supplier for PO/Receipt allocation;
+ * - attendance key: attendance:tenant:user for one employee's QR scan sequence;
  * - App Factory approval key: tenant:App Factory Approval Process:process-id for persisted
  *   process-control facts. It never writes the target business document or a ledger.
  *
@@ -137,6 +144,23 @@ export class AggregateCoordinator extends DurableObject<TenantEnv> {
     // so a revision retry also gets a fresh first-primary session and rereads the
     // authoritative queue state instead of reusing a service created while waiting.
     return executor.execute(() => this.commandServices().kernel.execute(command));
+  }
+
+  /**
+   * The only write path for an AlumDoor QR scan.  The entry Worker has already
+   * authenticated the app callback and token; this Durable Object serializes the
+   * authenticated employee's scan stream while the kernel bundle commits both facts.
+   */
+  async commitAlumDoorAttendanceScan(input: AlumDoorAttendanceScanInput): Promise<JsonObject> {
+    let executor = ATTENDANCE_EXECUTORS.get(this);
+    if (!executor) {
+      executor = new MutationSerialExecutor();
+      ATTENDANCE_EXECUTORS.set(this, executor);
+    }
+    return executor.execute(() => {
+      const { kernel, store } = this.commandServices();
+      return commitAlumDoorAttendanceScan(input, { kernel, store });
+    });
   }
 
   /**
