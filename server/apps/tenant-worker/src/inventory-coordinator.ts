@@ -4,6 +4,9 @@ import type { DomainReader } from "../../../packages/document-kernel/src/index.j
 
 const SUBMIT_CANCEL_DOCTYPES = new Set([
   "Stock Entry",
+  "Delivery Note",
+  "Purchase Receipt",
+  "Stock Return",
   "Work Order",
   "Cut Order",
   "Stock Reconciliation",
@@ -16,7 +19,8 @@ const RESERVATION_ACTIONS = new Set(["create", "save"]);
  *
  * Document-level Durable Objects are insufficient for two differently named
  * reservations competing for the same available stock. Reservation create/save
- * therefore shares the same company lock used by stock posting and cutting.
+ * therefore shares the same company lock used by stock posting, delivery, receipt,
+ * return, reconciliation and cutting.
  */
 export function inventoryCoordinatorKey(
   command: MutationCommand<JsonObject>,
