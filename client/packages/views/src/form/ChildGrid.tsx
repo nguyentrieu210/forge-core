@@ -1948,7 +1948,7 @@ export function ChildGrid(props: ChildGridProps) {
       <div className="overflow-x-auto rounded-md border border-input [scrollbar-width:thin]">
         {/* Bảng lớn CHIA phần trong khung (`w-full`, không ép min-width) nên 12 cột vừa trọn
             màn hình; bảng gọn vẫn tràn để cuộn vì khung của nó hẹp hơn tổng các cột. */}
-        <Table className="mf-child-grid-table w-full table-fixed" style={expanded ? undefined : { minWidth: `${minWidthRem}rem` }}>
+        <Table className="mf-child-grid-table w-full table-fixed text-[13px]" style={expanded ? undefined : { minWidth: `${minWidthRem}rem` }}>
           <colgroup>
             {!readOnly ? <col style={{ width: 40, minWidth: 40, maxWidth: 40 }} /> : null}
             <col style={{ width: 48, minWidth: 48, maxWidth: 48 }} />
@@ -1970,7 +1970,7 @@ export function ChildGrid(props: ChildGridProps) {
             {!readOnly ? <col className="w-[4.5rem]" /> : null}
           </colgroup>
           <TableHeader>
-            <TableRow className="hover:bg-transparent">
+            <TableRow className="h-9 hover:bg-transparent">
               {!readOnly ? (
                 <TableHead className="sticky left-0 z-40 w-10 min-w-10 max-w-10 bg-card px-0 text-center" style={{ width: 40 }}>
                   <Checkbox
@@ -2013,7 +2013,7 @@ export function ChildGrid(props: ChildGridProps) {
                 return (
                 <TableHead
                   key={c.fieldname}
-                  className={`group relative whitespace-pre-line text-center leading-tight ${sticky.className}`}
+                  className={`group relative whitespace-pre-line px-1 py-1 text-center text-[12px] leading-tight ${sticky.className}`}
                   style={sticky.style}
                   draggable={!readOnly}
                   onDragStart={() => { dragged.current = c.fieldname; }}
@@ -2052,6 +2052,10 @@ export function ChildGrid(props: ChildGridProps) {
                 : undefined;
               const DiscountControl = discountColumn ? registry.resolve(discountColumn.fieldtype) ?? FallbackControl : null;
               const DiscountAmountControl = discountAmountColumn ? registry.resolve(discountAmountColumn.fieldtype) ?? FallbackControl : null;
+              const rateNeedsApproval = childMeta.name === "Sales Order Item" && row.rate_requires_approval === true;
+              const discountNeedsApproval = childMeta.name === "Sales Order Item"
+                && Boolean(row.item_code)
+                && Number(row.discount_percentage ?? 0) !== defaultSalesDiscountPercent(row);
               return (
               <Fragment key={String(row.name ?? ri)}>
               <TableRow
@@ -2059,11 +2063,11 @@ export function ChildGrid(props: ChildGridProps) {
                 {...(expanded ? { onFocusCapture: () => setPickedRow(ri), onClick: () => setPickedRow(ri) } : {})}
               >
                 {!readOnly ? (
-                  <TableCell className="sticky left-0 z-20 w-10 min-w-10 max-w-10 bg-card px-0 text-center" style={{ width: 40 }} onClick={(event) => event.stopPropagation()}>
+                    <TableCell className="sticky left-0 z-20 w-10 min-w-10 max-w-10 bg-card px-0 py-1 text-center" style={{ width: 40 }} onClick={(event) => event.stopPropagation()}>
                     <Checkbox checked={selectedSet.has(rowKey(row, ri))} onCheckedChange={() => toggleSelected(row, ri)} aria-label={`Chọn dòng ${ri + 1}`} />
                   </TableCell>
                 ) : null}
-                <TableCell className={`sticky z-20 w-12 min-w-12 max-w-12 bg-card px-0 text-center text-xs text-muted-foreground ${readOnly ? "left-0" : "left-10"}`} style={{ width: 48 }}>{ri + 1}</TableCell>
+                <TableCell className={`sticky z-20 w-12 min-w-12 max-w-12 bg-card px-0 py-1 text-center text-xs text-muted-foreground ${readOnly ? "left-0" : "left-10"}`} style={{ width: 48 }}>{ri + 1}</TableCell>
                 {cols.map((c) => {
                   const sticky = stickyColumn(c.fieldname);
                   const Control = registry.resolve(c.fieldtype) ?? FallbackControl;
@@ -2109,10 +2113,12 @@ export function ChildGrid(props: ChildGridProps) {
                       key={c.fieldname}
                       data-cell={`${ri}:${cols.indexOf(c)}`}
                       data-editable={cellReadOnly ? "false" : "true"}
-                      className={`align-top text-center transition-colors [&_input]:text-center [&_.mf-control]:justify-center ${
-                        cellReadOnly
-                          ? "!bg-muted/80 text-muted-foreground [&_.mf-control]:border-muted-foreground/20 [&_.mf-control]:bg-muted/40"
-                          : "!bg-primary/[0.07] ring-1 ring-inset ring-primary/25 focus-within:!bg-primary/[0.12] focus-within:ring-2 focus-within:ring-primary/60 [&_.mf-control]:border-primary/40 [&_.mf-control]:bg-background"
+                      className={`align-top px-1 py-1 text-center transition-colors [&_input]:!h-8 [&_input]:text-center [&_button]:!h-8 [&_.mf-control]:!min-h-8 [&_.mf-control]:justify-center ${
+                        (c.fieldname === "rate" && rateNeedsApproval) || (c.fieldname === "discount_percentage" && discountNeedsApproval)
+                          ? "animate-pulse !bg-red-700 text-white ring-2 ring-inset ring-red-950 [&_*]:!text-white [&_.mf-control]:!border-red-950 [&_.mf-control]:!bg-red-700"
+                          : cellReadOnly
+                            ? "!bg-muted/80 text-muted-foreground [&_.mf-control]:border-muted-foreground/20 [&_.mf-control]:bg-muted/40"
+                            : "!bg-primary/[0.07] ring-1 ring-inset ring-primary/25 focus-within:!bg-primary/[0.12] focus-within:ring-2 focus-within:ring-primary/60 [&_.mf-control]:border-primary/40 [&_.mf-control]:bg-background"
                       } ${sticky.className}`}
                       style={sticky.style}
                       title={cellHint}
@@ -2151,9 +2157,9 @@ export function ChildGrid(props: ChildGridProps) {
                 <TableRow className="hover:bg-transparent">
                   <TableCell
                     colSpan={(readOnly ? 1 : 2) + discountColumnIndex}
-                    className="h-11 border-t-0 bg-muted/20"
+                    className="h-7 border-t-0 bg-muted/20"
                   />
-                  <TableCell className="border-t-0 bg-muted/20 px-2 py-1.5 text-center [&_input]:!text-center [&_.mf-control]:!justify-center" style={stickyColumn(discountColumn.fieldname).style}>
+                  <TableCell className={`border-t-0 px-1 py-0.5 text-center [&_input]:!h-8 [&_input]:!text-center [&_button]:!h-8 [&_.mf-control]:!min-h-8 [&_.mf-control]:!justify-center ${discountNeedsApproval ? "animate-pulse !bg-red-700 text-white ring-2 ring-inset ring-red-950 [&_*]:!text-white [&_.mf-control]:!border-red-950 [&_.mf-control]:!bg-red-700" : "bg-muted/20"}`} style={stickyColumn(discountColumn.fieldname).style}>
                     <DiscountControl
                       field={fieldForRow(discountColumn.list_only ? { ...discountColumn, list_only: 0 } : discountColumn, row)}
                       value={row.discount_percentage ?? 0}
@@ -2167,7 +2173,7 @@ export function ChildGrid(props: ChildGridProps) {
                       compact
                     />
                   </TableCell>
-                  <TableCell className="border-t-0 bg-muted/20 px-2 py-1.5 text-center [&_input]:!text-center [&_.mf-control]:!justify-center" style={stickyColumn(discountAmountColumn.fieldname).style}>
+                  <TableCell className="border-t-0 bg-muted/20 px-1 py-0.5 text-center [&_input]:!h-8 [&_input]:!text-center [&_button]:!h-8 [&_.mf-control]:!min-h-8 [&_.mf-control]:!justify-center" style={stickyColumn(discountAmountColumn.fieldname).style}>
                     <DiscountAmountControl
                       field={fieldForRow(discountAmountColumn.list_only ? { ...discountAmountColumn, list_only: 0 } : discountAmountColumn, row)}
                       // Lưu khoản chiết khấu là số dương để phép tính tổng rõ ràng;
@@ -2197,7 +2203,7 @@ export function ChildGrid(props: ChildGridProps) {
               </TableRow>
             ) : null}
             {rows.length > 0 && totals.size > 0 ? (
-              <TableRow className="border-t-2 bg-muted/40 font-medium hover:bg-muted/40">
+              <TableRow className="border-t-2 bg-muted/40 py-1 font-medium hover:bg-muted/40">
                 {!readOnly ? <TableCell className="sticky left-0 z-20 bg-muted/40" /> : null}
                 <TableCell className={`sticky z-20 bg-muted/40 text-center text-xs text-muted-foreground ${readOnly ? "left-0" : "left-10"}`}>Σ</TableCell>
                 {cols.map((c) => {
@@ -2412,12 +2418,12 @@ export function ChildGrid(props: ChildGridProps) {
       : [])
     : [];
   const priceApprovalNotice = priceApprovalWarnings.length ? (
-    <div className="animate-pulse rounded-md border-2 border-red-700 bg-red-100 px-3 py-2 text-sm font-medium text-red-950 shadow-sm ring-2 ring-red-600/50 dark:border-red-500 dark:bg-red-950/60 dark:text-red-50 dark:ring-red-400/50" role="alert">
+    <div className="animate-pulse rounded-md border-2 border-red-950 bg-red-700 px-3 py-2 text-sm font-medium text-white shadow-sm ring-2 ring-red-950" role="alert">
       <span className="font-semibold">Đơn giá cần duyệt trước khi bán:</span> {priceApprovalWarnings.join(" · ")}
     </div>
   ) : null;
   const discountPolicyNotice = discountPolicyWarnings.length ? (
-    <div className="animate-pulse rounded-md border-2 border-red-700 bg-red-100 px-3 py-2 text-sm font-medium text-red-950 shadow-sm ring-2 ring-red-600/50 dark:border-red-500 dark:bg-red-950/60 dark:text-red-50 dark:ring-red-400/50" role="alert">
+    <div className="animate-pulse rounded-md border-2 border-red-950 bg-red-700 px-3 py-2 text-sm font-medium text-white shadow-sm ring-2 ring-red-950" role="alert">
       <span className="font-semibold">Chiết khấu cần duyệt:</span> {discountPolicyWarnings.join(" · ")}
     </div>
   ) : null;

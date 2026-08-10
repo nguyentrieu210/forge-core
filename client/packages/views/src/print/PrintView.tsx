@@ -39,8 +39,11 @@ export const PrintView = forwardRef<HTMLIFrameElement, PrintViewProps>(function 
       className="mf-print-frame"
       title={props.title ?? "Print preview"}
       srcDoc={props.html}
-      /* Chỉ cho cùng nguồn để nạp font đóng gói; vẫn chặn JS, form và popup trong HTML in. */
-      sandbox="allow-same-origin"
+      /* Chỉ cho cùng nguồn để nạp font đóng gói; vẫn chặn JS, form và popup trong HTML in.
+         `allow-modals` là bắt buộc để window.print() chạy: iframe sandbox không có cờ này thì
+         trình duyệt lặng lẽ bỏ qua print() (cùng nhóm với alert/confirm). Vì không có
+         `allow-scripts`, nội dung bản in vẫn không thể tự mở hộp thoại nào. */
+      sandbox="allow-same-origin allow-modals"
       referrerPolicy="no-referrer"
       style={{ width: pageWidth, height: pageHeight, transform: `scale(${pageScale})`, transformOrigin: "top left", border: "1px solid var(--border)", borderRadius: "var(--mf-panel-radius)", background: "#fff" }}
     />

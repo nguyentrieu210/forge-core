@@ -107,7 +107,15 @@ test("Alumdoor Sales Order print keeps the A4 structural contract", () => {
   const html = print.html;
 
   assert.equal(print.name, "Đơn bán hàng ALUMDOOR");
-  assert.match(css, /@page\{size:A4 portrait;margin:0\}/i);
+  // Lề vật lý phải nằm ở @page thì MỌI trang mới có lề: body{padding} chỉ áp một lần ở đầu
+  // dòng chảy, nên trang 2 trở đi in sát mép giấy và rơi vào vùng không in được của máy in.
+  // Trang đầu giữ đúng 23,7mm để bản in không đổi so với mẫu khách đã duyệt.
+  assert.match(css, /@page\{size:A4 portrait;margin:12mm 8mm 8mm\}/i);
+  assert.match(css, /@page :first\{margin-top:23\.7mm\}/i);
+  // Khổ giấy và lề cũ chỉ còn dành cho màn hình xem trước. Nếu chúng rớt lại vào bản in thì
+  // body cao/rộng hơn khung trang đã trừ lề và trình duyệt đẩy ra thêm một trang trắng.
+  assert.doesNotMatch(css.replace(/@media screen\{.*?\}\}/gs, ""), /min-height:297mm|padding:23\.7mm/);
+  assert.match(css, /@media screen\{html\{width:210mm\}body\{width:210mm;min-height:297mm;padding:23\.7mm 8mm 8mm\}\}/);
   assert.match(css, /thead\{display:table-header-group\}/);
   assert.match(css, /tr\{[^}]*break-inside:avoid[^}]*page-break-inside:avoid/);
   assert.match(css, /th,td\{[^}]*text-align:center/);
@@ -170,6 +178,78 @@ test("Alumdoor Sales Order fixture renders door and ordinary rows through the re
   assert.match(rendered, /-2\.205\.000/);
   assert.match(rendered, /SĐT:<\/span><span class="meta-value">0901234567/);
   assert.doesNotMatch(rendered, /Nhóm giá/);
-  assert.doesNotMatch(rendered, /{{|}}/, "HTML preview/PDF không được còn placeholder chưa render");
+  // Chỉ soi "{{": mọi placeholder chưa render đều mở bằng nó, còn "}}" đứng một mình là
+  // CSS hợp lệ — at-rule lồng nhau (@media screen{…{…}}) đóng bằng đúng hai ngoặc.
+  assert.doesNotMatch(rendered, /\{\{/, "HTML preview/PDF không được còn placeholder chưa render");
   assert.doesNotMatch(rendered, /<script\b/i, "mẫu in không được chèn script vào iframe preview/PDF");
+});
+
+/**
+ * Bảng đơn bán ẩn/hiện cột theo dữ liệu, nên dòng chiết khấu phải trải đúng số cột CÒN LẠI.
+ * Trước đây nó viết cứng colspan 10/11: đơn chỉ có phụ kiện in ra bảng 8 cột trong khi dòng
+ * chiết khấu vẫn chiếm 12, đẩy ô "CK %" và số tiền chiết khấu ra hẳn ngoài mép phải bảng.
+ */
+function spanOf(row) {
+  return cells(row, "td").reduce((total, cell) => total + Number(/colspan="(\d+)"/i.exec(cell.attributes)?.[1] ?? 1), 0);
+}
+
+function orderWith(items) {
+  return { ...fixture, data: { ...fixture.data, items } };
+}
+
+const DISCOUNTED = { qty: 1, uom: "Cái", rate: 450_000, amount: 450_000, discount_percentage: 10, discount_amount: 45_000 };
+
+test("dòng chiết khấu trải đúng số cột với mọi tổ hợp cột tuỳ dữ liệu", () => {
+  const shapes = {
+    "đủ cột": { item_code: "A", color: "GS", width_m: 1.2, height_m: 2.4, mesh_height_m: 0.6, set_count: 1, ...DISCOUNTED },
+    "không màu, có cao lưới": { item_code: "A", color: "", width_m: 1.2, height_m: 2.4, mesh_height_m: 0.6, set_count: 1, ...DISCOUNTED },
+    "không cao lưới": { item_code: "A", color: "GS", width_m: 1.2, height_m: 2.4, set_count: 1, ...DISCOUNTED },
+    // Đúng hình dạng đã in sai ngoài thực tế: một dòng phụ kiện có chiết khấu, bảng 9 cột.
+    "chỉ phụ kiện, có số lượng": { item_code: "TP-Tanker-Alumax-Lac33", item_name: "LẮC TANKER_ALUMAX 33", set_count: 1, ...DISCOUNTED },
+    "phụ kiện trơn": { item_code: "REMOTE-01", ...DISCOUNTED },
+  };
+
+  for (const [label, item] of Object.entries(shapes)) {
+    const rendered = renderPrintFormat(print, orderWith([item]), "vi");
+    const columns = cells(section(rendered, "thead"), "th").length;
+    const discountRow = section(rendered, "tbody").match(/<tr class="discount-row">([\s\S]*?)<\/tr>/i);
+    assert.ok(discountRow, `${label}: thiếu dòng chiết khấu`);
+    assert.equal(spanOf(discountRow[1]), columns, `${label}: dòng chiết khấu phải phủ đúng ${columns} cột`);
+    assert.doesNotMatch(rendered, /colspan="rest/, `${label}: colspan động phải được giải trước khi ra HTML`);
+  }
+});
+
+/**
+ * Khối thông tin đầu trang là HAI CỘT TƯỜNG MINH, không phải lưới tự rải theo hàng.
+ * Với lưới tự rải, chỉ cần SĐT hoặc Ghi chú vắng mặt là cả cột phải trượt lên một ô và
+ * "Ngày giao hàng" nhảy sang nằm cạnh "Địa chỉ".
+ */
+function metaColumns(rendered) {
+  const meta = rendered.match(/<div class="meta">([\s\S]*?)<table/)?.[1] ?? "";
+  return [...meta.matchAll(/<div class="meta-col">([\s\S]*?)<\/div>\s*(?=<div class="meta-col">|<\/div>)/g)]
+    .map((match) => [...match[1].matchAll(/meta-label">([^<]*)</g)].map((label) => label[1]));
+}
+
+test("khối thông tin giữ đúng hai cột dù trường tuỳ chọn vắng mặt", () => {
+  const right = ["Số đơn:", "Ngày đặt hàng:", "Ngày giao hàng:"];
+
+  assert.deepEqual(metaColumns(renderPrintFormat(print, fixture, "vi")), [
+    ["Khách hàng:", "SĐT:", "Địa chỉ:", "Ghi chú:"],
+    right,
+  ]);
+
+  const noPhone = { ...fixture, data: { ...fixture.data, phone: "" } };
+  assert.deepEqual(metaColumns(renderPrintFormat(print, noPhone, "vi")), [
+    ["Khách hàng:", "Địa chỉ:", "Ghi chú:"],
+    right,
+  ]);
+
+  const noNote = { ...fixture, data: { ...fixture.data, note: "" } };
+  assert.deepEqual(metaColumns(renderPrintFormat(print, noNote, "vi")), [
+    ["Khách hàng:", "SĐT:", "Địa chỉ:"],
+    right,
+  ]);
+
+  // Ghi chú thuộc khối đầu trang, không còn khối riêng dưới bảng.
+  assert.doesNotMatch(renderPrintFormat(print, fixture, "vi"), /footer-note/);
 });

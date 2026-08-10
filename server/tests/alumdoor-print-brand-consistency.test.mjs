@@ -25,7 +25,10 @@ test("all new Alumdoor print forms reuse the exact Purchase Order brand system",
   for (const format of sidecar.prints) {
     const css = format.css.join("\n");
     const html = format.html.join("\n");
-    assert.match(css, /padding:23\.7mm 8mm 8mm/);
+    // Lề giấy nằm ở @page (mọi trang), lề 23,7mm của trang đầu giữ nguyên bố cục cũ,
+    // và bản xem trước trên màn hình vẫn dựng đúng khổ A4 như mẫu khách đã duyệt.
+    assert.match(css, /@page\{size:A4 portrait;margin:12mm 8mm 8mm\}@page :first\{margin-top:23\.7mm\}/);
+    assert.match(css, /@media screen\{html\{width:210mm\}body\{width:210mm;min-height:297mm;padding:23\.7mm 8mm 8mm\}\}/);
     assert.match(css, /\.letterhead\{position:relative;width:\d+mm;height:17mm;margin(?::0 auto|-left:0);overflow:hidden\}/);
     assert.match(css, /\.brand-logo\{position:absolute;left:0;top:1\.35mm;width:74mm;height:auto\}/);
     assert.match(css, /\.company-header-img\{position:absolute;right:-13\.5mm;top:0;width:114\.3mm;height:auto;display:block\}/);

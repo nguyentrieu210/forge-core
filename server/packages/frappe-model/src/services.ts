@@ -460,7 +460,32 @@ export function renderPrintFormat(format: PrintFormatMeta, document: CanonicalDo
       })
       .join(""));
 
-  return `<!doctype html><html><head><meta charset="utf-8"><style>${format.css ?? ""}</style></head><body>${interpolate(renderConditionals(expanded, context), context)}</body></html>`;
+  const body = resolveRestColspans(interpolate(renderConditionals(expanded, context), context));
+  return `<!doctype html><html><head><meta charset="utf-8"><style>${format.css ?? ""}</style></head><body>${body}</body></html>`;
+}
+
+/**
+ * `colspan="rest"` / `colspan="rest-2"` — số cột còn lại, tính sau khi bảng đã dựng xong.
+ *
+ * Bảng in ẩn/hiện cột theo dữ liệu (`{{#ifAny items.color}}`…), nên một dòng tổng hay dòng
+ * chiết khấu KHÔNG thể biết trước nó phải trải qua bao nhiêu cột. Viết cứng `colspan="10"`
+ * chỉ đúng với đúng một tổ hợp cột: đơn chỉ có phụ kiện in ra bảng 8 cột trong khi dòng
+ * chiết khấu vẫn chiếm 12, và hai ô cuối bị đẩy hẳn ra ngoài mép phải của bảng — khách nhận
+ * tờ đơn với số tiền chiết khấu nằm lơ lửng bên ngoài khung.
+ *
+ * Số cột được đếm từ `<thead>` của chính bảng đó (cộng cả `colspan` của từng `<th>`), nên
+ * quy tắc này đúng cho mọi mẫu in chứ không riêng đơn bán hàng.
+ */
+function resolveRestColspans(html: string): string {
+  if (!html.includes('colspan="rest')) return html;
+  return html.replace(/<table\b[\s\S]*?<\/table>/gi, (table) => {
+    const head = table.match(/<thead\b[\s\S]*?<\/thead>/i)?.[0] ?? "";
+    const columns = [...head.matchAll(/<th\b([^>]*)>/gi)]
+      .reduce((total, [, attributes]) => total + Number(/colspan="(\d+)"/i.exec(attributes ?? "")?.[1] ?? 1), 0);
+    if (!columns) return table;
+    return table.replace(/colspan="rest(?:-(\d+))?"/gi, (_match, subtract?: string) =>
+      `colspan="${Math.max(1, columns - Number(subtract ?? 0))}"`);
+  });
 }
 
 /**

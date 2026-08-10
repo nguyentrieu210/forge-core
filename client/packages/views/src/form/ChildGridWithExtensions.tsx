@@ -92,8 +92,11 @@ function dynamicLinkTarget(field: DocField, row: Doc): string | undefined {
 function ExtensionGrid(props: ChildGridProps) {
   const { childMeta, rows, onChange, registry, services, readOnly, parentDoc, roles } = props;
   const columns = extensionColumns(childMeta);
-  if (!columns.length) return null;
   const purchaseOrder = isPurchaseOrderGrid(childMeta);
+  // Đơn bán hàng chỉ dùng bảng con gọn ở trên. Các trường kỹ thuật như
+  // `length_m`/`qty_bar` không được tách thành bảng “Trường mở rộng” trong form
+  // bán hàng; chúng vẫn tồn tại trong metadata để phục vụ mua hàng/kho khi cần.
+  if (!purchaseOrder || !columns.length) return null;
   const orderDate = String(parentDoc?.transaction_date ?? "").trim();
 
   const setCell = (rowIndex: number, fieldname: string, value: unknown) => {

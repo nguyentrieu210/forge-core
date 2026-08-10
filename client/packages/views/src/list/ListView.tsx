@@ -18,7 +18,7 @@ import {
 } from "@metaforge/ui";
 import { deriveColumns, type ListColumn } from "./columns.js";
 import { renderCell, RowAvatar, formatValue } from "./cells.js";
-import { deriveStandardFilters, type ListState } from "./filters.js";
+import { deriveStandardFilters, type ListState, type StandardFilter } from "./filters.js";
 import { ListToolbar } from "./ListToolbar.js";
 import {
   clampWidth,
@@ -292,7 +292,19 @@ export function ListView(props: ListViewProps) {
     // Giữ thứ tự xuất hiện ⇒ nhóm vẫn theo đúng sort người dùng đang chọn.
     return [...map.entries()].map(([key, items]) => ({ key, items }));
   }, [rows, groupCol]);
-  const standardFilters = useMemo(() => deriveStandardFilters(meta), [meta]);
+  const standardFilters = useMemo<StandardFilter[]>(() => {
+    const filters = deriveStandardFilters(meta);
+    if (meta.name !== "Sales Order") return filters;
+    const approvalFilter: StandardFilter = {
+      fieldname: "_approval_status",
+      label: "Trạng thái duyệt",
+      fieldtype: "Select",
+      options: ["Cần duyệt", "Đã duyệt", "Không cần duyệt"],
+    };
+    const customerIndex = filters.findIndex((filter) => filter.fieldname === "customer");
+    const insertAt = customerIndex < 0 ? 0 : customerIndex + 1;
+    return [...filters.slice(0, insertAt), approvalFilter, ...filters.slice(insertAt)];
+  }, [meta]);
   const imgField = useMemo(() => derivedColumns.find((column) => column.isTitle)?.imageFieldname, [derivedColumns]);
 
   const total = props.total ?? rows.length;
@@ -443,7 +455,7 @@ export function ListView(props: ListViewProps) {
           "cursor-pointer bg-card [&>td]:align-top",
           // Run3: hàng đang mở = viền trái 2px primary + nền soft + đậm hơn (Frappe/Linear)
           isActive && "bg-accent font-medium shadow-[inset_2px_0_0_var(--primary)] hover:bg-accent",
-          isWarning && "bg-red-50 hover:bg-red-100 [&>td]:!bg-red-50 hover:[&>td]:!bg-red-100",
+          isWarning && "bg-red-700 text-white hover:bg-red-800 [&>td]:!bg-red-700 [&>td]:!text-white [&>td:not([data-list-actions])_*]:!text-white hover:[&>td]:!bg-red-800",
         )}
         onClick={() => onRowClick?.(row)}
         onKeyDown={(event) => {
@@ -482,15 +494,15 @@ export function ListView(props: ListViewProps) {
           </TableCell>
         );})}
         {hasRowActions ? (
-          <TableCell className={cn("w-28 px-2 text-center", compact && "py-1")}>
+          <TableCell data-list-actions className={cn("w-28 px-2 text-center", compact && "py-1")}>
             {Number(row.docstatus ?? 0) === 0 ? <div className="flex items-center justify-center gap-1">
-              {isWarning ? <Badge variant="outline" className="border-red-300 bg-red-100 text-red-900">Cần duyệt</Badge> : null}
+              {isWarning ? <Badge variant="outline" className="border-red-950 bg-red-700 text-white">Cần duyệt</Badge> : null}
               {props.onApprove && props.canApprove?.(row) ? (
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="h-7 gap-1 px-2 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
+                  className="h-7 gap-1 px-2 !text-emerald-700 hover:bg-emerald-50 hover:!text-emerald-800"
                   disabled={props.approvingName === name}
                   aria-label={`Duyệt ${name}`}
                   title="Duyệt đơn hàng"
@@ -605,7 +617,7 @@ export function ListView(props: ListViewProps) {
               <article
                 key={name}
                 data-list-row={name}
-                className={cn("bg-card p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring", props.activeRow === name && "bg-accent shadow-[inset_3px_0_0_var(--primary)]", isWarning && "bg-red-50")}
+                className={cn("bg-card p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring", props.activeRow === name && "bg-accent shadow-[inset_3px_0_0_var(--primary)]", isWarning && "bg-red-700 text-white")}
                 onClick={() => onRowClick?.(row)}
                 onKeyDown={(event) => {
                   if (event.target !== event.currentTarget) return;
@@ -622,7 +634,7 @@ export function ListView(props: ListViewProps) {
                   </span>
                   <div className="min-w-0 flex-1">
                     {titleCol ? <TitleCell row={row} col={titleCol} imgField={imgField} displayValues={props.displayValues} onUploadImage={props.onUploadImage} /> : <span className="font-medium">{name}</span>}
-                    {isWarning ? <Badge variant="outline" className="mt-1 border-red-300 bg-red-100 text-red-900">Cần duyệt</Badge> : null}
+                    {isWarning ? <Badge variant="outline" className="mt-1 border-red-950 bg-red-700 text-white">Cần duyệt</Badge> : null}
                     {detailCols.length ? <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
                       {detailCols.map((column) => <div key={column.fieldname} className="min-w-0"><dt className="truncate text-muted-foreground">{column.label}</dt><dd className="mt-0.5 truncate font-medium">{column.fieldtype === "Link" && column.options ? <LinkCell doctype={column.options} value={row[column.fieldname]} displayValues={props.displayValues} /> : renderCell(row[column.fieldname], column, props.fmt)}</dd></div>)}
                     </dl> : null}

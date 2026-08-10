@@ -21,6 +21,13 @@ import { useMeta, useListView, NO_CAPS } from "./hooks.js";
 
 const EMPTY_META: DocTypeMeta = { name: "", fields: [], permissions: [] };
 
+function hasPendingSalesApproval(row: Doc): boolean {
+  const flagged = row.discount_requires_approval === true
+    || row.discount_requires_approval === 1
+    || row.discount_requires_approval === "1";
+  return Number(row.docstatus ?? 0) === 0 && flagged;
+}
+
 /** Kích thước mở đầu gọn cho bảng Đơn hàng; vẫn có thể kéo rộng từng cột. */
 const SALES_ORDER_INITIAL_WIDTHS: Record<string, number> = {
   name: 132,
@@ -66,7 +73,27 @@ export function ListContainer(props: ListContainerProps) {
   const baseColumns = useMemo(() => {
     const derived = deriveColumns(meta, { roles });
     if (doctype !== "Sales Order") return derived;
-    return derived.map((column) => {
+    // Đơn hàng luôn đọc theo thứ tự vận hành: Mã đơn hàng → Khách hàng → ngày/trạng thái/tiền.
+    // Metadata cũ thường chọn customer làm title nên deriveColumns đưa customer lên đầu và
+    // gắn mã đơn vào dòng phụ; đổi title sang name để mã đơn là cột đầu tiên sau STT.
+    const customerColumn = derived.find((column) => column.fieldname === "customer");
+    const orderColumn: ListColumn = {
+      fieldname: "name",
+      label: "Mã đơn hàng",
+      fieldtype: "Data",
+      align: "left",
+      isStatus: false,
+      isTitle: true,
+      isImage: false,
+      defaultWidth: SALES_ORDER_INITIAL_WIDTHS.name ?? 132,
+      minWidth: 112,
+    };
+    const ordered = [
+      orderColumn,
+      ...(customerColumn ? [{ ...customerColumn, isTitle: false, isImage: false }] : []),
+      ...derived.filter((column) => column.fieldname !== "name" && column.fieldname !== "customer"),
+    ];
+    return ordered.map((column) => {
       const defaultWidth = SALES_ORDER_INITIAL_WIDTHS[column.fieldname];
       return defaultWidth === undefined
         ? column
@@ -88,19 +115,47 @@ export function ListContainer(props: ListContainerProps) {
       defaultWidth: 126,
       minWidth: 116,
     };
+    const approvalColumn: ListColumn = {
+      fieldname: "_approval_status",
+      label: "Trạng thái duyệt",
+      fieldtype: "Select",
+      align: "center",
+      isStatus: true,
+      isTitle: false,
+      isImage: false,
+      defaultWidth: 132,
+      minWidth: 120,
+    };
     const deliveryProgress = baseColumns.find((column) => column.fieldname === "delivered_percentage");
-    if (!deliveryProgress) return [...baseColumns, statusColumn];
+    if (!deliveryProgress) return [...baseColumns, statusColumn, approvalColumn];
     // Đưa cả trạng thái và % lên trước ngày giao dự kiến: mobile chỉ giữ bốn
     // thông tin phụ, vì vậy người dùng vẫn thấy tiến độ thay vì một ngày trống.
     const withoutProgress = baseColumns.filter((column) => column.fieldname !== "delivered_percentage");
     const deliveryDateIndex = withoutProgress.findIndex((column) => column.fieldname === "delivery_date");
     const insertAt = deliveryDateIndex < 0 ? withoutProgress.length : deliveryDateIndex;
-    return [...withoutProgress.slice(0, insertAt), statusColumn, deliveryProgress, ...withoutProgress.slice(insertAt)];
+    return [...withoutProgress.slice(0, insertAt), statusColumn, approvalColumn, deliveryProgress, ...withoutProgress.slice(insertAt)];
   }, [baseColumns, doctype]);
   // Global context is enforced by adapter.getContextualList/getContextualCount on the server,
   // including warehouse fields in child tables. Do not duplicate it as a parent-only filter here.
   const listOpts = useMemo<ListOpts>(() => {
-    const query = buildServerQuery(meta, state, baseColumns);
+    const approvalFilter = state.filters._approval_status;
+    const serverFilters = Object.fromEntries(Object.entries(state.filters).filter(([field]) => field !== "_approval_status"));
+    // Hai cột trạng thái là giá trị tính ở client, không tồn tại trong DocType để sort trực tiếp.
+    // Ánh xạ về field gốc trước khi gửi query để server không từ chối `_delivery_status`.
+    const serverSort = state.sort
+      .replace(/^_delivery_status(?=:|$)/, "delivered_percentage")
+      .replace(/^_approval_status(?=:|$)/, "docstatus");
+    const query = buildServerQuery(meta, { ...state, sort: serverSort, filters: serverFilters }, baseColumns);
+    if (doctype === "Sales Order" && approvalFilter) {
+      const approvalFilters: Array<[string, "=", unknown]> = approvalFilter === "Cần duyệt"
+        ? [["discount_requires_approval", "=", 1], ["docstatus", "=", 0]]
+        : approvalFilter === "Đã duyệt"
+          ? [["discount_requires_approval", "=", 1], ["docstatus", "=", 1]]
+          : [["discount_requires_approval", "=", 0]];
+      query.filters = Array.isArray(query.filters)
+        ? [...query.filters, ...approvalFilters]
+        : { ...(query.filters ?? {}), ...Object.fromEntries(approvalFilters.map(([field, , value]) => [field, value])) };
+    }
     /**
      * Cờ này là dữ liệu điều khiển của danh sách Đơn hàng: nó không phải cột để
      * người dùng xem/chỉnh, nhưng cần có trên từng dòng để tô cảnh báo và mở nút
@@ -114,9 +169,15 @@ export function ListContainer(props: ListContainerProps) {
   const rows = useMemo(() => (viewQ.data?.rows ?? []).map((row) => {
     if (doctype !== "Sales Order") return row;
     const delivered = Number(row.delivered_percentage ?? 0);
+    const approvalFlag = row.discount_requires_approval === true
+      || row.discount_requires_approval === 1
+      || row.discount_requires_approval === "1";
     return {
       ...row,
       _delivery_status: delivered >= 100 ? "Hoàn thành" : delivered > 0 ? "Đang giao" : "Chưa giao",
+      _approval_status: approvalFlag
+        ? (Number(row.docstatus ?? 0) === 0 ? "Cần duyệt" : "Đã duyệt")
+        : "Không cần duyệt",
     };
   }), [doctype, viewQ.data?.rows]);
   const caps = viewQ.data?.capabilities ?? NO_CAPS;
@@ -275,15 +336,17 @@ export function ListContainer(props: ListContainerProps) {
         error={viewQ.error ? adapter.mapError(viewQ.error).message : null}
         state={state}
         onStateChange={patch}
-        preferenceScope={stableColumnPreferenceScope(scopeKey)}
+        preferenceScope={doctype === "Sales Order"
+          ? `${stableColumnPreferenceScope(scopeKey)}|sales-order-code-first-v1`
+          : stableColumnPreferenceScope(scopeKey)}
         onRowClick={props.onRowClick}
         onCreate={caps.create ? props.onCreate : undefined}
         onRefresh={refresh}
         onBulkDelete={caps.delete ? confirmBulkDelete : undefined}
         onDelete={caps.delete ? (name) => setPendingDelete([name]) : undefined}
         onApprove={doctype === "Sales Order" && caps.submit ? (name) => { void approveSalesOrder(name); } : undefined}
-        canApprove={(row) => row.discount_requires_approval === true || row.discount_requires_approval === 1 || row.discount_requires_approval === "1"}
-        isWarningRow={(row) => doctype === "Sales Order" && (row.discount_requires_approval === true || row.discount_requires_approval === 1 || row.discount_requires_approval === "1")}
+        canApprove={(row) => hasPendingSalesApproval(row)}
+        isWarningRow={(row) => doctype === "Sales Order" && hasPendingSalesApproval(row)}
         approvingName={approvingName}
         onExport={exportSelected}
         exporting={exporting}

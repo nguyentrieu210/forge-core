@@ -75,6 +75,8 @@ test("Alumdoor stock reconciliation real renderer emits the QR image for the exa
   assert.match(rendered, /<img class="qr" alt="QR KK-2026-00001" src="data:image\/gif;base64,[^"]+">/,
     "renderer phải biến qrcode filter thành data URL thật cho đúng name");
   assert.doesNotMatch(rendered, /QR KK-2026-00002/);
-  assert.doesNotMatch(rendered, /\{\{|\}\}/, "preview/PDF không được còn placeholder chưa render");
+  // Chỉ soi "{{": mọi placeholder chưa render đều mở bằng nó, còn "}}" đứng một mình là
+  // CSS hợp lệ — at-rule lồng nhau (@media screen{…{…}}) đóng bằng đúng hai ngoặc.
+  assert.doesNotMatch(rendered, /\{\{/, "preview/PDF không được còn placeholder chưa render");
   assert.doesNotMatch(rendered, /<script\b/i);
 });

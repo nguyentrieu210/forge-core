@@ -10,7 +10,6 @@ import { Printer, ArrowLeft, Minus, Plus, RotateCcw, RefreshCw, Download, Loader
 import { Button, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, toast, useT } from "@metaforge/ui";
 import { useMetaForge } from "../container/provider.js";
 import { PrintView } from "./PrintView.js";
-import { downloadPrintPdf } from "./downloadPdf.js";
 
 export interface PrintContainerProps {
   doctype: string;
@@ -25,7 +24,7 @@ export function PrintContainer({ doctype, name, format, onFormatChange, onBack }
   const { adapter, scopeKey } = useMetaForge();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [zoom, setZoom] = useState(1);
-  const [downloading, setDownloading] = useState(false);
+  const [savingPdf, setSavingPdf] = useState(false);
   const [localFormat, setLocalFormat] = useState(format);
   const formatsQ = useQuery({
     queryKey: [scopeKey, "print-formats", doctype, name],
@@ -59,32 +58,58 @@ export function PrintContainer({ doctype, name, format, onFormatChange, onBack }
   const loading = formatsQ.isLoading || printQ.isLoading;
   const requestError = formatsQ.error ?? printQ.error;
 
-  const doPrint = () => {
-    // In khung xem (không phải toàn trang MetaForge) — iframe sandbox="" vẫn cho phép print() ở hầu
-    // hết trình duyệt hiện đại; nếu trình duyệt cụ thể chặn, người dùng vẫn xem/đọc được bản in, chỉ
-    // cần bấm chuột phải trong khung → "Print Frame" như phương án dự phòng thủ công.
-    try { iframeRef.current?.contentWindow?.print(); } catch { /* trình duyệt chặn — người dùng tự in qua chuột phải */ }
+  /**
+   * Mở hộp thoại in của CHÍNH khung xem (không phải toàn trang MetaForge).
+   *
+   * Đây cũng là đường duy nhất tạo PDF. Hộp thoại in có sẵn máy in ảo "Lưu thành PDF",
+   * và nó dùng bộ phân trang thật của trình duyệt — thứ duy nhất tôn trọng
+   * `tr{break-inside:avoid}`, `thead{display:table-header-group}` và lề `@page` của mẫu in.
+   * Bản tự chụp ảnh rồi cắt theo chiều cao trang trước đây làm ngược lại: cắt ngang giữa
+   * dòng bảng, mất tiêu đề cột ở trang sau, và biến toàn bộ chữ thành ảnh raster không
+   * bôi đen / tìm kiếm được.
+   */
+  const openPrintDialog = (): boolean => {
+    const frame = iframeRef.current?.contentWindow;
+    if (!frame) return false;
+    try {
+      frame.focus();
+      frame.print();
+      return true;
+    } catch {
+      return false;
+    }
   };
 
-  const doDownloadPdf = async () => {
-    if (!selectedFormat || downloading) return;
-    setDownloading(true);
+  const printBlockedMessage = "Trình duyệt chặn hộp thoại in. Bấm chuột phải trong khung xem → \"In khung\" (Print frame).";
+
+  const doPrint = () => {
+    if (!openPrintDialog()) toast.error(printBlockedMessage);
+  };
+
+  const doSavePdf = async () => {
+    if (!selectedFormat || savingPdf) return;
+    setSavingPdf(true);
     try {
-      // Export the exact HTML/CSS already rendered in the preview iframe so the
-      // downloaded PDF keeps the same layout, page size, fonts and discount rows.
-      const html = printQ.data ?? await adapter.printHtml(doctype, name, selectedFormat);
-      await downloadPrintPdf(html, `${doctype}-${name}.pdf`);
-      toast.success("Đã tạo file PDF");
+      // Đường chính: Worker dựng PDF thật bằng Cloudflare Browser Run, trên đúng HTML đã qua
+      // kiểm tra quyền của printview (apps/tenant-worker/src/index-cf6.ts). Chrome headless
+      // phân trang theo `@page` với preferCSSPageSize, nên lề áp cho MỌI trang, tiêu đề cột
+      // lặp lại và chữ vẫn là chữ — bôi đen, copy và tìm kiếm được.
+      const blob = await adapter.downloadPdf(doctype, name, selectedFormat);
+      const href = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = href;
+      link.download = `${doctype}-${name}.pdf`;
+      link.click();
+      URL.revokeObjectURL(href);
+      toast.success("Đã tải PDF");
     } catch (error) {
-      try {
-        const html = printQ.data ?? await adapter.printHtml(doctype, name, selectedFormat);
-        await downloadPrintPdf(html, `${doctype}-${name}.pdf`);
-        toast.success("Đã tạo file PDF");
-      } catch {
-        toast.error(error instanceof Error ? error.message : "Không thể tạo file PDF");
-      }
+      // Bản dev local chạy entrypoint không có route cf6 và cũng không gắn binding BROWSER
+      // (Worker trả 501). Hộp thoại in của trình duyệt cho ra PDF đúng phân trang y hệt, chỉ
+      // tốn thêm một bước chọn máy in ảo.
+      if (openPrintDialog()) toast.info("Máy chủ chưa bật dựng PDF. Trong hộp thoại in, chọn máy in \"Lưu thành PDF\".");
+      else toast.error(adapter.mapError(error).message);
     } finally {
-      setDownloading(false);
+      setSavingPdf(false);
     }
   };
 
@@ -112,9 +137,9 @@ export function PrintContainer({ doctype, name, format, onFormatChange, onBack }
           <Button variant="ghost" size="sm" className="min-w-16 tabular-nums" onClick={() => setZoom(1)} aria-label="Đặt lại tỷ lệ"><RotateCcw className="size-3.5" /> {Math.round(zoom * 100)}%</Button>
           <Button variant="ghost" size="icon-sm" onClick={() => setZoom((value) => Math.min(1.5, value + 0.1))} disabled={zoom >= 1.5} aria-label="Phóng to"><Plus /></Button>
         </div>
-        <Button variant="outline" size="sm" onClick={() => void doDownloadPdf()} disabled={loading || !selectedFormat || downloading}>
-          {downloading ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
-          {downloading ? "Đang tạo PDF…" : "Tải PDF"}
+        <Button variant="outline" size="sm" onClick={() => void doSavePdf()} disabled={loading || !printQ.data || savingPdf}>
+          {savingPdf ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+          {savingPdf ? "Đang tạo PDF…" : "Tải PDF"}
         </Button>
         <Button size="sm" onClick={doPrint} disabled={loading || !printQ.data}><Printer className="size-4" /> {t("form.action.print")}</Button>
       </div>

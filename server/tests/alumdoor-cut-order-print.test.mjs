@@ -100,7 +100,15 @@ test("Alumdoor Cut Order print keeps the A4 cutting contract", () => {
     .map((match) => Number(match[1]));
 
   assert.equal(print.name, "Phiếu cắt nhôm ALUMDOOR");
-  assert.match(css, /@page\{size:A4 portrait;margin:0\}/i);
+  // Lề vật lý phải nằm ở @page thì MỌI trang mới có lề: body{padding} chỉ áp một lần ở đầu
+  // dòng chảy, nên trang 2 trở đi in sát mép giấy và rơi vào vùng không in được của máy in.
+  // Trang đầu giữ đúng 23,7mm để bản in không đổi so với mẫu khách đã duyệt.
+  assert.match(css, /@page\{size:A4 portrait;margin:12mm 8mm 8mm\}/i);
+  assert.match(css, /@page :first\{margin-top:23\.7mm\}/i);
+  // Khổ giấy và lề cũ chỉ còn dành cho màn hình xem trước. Nếu chúng rớt lại vào bản in thì
+  // body cao/rộng hơn khung trang đã trừ lề và trình duyệt đẩy ra thêm một trang trắng.
+  assert.doesNotMatch(css.replace(/@media screen\{.*?\}\}/gs, ""), /min-height:297mm|padding:23\.7mm/);
+  assert.match(css, /@media screen\{html\{width:210mm\}body\{width:210mm;min-height:297mm;padding:23\.7mm 8mm 8mm\}\}/);
   assert.match(css, /thead\{display:table-header-group\}/);
   assert.match(css, /tr\{[^}]*break-inside:avoid[^}]*page-break-inside:avoid/);
   assert.match(css, /overflow-wrap:anywhere/);
@@ -163,6 +171,8 @@ test("Alumdoor Cut Order renders traceable bundles, QR and cutting measures thro
   assert.match(textContent(rendered), /QR chứng từ:\s*CN-2026-00001/);
   assert.match(rendered, /<img class="qr" alt="QR CN-2026-00001" src="data:image\/gif;base64,[^"]+">/,
     "renderer phải biến qrcode filter thành data URL thật");
-  assert.doesNotMatch(rendered, /{{|}}/, "HTML preview/PDF không được còn placeholder chưa render");
+  // Chỉ soi "{{": mọi placeholder chưa render đều mở bằng nó, còn "}}" đứng một mình là
+  // CSS hợp lệ — at-rule lồng nhau (@media screen{…{…}}) đóng bằng đúng hai ngoặc.
+  assert.doesNotMatch(rendered, /\{\{/, "HTML preview/PDF không được còn placeholder chưa render");
   assert.doesNotMatch(rendered, /<script\b/i, "mẫu in không được chèn script vào iframe preview/PDF");
 });

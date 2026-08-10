@@ -154,17 +154,38 @@ export class SalesOrderController extends BaseController<SalesOrderData> {
       // để controller hạch toán đúng tiền phải trả; không còn ép chiết khấu toàn đơn.
       discount_amount: input.discount_amount,
     });
+    /**
+     * VAT của Alumdoor là MỘT TỶ LỆ ở đầu đơn (`vat_rate`), không phải dòng trong bảng
+     * `taxes` của ERPNext — nên `calculateSalesTotals` không nhìn thấy nó và trả về
+     * grand_total chưa có thuế. Controller lại ghi đè mọi con số client gửi lên, nên nếu
+     * không cộng ở đây thì "Tiền phải thu" trên chứng từ và trên bản in luôn thiếu VAT,
+     * dù màn hình nhập liệu hiển thị đúng.
+     *
+     * Thứ tự khớp với form: (tiền hàng − chiết khấu) → VAT → phụ thu. `net_total_minor`
+     * đã trừ chiết khấu vì đơn Alumdoor luôn chạy `apply_discount_on: "Net Total"`.
+     */
     // Phụ thu của Alumdoor là khoản cộng cố định trên đơn, sau VAT. Canonicalize bằng
     // số nguyên theo đơn vị tiền để client không thể ghi tổng phải trả tùy ý.
     const surchargeMinor = Math.max(0, toScaledInt(input.surcharge_amount ?? 0, currencyScale, "surcharge_amount"));
-    const adjustedTotals = surchargeMinor === 0 ? totals : {
+    const { extraMinor, ...alumdoorFields } = alumdoorOrderTotals({
+      netTotalMinor: totals.net_total_minor,
+      discountAmountMinor: totals.discount_amount_minor,
+      vatRate: input.vat_rate,
+      surchargeMinor,
+      currencyScale,
+    });
+    // Chỉ phát ra ba trường này cho chứng từ thực sự khai chúng; app khác dùng chung
+    // controller vẫn giữ đúng hợp đồng cũ của nó.
+    const alumdoorTotals = input.vat_rate === undefined && input.total_amount === undefined ? {} : alumdoorFields;
+    const adjustedTotals = extraMinor === 0 ? { ...totals, ...alumdoorTotals } : {
       ...totals,
+      ...alumdoorTotals,
       surcharge_amount: fromScaledInt(surchargeMinor, currencyScale),
       surcharge_amount_minor: surchargeMinor,
-      grand_total_minor: totals.grand_total_minor + surchargeMinor,
-      grand_total: fromScaledInt(totals.grand_total_minor + surchargeMinor, currencyScale),
-      rounded_total_minor: totals.rounded_total_minor + surchargeMinor,
-      rounded_total: fromScaledInt(totals.rounded_total_minor + surchargeMinor, currencyScale),
+      grand_total_minor: totals.grand_total_minor + extraMinor,
+      grand_total: fromScaledInt(totals.grand_total_minor + extraMinor, currencyScale),
+      rounded_total_minor: totals.rounded_total_minor + extraMinor,
+      rounded_total: fromScaledInt(totals.rounded_total_minor + extraMinor, currencyScale),
     };
     // Master-data EXISTENCE is deliberately validated at submit, not while a
     // lightweight draft is being edited. The posting gate remains authoritative.
@@ -223,6 +244,47 @@ function isAlumdoorLinearItem(item: Record<string, unknown>): boolean {
   const code = normalizedAlumdoorText(item.item_code);
   return name.startsWith("ray") || code.includes("ray")
     || name.startsWith("trục") || name.startsWith("truc") || code.includes("trục") || code.includes("truc");
+}
+
+/**
+ * Phần tổng riêng của Alumdoor, tách khỏi controller để phép tính TIỀN kiểm chứng được mà
+ * không phải dựng cả một ControllerContext (tiền tệ, bảng giá, master data).
+ *
+ * Ba điều bộ máy ERPNext chung không biểu diễn được:
+ *  - VAT khai bằng MỘT TỶ LỆ ở đầu đơn (`vat_rate`), không phải dòng trong bảng `taxes`;
+ *  - phụ thu cộng SAU VAT;
+ *  - "Tổng tiền hàng" trên bản in là số TRƯỚC chiết khấu, còn `net_total` đã trừ rồi.
+ *
+ * `netTotalMinor` là số ĐÃ trừ chiết khấu (đơn Alumdoor luôn `apply_discount_on: "Net Total"`).
+ * Phụ thu KHÔNG chịu chiết khấu nhưng CÓ chịu VAT, nên nó cộng vào gốc tính thuế:
+ *
+ *     (tiền hàng − chiết khấu + phụ thu) × %VAT = tiền VAT
+ *     tiền phải thu = tiền hàng − chiết khấu + phụ thu + tiền VAT
+ */
+export function alumdoorOrderTotals(input: {
+  netTotalMinor: number;
+  discountAmountMinor: number;
+  vatRate: unknown;
+  surchargeMinor: number;
+  currencyScale: number;
+}): {
+  total_amount: string; vat_rate: number; vat_amount: string; vat_amount_minor: number;
+  /** Gốc tính thuế = tiền hàng − chiết khấu + phụ thu. In ra để người đọc kiểm được số VAT. */
+  vat_base_amount: string;
+  extraMinor: number;
+} {
+  const rawRate = Number(input.vatRate ?? 0);
+  const vatRate = Number.isFinite(rawRate) ? Math.min(100, Math.max(0, rawRate)) : 0;
+  const vatBaseMinor = input.netTotalMinor + input.surchargeMinor;
+  const vatAmountMinor = vatRate === 0 ? 0 : Math.round(vatBaseMinor * vatRate / 100);
+  return {
+    total_amount: fromScaledInt(input.netTotalMinor + input.discountAmountMinor, input.currencyScale),
+    vat_rate: vatRate,
+    vat_amount: fromScaledInt(vatAmountMinor, input.currencyScale),
+    vat_amount_minor: vatAmountMinor,
+    vat_base_amount: fromScaledInt(vatBaseMinor, input.currencyScale),
+    extraMinor: vatAmountMinor + input.surchargeMinor,
+  };
 }
 
 /** Chỉ mã cửa mặc định 15%; ray/trục và các phụ kiện mặc định 0%. */

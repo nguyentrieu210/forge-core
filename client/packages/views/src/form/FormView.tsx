@@ -21,6 +21,12 @@ import { WorkflowActionBar, FormActionBar } from "../detail/WorkflowActionBar.js
 import { DIRTY_GUARD_REASON, type FormActionKind, type FormPerms, type FormActionCtx } from "../detail/formActions.js";
 import { defaultSalesDiscountPercent } from "./sales-line-policy.js";
 
+const SALES_VND_FORMATTER = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
+
+function formatSalesVnd(value: number): string {
+  return `${SALES_VND_FORMATTER.format(Math.round(Number.isFinite(value) ? value : 0))} VNĐ`;
+}
+
 export interface FormViewProps {
   meta: DocTypeMeta;
   doc: Doc;
@@ -171,6 +177,8 @@ export function FormView(props: FormViewProps) {
   }, [meta, fetchRules]);
   const reactiveValues = useWatch({ control: form.control, name: reactiveFields });
   const salesOrderItems = useWatch({ control: form.control, name: "items", disabled: meta.name !== "Sales Order" }) as Array<Record<string, unknown>> | undefined;
+  const salesVatRate = useWatch({ control: form.control, name: "vat_rate", disabled: meta.name !== "Sales Order" }) as number | string | undefined;
+  const salesSurcharge = useWatch({ control: form.control, name: "surcharge_amount", disabled: meta.name !== "Sales Order" }) as number | string | undefined;
   const paymentMethod = useWatch({ control: form.control, name: "payment_method", disabled: meta.name !== "Sales Order" }) as string | undefined;
   useEffect(() => {
     if (meta.name === "Sales Order" && !form.getValues("payment_method")) {
@@ -184,6 +192,28 @@ export function FormView(props: FormViewProps) {
     });
     return current;
   }, [form, reactiveFields, reactiveValues]);
+
+  const salesSummary = useMemo(() => {
+    if (meta.name !== "Sales Order") return null;
+    const rows = Array.isArray(salesOrderItems) ? salesOrderItems : [];
+    const subtotal = rows.reduce((sum, row) => {
+      const amount = Number(row.amount);
+      if (Number.isFinite(amount)) return sum + amount;
+      const qty = Number(row.qty);
+      const rate = Number(row.rate);
+      return sum + (Number.isFinite(qty) && Number.isFinite(rate) ? qty * rate : 0);
+    }, 0);
+    const discount = rows.reduce((sum, row) => sum + Math.max(0, Number(row.discount_amount) || 0), 0);
+    const vatRate = Math.min(100, Math.max(0, Number(salesVatRate) || 0));
+    const surcharge = Math.max(0, Number(salesSurcharge) || 0);
+    // Phụ thu KHÔNG chịu chiết khấu nhưng CÓ chịu VAT, nên nó nằm trong gốc tính thuế.
+    // Giữ khớp từng đồng với `alumdoorOrderTotals` phía server — server mới là nơi chốt số,
+    // nếu hai bên tính khác nhau thì người bán thấy một đằng, chứng từ lưu một nẻo.
+    const vatBase = subtotal - discount + surcharge;
+    const vatAmount = Math.round(vatBase * vatRate / 100);
+    const total = vatBase + vatAmount;
+    return { subtotal, discount, surcharge, vatRate, vatBase, vatAmount, total };
+  }, [meta.name, salesOrderItems, salesSurcharge, salesVatRate]);
 
   // Cờ này chỉ là trạng thái tổng hợp của các dòng: hệ thống tự lưu để danh sách biết đơn nào
   // cần duyệt, nhưng không để người dùng tự bật/tắt. Server sẽ tính lại khi ghi chứng từ.
@@ -315,12 +345,28 @@ export function FormView(props: FormViewProps) {
     const has = (name: string) => meta.fields.some((f) => f.fieldname === name);
     const table = meta.fields.find((f) => f.fieldtype === "Table" && f.fieldname === "items");
     if (!table) return null;
+    const sumAmount = has("grand_total");
+    const sumQty = has("total_qty");
+    const salesSummary = meta.name === "Sales Order" && has("total_amount") && has("vat_rate") && has("vat_amount") && has("surcharge_amount");
+    const discountAmount = has("discount_amount");
     return {
       table: table.fieldname,
-      sumAmount: has("grand_total"),
-      sumQty: has("total_qty"),
-      salesSummary: meta.name === "Sales Order" && has("total_amount") && has("vat_rate") && has("vat_amount") && has("surcharge_amount"),
-      discountAmount: has("discount_amount"),
+      sumAmount,
+      sumQty,
+      salesSummary,
+      discountAmount,
+      // Đúng những ô mà `updateTotals` bên dưới ghi ngược vào form — danh sách này là thứ
+      // `onValid` dùng để đảm bảo chúng theo được vào payload lưu. Giữ hai chỗ khớp nhau.
+      derived: [
+        ...(sumAmount
+          ? [
+            ...(salesSummary ? ["total_amount", "vat_amount"] : []),
+            ...(discountAmount ? ["discount_amount"] : []),
+            "grand_total",
+          ]
+          : []),
+        ...(sumQty ? ["total_qty"] : []),
+      ],
     };
   }, [meta]);
   useEffect(() => {
@@ -381,6 +427,12 @@ export function FormView(props: FormViewProps) {
     () => resolveMeta(meta, { doc: values, roles, maskedFields, forceReadOnly }),
     [meta, values, roles, maskedFields, forceReadOnly],
   );
+  const salesVatField = meta.name === "Sales Order"
+    ? resolved.find((field) => field.field.fieldname === "vat_rate")
+    : undefined;
+  const salesSurchargeField = meta.name === "Sales Order"
+    ? resolved.find((field) => field.field.fieldname === "surcharge_amount")
+    : undefined;
   const tabs: FormTab[] = useMemo(() => groupLayout(resolved), [resolved]);
   const activeIdx = Math.min(activeTab, tabs.length - 1);
   const tab = tabs[activeIdx] ?? tabs[0];
@@ -453,6 +505,19 @@ export function FormView(props: FormViewProps) {
     const dirty = form.formState.dirtyFields;
     const changed: Record<string, unknown> = {};
     for (const k of Object.keys(dirty)) changed[k] = vals[k];
+    /**
+     * Các ô tổng do chính form tính (`updateTotals`) cố ý KHÔNG đánh dấu dirty: đánh dấu thì
+     * vừa mở chứng từ lên đã bị coi là có thay đổi chưa lưu và chặn nút đóng.
+     *
+     * Nhưng `dirtyFields` lại là thứ DUY NHẤT dựng nên payload, nên hệ quả là chúng cũng chưa
+     * bao giờ được gửi đi: màn hình hiện "Tiền phải thu 567.000" trong khi chứng từ đã lưu vẫn
+     * giữ con số cũ — và bản in đọc theo chứng từ nên in ra số sai. Gửi kèm khi giá trị thực sự
+     * lệch so với bản đang lưu, vẫn không đụng tới trạng thái dirty của form.
+     */
+    for (const fieldname of totalFields?.derived ?? []) {
+      if (fieldname in changed) continue;
+      if (Number(vals[fieldname] ?? 0) !== Number(doc[fieldname] ?? 0)) changed[fieldname] = vals[fieldname];
+    }
     props.onSave?.(changed, { ...vals, name: doc.name, modified: doc.modified });
   };
   onValidRef.current = onValid;
@@ -568,7 +633,10 @@ export function FormView(props: FormViewProps) {
           {tab?.sections.map((section, si) => {
             if (section.hidden) return null;
             const sectionFields = section.columns.flatMap((col) => col.fields).filter((field) =>
-              meta.name !== "Sales Order" || !["product_group", "against_quotation"].includes(field.field.fieldname),
+              meta.name !== "Sales Order" || ![
+                "product_group", "against_quotation", "total_amount", "discount_amount",
+                "vat_rate", "vat_amount", "surcharge_amount", "grand_total", "note",
+              ].includes(field.field.fieldname),
             );
             const mainFields = sectionFields.filter((field) => field.field.form_region !== "aside" && field.field.form_region !== "full");
             const asideFields = sectionFields.filter((field) => field.field.form_region === "aside");
@@ -722,6 +790,48 @@ export function FormView(props: FormViewProps) {
               </section>
             );
           })}
+          {salesSummary ? (
+            <section className="mt-4 w-full rounded-lg border bg-muted/10 px-4 py-3 md:ml-auto md:w-1/3 md:min-w-[18rem]" aria-label="Tổng kết đơn hàng">
+              <div className="mb-3 flex items-center gap-3">
+                <h3 className="shrink-0 text-[15px] font-semibold tracking-[-0.01em] text-foreground">Tổng kết</h3>
+                <span className="h-0.5 min-w-8 flex-1 bg-border/80" aria-hidden="true" />
+              </div>
+              <div className="grid grid-cols-1 gap-3">
+                <SalesSummaryValue label="Tổng cộng tiền hàng" value={formatSalesVnd(salesSummary.subtotal)} />
+                <SalesSummaryValue label="Tiền chiết khấu" value={salesSummary.discount > 0 ? `-${formatSalesVnd(salesSummary.discount)}` : formatSalesVnd(0)} negative={salesSummary.discount > 0} />
+                {salesSurchargeField ? (
+                  <SalesSummaryField
+                    rf={salesSurchargeField}
+                    label="Phụ thu"
+                    id={fieldDomId("surcharge_amount")}
+                    form={form}
+                    registry={registry}
+                    services={services}
+                    docName={String(doc.name)}
+                    parentDoctype={meta.name}
+                    roles={roles}
+                    values={values}
+                  />
+                ) : <SalesSummaryValue label="Phụ thu" value={formatSalesVnd(salesSummary.surcharge)} />}
+                {salesVatField ? (
+                  <SalesSummaryField
+                    rf={salesVatField}
+                    label="% VAT"
+                    id={fieldDomId("vat_rate")}
+                    form={form}
+                    registry={registry}
+                    services={services}
+                    docName={String(doc.name)}
+                    parentDoctype={meta.name}
+                    roles={roles}
+                    values={values}
+                  />
+                ) : <SalesSummaryValue label="% VAT" value={`${SALES_VND_FORMATTER.format(salesSummary.vatRate)} %`} />}
+                <SalesSummaryValue label="Số tiền VAT" value={formatSalesVnd(salesSummary.vatAmount)} />
+                <SalesSummaryValue label="Tiền phải thu" value={formatSalesVnd(salesSummary.total)} emphasis />
+              </div>
+            </section>
+          ) : null}
         </div>
       </div>
       {props.footerActions ? <div className="mf-form-footer sticky bottom-0 z-20 flex shrink-0 items-center justify-end gap-2 border-t bg-card/95 px-4 py-3 backdrop-blur">{props.footerActions}</div> : null}
@@ -730,6 +840,28 @@ export function FormView(props: FormViewProps) {
 }
 
 /** Gom các checkbox LIỀN NHAU vào một hàng riêng để chúng không chen vào phần trống của hàng input. */
+function SalesSummaryValue({ label, value, negative, emphasis }: { label: string; value: string; negative?: boolean; emphasis?: boolean }) {
+  return (
+    <div className="min-w-0 text-center">
+      <div className="mb-1 text-xs font-medium text-muted-foreground">{label}</div>
+      <div className={cn(
+        "flex min-h-9 items-center justify-center rounded-md border bg-background px-3 text-sm tabular-nums",
+        negative && "text-destructive",
+        emphasis && "font-semibold text-primary",
+      )}>{value}</div>
+    </div>
+  );
+}
+
+function SalesSummaryField({ label, rf, ...fieldProps }: Omit<FieldProps, "width"> & { label: string }) {
+  const displayRf = { ...rf, field: { ...rf.field, label } };
+  return (
+    <div className="min-w-0">
+      <Field {...fieldProps} rf={displayRf} width="full" />
+    </div>
+  );
+}
+
 function groupCheckFields(fields: ResolvedField[]): Array<ResolvedField | ResolvedField[]> {
   const grouped: Array<ResolvedField | ResolvedField[]> = [];
   let checks: ResolvedField[] = [];

@@ -480,6 +480,35 @@ test("sales and production documents require an active allowed color", async () 
   assert.equal(valid.status, 200, await valid.text());
 });
 
+test("ray and truc sales lines do not require a color", async () => {
+  const response = await alumdoorWorker.fetch(new Request("https://app.internal/hooks/validate", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-cloudforge-tenant": "tenant-test",
+      "x-cloudforge-callback": "https://tenant.test/_app/",
+    },
+    body: JSON.stringify({
+      doctype: "Sales Order",
+      name: "NEW-LINEAR-SALES-ORDER",
+      action: "create",
+      payload: { items: [{ item_code: "TRUC-114", color: "" }] },
+    }),
+  }), {
+    PLATFORM: masterPlatform({
+      "Item:TRUC-114": {
+        item_name: "Trục 114",
+        item_code: "TRUC-114",
+        inventory_mode: "Thành phẩm theo m2",
+        measurement_profile: "Thành phẩm theo m2",
+        allowed_colors: [],
+      },
+      "Measurement Profile:Thành phẩm theo m2": { require_color: 1 },
+    }),
+  }, {});
+  assert.equal(response.status, 200, await response.text());
+});
+
 test("ordinary items keep the simple qty/uom path", async () => {
   const response = await alumdoorWorker.fetch(
     validatorRequest([{ item_code: "MOTOR-01", qty: 2, uom: "Cái", rate: 1_000_000 }]),

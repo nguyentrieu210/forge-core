@@ -71,6 +71,17 @@ interface SalesTotalsData extends JsonObject {
   /** Optional commercial surcharge, used by Alumdoor sales orders. */
   surcharge_amount?: DecimalInput | undefined;
   surcharge_amount_minor?: number;
+  /**
+   * Alumdoor khai VAT bằng một tỷ lệ ở đầu đơn thay vì bảng `taxes` của ERPNext, và in
+   * "Tổng tiền hàng" là số TRƯỚC chiết khấu. Ba trường này để controller chốt được cả ba
+   * con số đó thay vì tin vào giá trị client gửi lên.
+   */
+  total_amount?: DecimalInput | undefined;
+  vat_rate?: DecimalInput | undefined;
+  vat_amount?: DecimalInput | undefined;
+  vat_amount_minor?: number;
+  /** Gốc tính thuế: tiền hàng − chiết khấu + phụ thu (phụ thu không chịu CK nhưng chịu VAT). */
+  vat_base_amount?: DecimalInput | undefined;
 }
 
 interface CurrencyContextData extends JsonObject {

@@ -253,6 +253,15 @@ function colorNames(item: Record<string, unknown>): string[] {
     .filter(Boolean);
 }
 
+/** Ray/trục bán theo mét không mang mã màu và không được chặn khi để trống màu. */
+function isColorlessLinearItem(item: Record<string, unknown>): boolean {
+  const name = String(item.item_name ?? "").normalize("NFC").trim().toLocaleLowerCase("vi");
+  const code = String(item.item_code ?? "").normalize("NFC").trim().toLocaleLowerCase("vi");
+  return name.startsWith("ray") || code.includes("ray")
+    || name.startsWith("trục") || name.startsWith("truc")
+    || code.includes("trục") || code.includes("truc");
+}
+
 async function assertActiveColors(
   call: PlatformCall,
   colors: string[],
@@ -882,10 +891,10 @@ async function validateDocumentColors(
     const profileName = String(item.measurement_profile ?? "").trim();
     const profile = profileName ? profiles.get(profileName) : null;
     const mode = String(item.inventory_mode ?? "Hàng thường");
-    const required = subject.doctype === "Aluminium Lot"
+    const required = !isColorlessLinearItem(item) && (subject.doctype === "Aluminium Lot"
       || checked(profile?.require_color)
       || mode === "Nhôm cây/lá"
-      || mode === "Thành phẩm theo m2";
+      || mode === "Thành phẩm theo m2");
     const color = String(row.color ?? "").trim();
     const line = subject.doctype === "Work Order" || subject.doctype === "Aluminium Lot"
       ? `${subject.doctype} (${code})`

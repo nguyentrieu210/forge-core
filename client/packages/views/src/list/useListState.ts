@@ -44,9 +44,16 @@ export function readState(bridge: UrlStateBridge, meta: DocTypeMeta): ListState 
       }
     } catch { /* URL cũ/sai JSON: bỏ qua, không làm crash list */ }
   }
-  for (const f of meta.fields ?? []) {
-    const v = bridge.get(`f_${f.fieldname}`);
-    if (v != null && v !== "") filters[f.fieldname] = v;
+  // Một số bộ lọc được tính ở client nhưng vẫn phải sống trong URL như field thật.
+  // Đơn hàng dùng `_approval_status` để lọc theo cờ duyệt; nếu chỉ đọc meta.fields
+  // thì giá trị vừa chọn sẽ biến mất ngay sau khi URL cập nhật.
+  const filterFieldnames = [
+    ...(meta.fields ?? []).map((field) => field.fieldname),
+    ...(meta.name === "Sales Order" ? ["_approval_status"] : []),
+  ];
+  for (const fieldname of new Set(filterFieldnames)) {
+    const v = bridge.get(`f_${fieldname}`);
+    if (v != null && v !== "") filters[fieldname] = v;
   }
   s.filters = filters;
 
@@ -94,6 +101,7 @@ export function useListUrlState(bridge: UrlStateBridge, meta: DocTypeMeta) {
       if ("filters" in p) {
         // xoá mọi f_* cũ rồi set lại từ p.filters
         for (const f of meta.fields ?? []) next[`f_${f.fieldname}`] = null;
+        if (meta.name === "Sales Order") next.f__approval_status = null;
         for (const [k, v] of Object.entries(p.filters ?? {})) if (v) next[`f_${k}`] = v;
       }
       // đổi filter/search/sort/pageSize → về trang 1 (trừ khi chính p.page được set)
