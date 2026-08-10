@@ -26,6 +26,11 @@ function stateOf(value: unknown): string {
   return text(value) || "Đang giữ";
 }
 
+function decimalInput(value: unknown, field: string): string | number {
+  if (typeof value === "string" || typeof value === "number") return value;
+  throw errors.validation(`${field} là bắt buộc và phải là số`);
+}
+
 function timestamp(value: unknown, field: string): number | null {
   const raw = text(value);
   if (!raw) return null;
@@ -120,7 +125,11 @@ export async function assertReservationFeasibleAcrossThresholds(
       position.warehouse,
     );
     if (warehouse?.stock_role !== "Kho chính") continue;
-    const lengthMicros = toScaledInt(batch.length_m, 6, `Batch ${position.batch_no}.length_m`);
+    const lengthMicros = toScaledInt(
+      decimalInput(batch.length_m, `Batch ${position.batch_no}.length_m`),
+      6,
+      `Batch ${position.batch_no}.length_m`,
+    );
     eligible.push({ qtyMicros: position.qty_micros, lengthMicros });
   }
 
