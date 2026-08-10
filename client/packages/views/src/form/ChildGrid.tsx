@@ -43,7 +43,7 @@ const SALES_ORDER_HIDDEN_FIELDS = new Set([
   "door_type", "has_butterfly_bracket", "mesh_height_m", "leaf_height_deduction_m", "leaf_divisor_m", "leaf_rounding",
   "leaf_count", "estimated_weight_kg", "estimated_minutes", "formula_explanation", "motor_model",
   "accessories", "warehouse", "stock_qty", "available_qty", "available_stock_qty", "available_stock_uom",
-  "availability_status", "rate", "install_note",
+  "availability_status", "install_note",
 ]);
 const PURCHASE_ORDER_ITEM_FULL_FIELDS = [
   "item_code",
