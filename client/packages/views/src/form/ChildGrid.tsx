@@ -26,11 +26,11 @@ const EMPTY_LAYOUT: GridLayout = { w: {}, order: [], hidden: [], pinned: [], lab
 
 const PURCHASE_COMPACT_FIELDS = ["item_code", "qty", "uom", "rate", "amount"];
 const SALES_COMPACT_FIELDS = [
-  "item_code", "color", "width_m", "height_m", "set_count", "sales_mode", "has_butterfly_bracket",
+  "item_code", "color", "height_m", "width_m", "set_count", "sales_mode", "has_butterfly_bracket",
   "length_m", "qty_bar", "uom", "qty", "rate", "discount_percentage", "amount",
 ];
 const SALES_ORDER_ITEM_FULL_FIELDS = [
-  "item_code", "door_type", "color", "width_m", "height_m", "mesh_height_m", "set_count", "sales_mode",
+  "item_code", "door_type", "color", "height_m", "width_m", "mesh_height_m", "set_count", "sales_mode",
   "has_butterfly_bracket", "leaf_variant", "leaf_height_deduction_m", "leaf_divisor_m", "leaf_rounding",
   "leaf_count", "single_layer_leaf_count", "double_layer_leaf_count", "cut_width_m", "billable_area_sqm",
   "estimated_weight_kg", "estimated_minutes", "formula_policy", "formula_version", "formula_explanation",
@@ -312,6 +312,10 @@ export function defaultChildGridHiddenColumns(meta: DocTypeMeta, columns: DocFie
 }
 
 function childGridColumnLabel(meta: DocTypeMeta, field: DocField): string {
+  if (meta.name === "Sales Order Item") {
+    if (field.fieldname === "set_count") return "Số lượng";
+    if (field.fieldname === "qty") return "Khối lượng";
+  }
   if (isPurchaseGrid(meta)) {
     if (field.fieldname === "qty") return "Số lượng";
     if (field.fieldname === "uom") return "ĐVT";
@@ -1830,6 +1834,12 @@ export function ChildGrid(props: ChildGridProps) {
                     .map((row) => fieldForRow(c, row).label)
                     .filter((label): label is string => Boolean(label)))];
                   if (rowLabels.length === 1) headerLabel = rowLabels[0]!;
+                  // Giữ header nghiệp vụ ổn định; nhãn nội bộ của từng mặt hàng
+                  // không được làm đổi tên cột trên đơn bán hàng.
+                  if (childMeta.name === "Sales Order Item") {
+                    if (c.fieldname === "set_count") headerLabel = "Số lượng";
+                    if (c.fieldname === "qty") headerLabel = "Khối lượng";
+                  }
                   // Bảng có thể vừa có cửa vừa có ray/phụ kiện. Khi đó nhãn chung
                   // "Rộng (m)" của vật tư không được làm mất PB ray/PB nhựa của cửa.
                   if (c.fieldname === "width_m") {
