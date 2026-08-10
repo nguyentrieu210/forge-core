@@ -37,6 +37,14 @@ const SALES_ORDER_ITEM_FULL_FIELDS = [
   "length_m", "qty_bar", "uom", "qty", "rate", "discount_percentage", "amount", "motor_model", "accessories", "install_note", "warehouse",
   "availability_status", "note",
 ];
+// Các cột kỹ thuật/sản xuất vẫn được giữ trong dữ liệu để tính toán và in nội bộ,
+// nhưng không đưa vào bảng con bán hàng cho người dùng kinh doanh.
+const SALES_ORDER_HIDDEN_FIELDS = new Set([
+  "door_type", "has_butterfly_bracket", "mesh_height_m", "leaf_height_deduction_m", "leaf_divisor_m", "leaf_rounding",
+  "leaf_count", "estimated_weight_kg", "estimated_minutes", "formula_explanation", "motor_model",
+  "accessories", "warehouse", "stock_qty", "available_qty", "available_stock_qty", "available_stock_uom",
+  "availability_status", "rate", "install_note",
+]);
 const PURCHASE_ORDER_ITEM_FULL_FIELDS = [
   "item_code",
   "length_m",
@@ -285,7 +293,8 @@ export function resolveChildGridColumns(
   if (isSalesOrderGrid(meta)) {
     return SALES_ORDER_ITEM_FULL_FIELDS
       .map((fieldname) => (meta.fields ?? []).find((field) => field.fieldname === fieldname))
-      .filter((field): field is DocField => Boolean(field));
+      .filter((field): field is DocField => Boolean(field))
+      .filter((field) => meta.name !== "Sales Order Item" || !SALES_ORDER_HIDDEN_FIELDS.has(field.fieldname));
   }
   const visible = visibleColumns(gridColumns(meta), meta, rows, parentDoc, roles);
   if (visible.length) return visible;
@@ -632,7 +641,9 @@ export function ChildGrid(props: ChildGridProps) {
         ...baseCols.filter((c) => !layout.order.includes(c.fieldname)),
       ]
     : baseCols;
-  const cols = orderedCols.filter((column) => column.fieldname === baseIdentity || !layout.hidden.includes(column.fieldname));
+  const cols = orderedCols.filter((column) => column.fieldname === baseIdentity
+    || (!layout.hidden.includes(column.fieldname)
+      && !(childMeta.name === "Sales Order Item" && SALES_ORDER_HIDDEN_FIELDS.has(column.fieldname))));
   const formulaLoadVersion = useRef(new Map<string, number>());
   const previousFormulaGroup = useRef("");
   const previousSellingContext = useRef("");
