@@ -648,7 +648,7 @@ export function FormView(props: FormViewProps) {
                         <div className="mf-form-grid grid items-start gap-x-3 gap-y-3">{renderFields(salesOrderInfoFields)}</div>
                       </div>
                       <div className="min-w-0 border-t pt-4 md:border-l md:border-t-0 md:pl-5 md:pt-0">
-                        <div className="mf-form-grid grid w-full max-w-[15rem] items-start gap-y-2">{renderFields(salesOrderDateFields, "aside")}</div>
+                        <div className="mf-form-grid grid w-full max-w-[11rem] items-start gap-y-2">{renderFields(salesOrderDateFields, "aside")}</div>
                       </div>
                     </div>
                     {salesOrderRemainderFields.length ? (
