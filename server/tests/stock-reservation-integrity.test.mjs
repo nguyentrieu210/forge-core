@@ -13,21 +13,35 @@ function reservation(overrides = {}) {
   };
 }
 
-function reader({ warehouseCompany, sourceCompany, disabled = 0, isGroup = 0 } = {}) {
+function reservationDocument(name, data) {
+  return {
+    tenant_id: "tenant-a", doctype: "Stock Reservation", name,
+    owner: "planner@example.test", docstatus: 0, status: String(data.state ?? "Đang giữ"), version: 1,
+    created_at: RESERVED_AT, modified_at: RESERVED_AT, data, children: [],
+  };
+}
+
+function reader({
+  warehouseCompany,
+  sourceCompany,
+  disabled = 0,
+  isGroup = 0,
+  positions = [{ item_code: "AL548", warehouse: "KHO-1", batch_no: "LO-46", qty_micros: 100_000_000 }],
+  reservations = [],
+  batches = {},
+} = {}) {
   return {
     async getMasterRecordData(_tenantId, type, name) {
       if (type === "Item") return { item_code: name, has_batch_no: 1 };
       if (type === "Warehouse") return { stock_role: "Kho chính", is_group: isGroup, disabled, ...(warehouseCompany ? { company: warehouseCompany } : {}) };
-      if (type === "Batch") return { item_code: "AL548", length_m: "4.6", color: "Ghi", condition: "Đã sơn" };
+      if (type === "Batch") return batches[name] ?? { item_code: "AL548", length_m: "4.6", color: "Ghi", condition: "Đã sơn" };
       return null;
     },
     async getDocument() {
       return { tenant_id: "tenant-a", doctype: "Production Order", name: "LSX-1", docstatus: 1, data: sourceCompany ? { company: sourceCompany } : {} };
     },
-    async listTrackedStockPositions() {
-      return [{ item_code: "AL548", warehouse: "KHO-1", batch_no: "LO-46", qty_micros: 100_000_000 }];
-    },
-    async listDocumentsByDoctype() { return []; },
+    async listTrackedStockPositions() { return positions; },
+    async listDocumentsByDoctype() { return reservations; },
   };
 }
 
@@ -37,9 +51,7 @@ function context({ document = reservation(), existing, actor, action = existing 
       actor: actor ?? { user_id: "planner@example.test", roles: ["Kế hoạch"] },
       aggregate: { doctype: "Stock Reservation", name: "GC-2026-00001" }, action,
       expected_version: existing ? 1 : null, payload_hash: "a".repeat(64), document },
-    ...(existing ? { existing: { tenant_id: "tenant-a", doctype: "Stock Reservation", name: "GC-2026-00001",
-      owner: "planner@example.test", docstatus: 0, status: String(existing.state ?? "Đang giữ"), version: 1,
-      created_at: RESERVED_AT, modified_at: RESERVED_AT, data: existing, children: [] } } : {}),
+    ...(existing ? { existing: reservationDocument("GC-2026-00001", existing) } : {}),
     nextVersion: existing ? 2 : 1, now, reader: sourceReader,
   };
 }
@@ -93,4 +105,26 @@ test("reservation warehouse phải là leaf active và cùng company với chứ
   const controller = new StockReservationIntegrityController();
   await assert.rejects(() => controller.normalize(context({ sourceReader: reader({ sourceCompany: "COMP-A", warehouseCompany: "COMP-B" }) })), /belongs to COMP-B, not COMP-A/);
   await assert.rejects(() => controller.normalize(context({ sourceReader: reader({ sourceCompany: "COMP-A", warehouseCompany: "COMP-A", isGroup: 1 }) })), /disabled or is a group/);
+});
+
+test("reservation kiểm mọi breakpoint chiều dài để không hứa cùng một cây cho hai ngưỡng", async () => {
+  const controller = new StockReservationIntegrityController();
+  const existingShorterPromise = reservationDocument("GC-OLD", reservation({
+    min_length_m: "3",
+    qty_reserved: "1",
+    source_name: "LSX-OLD",
+  }));
+  const sourceReader = reader({
+    positions: [{ item_code: "AL548", warehouse: "KHO-1", batch_no: "LO-50", qty_micros: 1_000_000 }],
+    batches: { "LO-50": { item_code: "AL548", length_m: "5", color: "Ghi", condition: "Đã sơn" } },
+    reservations: [existingShorterPromise],
+  });
+
+  await assert.rejects(
+    () => controller.normalize(context({
+      document: reservation({ min_length_m: "5", qty_reserved: "1", source_name: "LSX-NEW" }),
+      sourceReader,
+    })),
+    /Không đủ tồn khả dụng theo cơ cấu khổ.*ngưỡng ≥ 3\.000000 m/,
+  );
 });
