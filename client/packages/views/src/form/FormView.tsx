@@ -577,8 +577,11 @@ export function FormView(props: FormViewProps) {
             const salesOrderCustomerFields = isSalesOrderHeader
               ? salesOrderInfoFields.filter((field) => field.field.fieldname === "customer")
               : [];
+            const salesOrderResponsibleFields = isSalesOrderHeader
+              ? salesOrderInfoFields.filter((field) => field.field.fieldname === "responsible_person")
+              : [];
             const salesOrderOtherInfoFields = isSalesOrderHeader
-              ? salesOrderInfoFields.filter((field) => field.field.fieldname !== "customer")
+              ? salesOrderInfoFields.filter((field) => !["customer", "responsible_person"].includes(field.field.fieldname))
               : [];
             const salesOrderRemainderFields = isSalesOrderHeader
               ? sectionFields.filter((field) => !salesOrderHeaderNames.includes(field.field.fieldname))
@@ -647,8 +650,9 @@ export function FormView(props: FormViewProps) {
                   <>
                     <div className="grid grid-cols-1 gap-5 md:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)]">
                       <div className="min-w-0">
-                        <div className="grid grid-cols-1 items-start gap-x-3 gap-y-3">
+                        <div className="grid grid-cols-1 items-start gap-x-3 gap-y-3 md:grid-cols-2">
                           {renderFields(salesOrderCustomerFields)}
+                          {renderFields(salesOrderResponsibleFields)}
                         </div>
                         <div className="mf-form-grid mt-3 grid items-start gap-x-3 gap-y-3">{renderFields(salesOrderOtherInfoFields)}</div>
                       </div>
