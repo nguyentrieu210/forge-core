@@ -14,6 +14,32 @@ test("ray/trục bán Mét derives total billable metres", () => {
   assert.equal(result.quantity, 15.9);
 });
 
+test("Ray Hàng thường bán Mét uses Cao × Số lượng", () => {
+  const result = deriveSalesQuantity({
+    item_name: "RAY SẮT U100",
+    inventory_mode: "Hàng thường",
+    uom: "Mét",
+    height_m: 3.2,
+    set_count: 2,
+  });
+  assert.equal(result.policy, "LENGTH_X_PIECES");
+  assert.equal(result.derived, true);
+  assert.equal(result.quantity, 6.4);
+});
+
+test("Trục Hàng thường bán Mét uses Rộng × Số lượng", () => {
+  const result = deriveSalesQuantity({
+    item_code: "TP-TRUC140",
+    inventory_mode: "Hàng thường",
+    uom: "Mét",
+    width_m: 4.5,
+    set_count: 1,
+  });
+  assert.equal(result.policy, "LENGTH_X_PIECES");
+  assert.equal(result.derived, true);
+  assert.equal(result.quantity, 4.5);
+});
+
 test("door quantity only trusts the Cutting Policy snapshot", () => {
   const pending = deriveSalesQuantity({
     inventory_mode: "Thành phẩm theo m2",

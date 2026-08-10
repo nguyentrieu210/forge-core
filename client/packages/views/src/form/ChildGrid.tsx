@@ -102,6 +102,21 @@ function normalizedUom(value: unknown): string {
   return String(value ?? "").normalize("NFC").trim().toLocaleLowerCase("vi");
 }
 
+export type LinearSalesBasis = "RAY" | "TRUC";
+
+/**
+ * Ray/trục trong danh mục hiện có thể vẫn để Kiểu quản lý tồn = Hàng thường.
+ * Đây là quy cách bán của dòng hàng, không được bắt người dùng đổi cả mô hình tồn kho
+ * chỉ để nhập kích thước tính tiền.
+ */
+export function deriveLinearSalesBasis(row: Doc): LinearSalesBasis | undefined {
+  const itemName = String(row.item_name ?? "").normalize("NFC").trim().toLocaleLowerCase("vi");
+  const itemCode = String(row.item_code ?? "").normalize("NFC").trim().toLocaleLowerCase("vi");
+  if (itemName.startsWith("ray") || itemCode.includes("ray")) return "RAY";
+  if (itemName.startsWith("trục") || itemName.startsWith("truc") || itemCode.includes("truc")) return "TRUC";
+  return undefined;
+}
+
 function checkedValue(value: unknown): boolean {
   return value === true || value === 1 || value === "1"
     || ["true", "yes", "có", "co"].includes(String(value ?? "").normalize("NFC").trim().toLocaleLowerCase("vi"));
@@ -155,6 +170,17 @@ export function deriveSalesQuantity(row: Doc): SalesQuantityPreview {
   const mode = String(row.inventory_mode ?? "").normalize("NFC").trim();
   const uom = normalizedUom(row.uom);
   const sets = salesSetCount(row);
+
+  const linearBasis = deriveLinearSalesBasis(row);
+  if (linearBasis && METRE_UOMS.has(uom)) {
+    const dimension = finitePositive(linearBasis === "RAY" ? row.height_m : row.width_m);
+    return {
+      policy: "LENGTH_X_PIECES",
+      derived: true,
+      ...(dimension && sets ? { quantity: roundSalesQuantity(dimension * sets) } : {}),
+      label: linearBasis === "RAY" ? "Cao × Số lượng (m)" : "Rộng × Số lượng (m)",
+    };
+  }
 
   if (mode === "Thành phẩm theo m2") {
     if (SET_UOMS.has(uom)) {
@@ -270,7 +296,16 @@ function visibleColumns(
       column.list_only ? { ...column, list_only: 0 } : column,
       meta,
       { doc: row, parent: parentDoc, roles, assumeWritable: true },
-    ).visible));
+    ).visible || (meta.name === "Sales Order Item" && (() => {
+      const basis = deriveLinearSalesBasis(row);
+      return column.fieldname === "set_count"
+        ? Boolean(basis)
+        : column.fieldname === "height_m"
+          ? basis === "RAY"
+          : column.fieldname === "width_m"
+            ? basis === "TRUC"
+            : false;
+    })())));
 }
 
 /** Một bộ cột chuẩn dùng chung cho cả bảng trong form và bảng lớn. */
@@ -756,6 +791,23 @@ export function ChildGrid(props: ChildGridProps) {
       const itemCode = String(row.item_code ?? "").trim();
       if (isSalesTransactionGrid(childMeta)) {
         const quantity = salesQuantityForRow(row);
+        const linearBasis = deriveLinearSalesBasis(row);
+        if (linearBasis && field.fieldname === "set_count") {
+          return {
+            ...field,
+            hidden: 0,
+            depends_on: undefined,
+            mandatory_depends_on: undefined,
+            label: "Số lượng",
+            reqd: 1,
+          };
+        }
+        if (linearBasis && field.fieldname === "height_m" && linearBasis === "RAY") {
+          return { ...field, hidden: 0, depends_on: undefined, mandatory_depends_on: undefined, label: "Cao (m)", reqd: 1 };
+        }
+        if (linearBasis && field.fieldname === "width_m" && linearBasis === "TRUC") {
+          return { ...field, hidden: 0, depends_on: undefined, mandatory_depends_on: undefined, label: "Rộng (m)", reqd: 1 };
+        }
         if (field.fieldname === "width_m" && row.inventory_mode === "Thành phẩm theo m2") {
         const widthBasis = String(row.width_basis ?? "").normalize("NFC").toLocaleLowerCase("vi");
         const customerGroup = String(parentDoc?.customer_group ?? "").trim();

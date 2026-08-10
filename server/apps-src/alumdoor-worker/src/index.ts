@@ -551,6 +551,17 @@ const SALES_METRE_UOMS = new Set(["m", "mét", "met", "meter", "metre"]);
 const SALES_SET_UOMS = new Set(["bộ", "bo", "set"]);
 const SALES_PIECE_UOMS = new Set(["cây", "cay", "lá", "la", "đoạn", "doan"]);
 
+type LinearSalesBasis = "RAY" | "TRUC";
+
+/** Ray/trục dùng kích thước công trình để tính mét bán, kể cả khi Item vẫn tồn Hàng thường. */
+export function deriveLinearSalesBasis(item: { item_name?: unknown; item_code?: unknown }): LinearSalesBasis | undefined {
+  const itemName = String(item.item_name ?? "").normalize("NFC").trim().toLocaleLowerCase("vi");
+  const itemCode = String(item.item_code ?? "").normalize("NFC").trim().toLocaleLowerCase("vi");
+  if (itemName.startsWith("ray") || itemCode.includes("ray")) return "RAY";
+  if (itemName.startsWith("trục") || itemName.startsWith("truc") || itemCode.includes("truc")) return "TRUC";
+  return undefined;
+}
+
 function nearlyEqual(left: number, right: number): boolean {
   return Math.abs(left - right) <= Math.max(0.000001, Math.abs(right) * 0.000001);
 }
@@ -626,6 +637,7 @@ async function validateTransactionLines(
     const defaultUom = String(side === "purchase" ? item.default_purchase_uom ?? "" : item.default_sales_uom ?? "").trim();
     const uom = String(row.uom ?? (defaultUom || stockUom)).trim();
     const mode = String(item.inventory_mode ?? "Hàng thường");
+    const linearBasis = side === "sales" ? deriveLinearSalesBasis(item) : undefined;
     const selected = normalizedUom(uom);
     if (side === "purchase" && mode === "Nhôm cây/lá" && selected !== "kg") {
       return refuse(`${line}: nhôm cây/lá phải nhập theo Kg; số cây và chiều dài chỉ là quy cách đối chiếu.`);
@@ -717,7 +729,20 @@ async function validateTransactionLines(
         return refuse(`${line}: bán theo Bộ thì số lượng tính tiền phải bằng số bộ.`);
       }
     }
-    if (side === "sales" && mode === "Nhôm cây/lá" && SALES_METRE_UOMS.has(selected)) {
+    if (side === "sales" && linearBasis && SALES_METRE_UOMS.has(selected)) {
+      const dimension = Number(linearBasis === "RAY" ? row.height_m : row.width_m);
+      const quantityUnits = Number(row.set_count);
+      if (!Number.isFinite(dimension) || dimension <= 0) {
+        return refuse(`${line}: ${linearBasis === "RAY" ? "Ray cần nhập Cao" : "Trục cần nhập Rộng"} lớn hơn 0.`);
+      }
+      if (!Number.isFinite(quantityUnits) || quantityUnits <= 0) {
+        return refuse(`${line}: cần nhập Số lượng lớn hơn 0.`);
+      }
+      const billableLength = dimension * quantityUnits;
+      if (!nearlyEqual(quantity, billableLength)) {
+        return refuse(`${line}: SL tính tiền phải là ${billableLength.toFixed(6)} Mét = ${linearBasis === "RAY" ? "Cao" : "Rộng"} × Số lượng.`);
+      }
+    } else if (side === "sales" && mode === "Nhôm cây/lá" && SALES_METRE_UOMS.has(selected)) {
       const length = Number(row.length_m);
       const pieces = Number(row.qty_bar);
       if (!Number.isFinite(length) || length <= 0) {
