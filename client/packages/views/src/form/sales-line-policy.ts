@@ -23,6 +23,27 @@ export function deriveLinearSalesBasis(row: Doc | Record<string, unknown>): Line
   return undefined;
 }
 
+/**
+ * Phụ kiện Bộ ba lá đáy và Lá đầu bán theo mét lấy chiều rộng làm cơ sở.
+ * Đây là quy tắc thương mại riêng của hai mã, không phải quy tắc chung cho
+ * toàn bộ nhóm Nhôm cây/lá.
+ */
+export function isWidthQuantitySalesItem(row: Doc | Record<string, unknown>): boolean {
+  const itemName = normalized(row.item_name);
+  const itemCode = normalized(row.item_code).replace(/[ _-]+/g, "");
+  return itemName.includes("bộ ba lá đáy")
+    || itemName === "lá đầu"
+    || itemCode.includes("bo3laday")
+    || itemCode === "tpa282"
+    || itemCode.includes("ladau");
+}
+
+export function isOrdinaryQuantitySalesItem(row: Doc | Record<string, unknown>): boolean {
+  return normalized(row.inventory_mode) === "hàng thường"
+    && !deriveLinearSalesBasis(row)
+    && !isWidthQuantitySalesItem(row);
+}
+
 /** Chỉ mã cửa được mặc định 15%; ray/trục và phụ kiện luôn bắt đầu từ 0%. */
 export function defaultSalesDiscountPercent(row: Doc | Record<string, unknown>): number {
   if (deriveLinearSalesBasis(row)) return 0;

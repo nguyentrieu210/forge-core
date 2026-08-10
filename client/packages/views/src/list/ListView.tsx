@@ -443,7 +443,7 @@ export function ListView(props: ListViewProps) {
           "cursor-pointer bg-card [&>td]:align-top",
           // Run3: hàng đang mở = viền trái 2px primary + nền soft + đậm hơn (Frappe/Linear)
           isActive && "bg-accent font-medium shadow-[inset_2px_0_0_var(--primary)] hover:bg-accent",
-          isWarning && "bg-amber-50 hover:bg-amber-100 [&>td]:!bg-amber-50 hover:[&>td]:!bg-amber-100",
+          isWarning && "bg-red-50 hover:bg-red-100 [&>td]:!bg-red-50 hover:[&>td]:!bg-red-100",
         )}
         onClick={() => onRowClick?.(row)}
         onKeyDown={(event) => {
@@ -484,7 +484,7 @@ export function ListView(props: ListViewProps) {
         {hasRowActions ? (
           <TableCell className={cn("w-28 px-2 text-center", compact && "py-1")}>
             {Number(row.docstatus ?? 0) === 0 ? <div className="flex items-center justify-center gap-1">
-              {isWarning ? <Badge variant="outline" className="border-amber-300 bg-amber-100 text-amber-900">Cần duyệt</Badge> : null}
+              {isWarning ? <Badge variant="outline" className="border-red-300 bg-red-100 text-red-900">Cần duyệt</Badge> : null}
               {props.onApprove && props.canApprove?.(row) ? (
                 <Button
                   type="button"
@@ -605,7 +605,7 @@ export function ListView(props: ListViewProps) {
               <article
                 key={name}
                 data-list-row={name}
-                className={cn("bg-card p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring", props.activeRow === name && "bg-accent shadow-[inset_3px_0_0_var(--primary)]", isWarning && "bg-amber-50")}
+                className={cn("bg-card p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring", props.activeRow === name && "bg-accent shadow-[inset_3px_0_0_var(--primary)]", isWarning && "bg-red-50")}
                 onClick={() => onRowClick?.(row)}
                 onKeyDown={(event) => {
                   if (event.target !== event.currentTarget) return;
@@ -622,7 +622,7 @@ export function ListView(props: ListViewProps) {
                   </span>
                   <div className="min-w-0 flex-1">
                     {titleCol ? <TitleCell row={row} col={titleCol} imgField={imgField} displayValues={props.displayValues} onUploadImage={props.onUploadImage} /> : <span className="font-medium">{name}</span>}
-                    {isWarning ? <Badge variant="outline" className="mt-1 border-amber-300 bg-amber-100 text-amber-900">Chiết khấu cần duyệt</Badge> : null}
+                    {isWarning ? <Badge variant="outline" className="mt-1 border-red-300 bg-red-100 text-red-900">Cần duyệt</Badge> : null}
                     {detailCols.length ? <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
                       {detailCols.map((column) => <div key={column.fieldname} className="min-w-0"><dt className="truncate text-muted-foreground">{column.label}</dt><dd className="mt-0.5 truncate font-medium">{column.fieldtype === "Link" && column.options ? <LinkCell doctype={column.options} value={row[column.fieldname]} displayValues={props.displayValues} /> : renderCell(row[column.fieldname], column, props.fmt)}</dd></div>)}
                     </dl> : null}

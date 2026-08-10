@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { defaultSalesDiscountPercent, deriveItemColorPolicy, deriveLinearSalesBasis, deriveSalesQuantity } from "../dist/form/ChildGrid.js";
+import { defaultSalesDiscountPercent, deriveItemColorPolicy, deriveLinearSalesBasis, deriveSalesQuantity, isOrdinaryQuantitySalesItem, isWidthQuantitySalesItem } from "../dist/form/ChildGrid.js";
 
 test("only door items default to 15 percent while ray/trục stay at zero", () => {
   assert.equal(defaultSalesDiscountPercent({ item_code: "TP-AL752N", item_group: "Cửa CN Đức", inventory_mode: "Thành phẩm theo m2" }), 15);
@@ -47,6 +47,20 @@ test("Trục Hàng thường bán Mét uses Rộng × Số lượng", () => {
   assert.equal(result.quantity, 4.5);
 });
 
+test("width-based leaf accessories use width times quantity", () => {
+  assert.equal(isWidthQuantitySalesItem({ item_code: "TP-BO3LADAY", item_name: "BỘ BA LÁ ĐÁY" }), true);
+  assert.equal(isWidthQuantitySalesItem({ item_code: "TP-A282", item_name: "LÁ ĐẦU" }), true);
+  const result = deriveSalesQuantity({ item_code: "TP-BO3LADAY", inventory_mode: "Hàng thường", uom: "Mét", width_m: 1.25, set_count: 3 });
+  assert.equal(result.quantity, 3.75);
+});
+
+test("ordinary sales items enter quantity and mirror it to billable weight", () => {
+  assert.equal(isOrdinaryQuantitySalesItem({ item_code: "MOTOR-01", inventory_mode: "Hàng thường" }), true);
+  const result = deriveSalesQuantity({ item_code: "MOTOR-01", inventory_mode: "Hàng thường", uom: "Cái", set_count: 4 });
+  assert.equal(result.quantity, 4);
+  assert.equal(result.derived, true);
+});
+
 test("door quantity only trusts the Cutting Policy snapshot", () => {
   const pending = deriveSalesQuantity({
     inventory_mode: "Thành phẩm theo m2",
@@ -72,9 +86,9 @@ test("door quantity only trusts the Cutting Policy snapshot", () => {
 
 test("ordinary accessories keep direct quantity in their selected UOM", () => {
   const result = deriveSalesQuantity({ inventory_mode: "Hàng thường", uom: "Bộ", qty: 2 });
-  assert.equal(result.policy, "DIRECT");
-  assert.equal(result.derived, false);
-  assert.equal(result.quantity, undefined);
+  assert.equal(result.policy, "PIECES");
+  assert.equal(result.derived, true);
+  assert.equal(result.quantity, 2);
 });
 
 test("sheet/glass quantity stays directly editable until it has an explicit policy", () => {

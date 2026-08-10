@@ -138,6 +138,14 @@ export class SalesOrderController extends BaseController<SalesOrderData> {
     const discountPolicy = locksOrderPricing
       ? await applyAlumdoorDiscountPolicy(context, pricedItems)
       : { items: pricedItems, requiresApproval: false };
+    const pricingRequiresApproval = discountPolicy.requiresApproval
+      || orderDiscountMicros !== 0
+      || pricedItems.some((item) => item.rate_requires_approval === true);
+    if (context.command.action === "submit" && locksOrderPricing && pricingRequiresApproval) {
+      const approver = context.command.actor.user_id === "Administrator"
+        || context.command.actor.roles.some((role) => role === "Sales Manager" || role === "System Manager");
+      if (!approver) throw errors.permission("Đơn hàng có đơn giá/chiết khấu khác chính sách; Sales Manager phải duyệt trước khi bán.");
+    }
     const totals = calculateSalesTotals(discountPolicy.items, input.taxes ?? [], currencyScale, {
       use_priced_quantity: true,
       apply_discount_on: locksOrderPricing ? "Net Total" : input.apply_discount_on,
@@ -171,7 +179,7 @@ export class SalesOrderController extends BaseController<SalesOrderData> {
       ...input,
       // Đơn cũ có thể còn giảm giá ở đầu đơn. Từ nay cả kiểu giảm đó cũng phải đi duyệt,
       // vì chính sách Alumdoor chỉ cho phép 15% trên dòng Cửa Đức, 0% ở dòng khác.
-      discount_requires_approval: discountPolicy.requiresApproval || orderDiscountMicros !== 0,
+      discount_requires_approval: pricingRequiresApproval,
       currency_scale: currencyScale,
       ...adjustedTotals,
       ...baseTotals(adjustedTotals, currency, currencyScale),
@@ -831,6 +839,7 @@ interface ResolvedCurrencyContext {
 
 async function applySellingPricing<T extends SalesItem>(context: ControllerContext<JsonObject>, items: T[], priceList: string | undefined, currency: string, postingDate: string, customer: string, customerGroup?: string): Promise<T[]> {
   if (!priceList) return items;
+  const allowsManualOverride = String(context.command.document.company ?? "").trim() === "ALUMDOOR";
   return Promise.all(items.map(async (item) => {
     // Bậc giá phải chạy trên đúng trục của đơn giá. Hầu hết dòng dùng transaction qty;
     // catch-weight dùng số kg thực mà UOM core đã chụp vào priced_qty_micros.
@@ -839,7 +848,21 @@ async function applySellingPricing<T extends SalesItem>(context: ControllerConte
       ? item.rate_uom.trim()
       : typeof item.uom === "string" ? item.uom.trim() : "";
     const price = await resolveServerPrice(context, { itemCode:item.item_code, qtyMicros, postingDate, priceList, documentCurrency:currency, ...(priceUom ? { uom:priceUom } : {}), partyType:"Customer", party:customer, ...(customerGroup?{customerGroup}:{}) });
-    return { ...item, rate:price.rate, rate_minor:price.rate_minor, item_price:price.item_price, ...(price.pricing_rule?{pricing_rule:price.pricing_rule}:{}), ...(price.discount_percentage?{discount_percentage:price.discount_percentage}:{}) };
+    const hasSubmittedRate = allowsManualOverride && item.rate !== undefined && item.rate !== null && String(item.rate).trim() !== "";
+    const submittedRateMinor = hasSubmittedRate
+      ? toScaledInt(item.rate, price.currency_scale, `${item.item_code}.rate`)
+      : price.rate_minor;
+    const rateChanged = hasSubmittedRate && submittedRateMinor !== price.rate_minor;
+    return {
+      ...item,
+      rate: rateChanged ? item.rate : price.rate,
+      rate_minor: rateChanged ? submittedRateMinor : price.rate_minor,
+      standard_rate: price.rate,
+      rate_requires_approval: rateChanged,
+      item_price: price.item_price,
+      ...(price.pricing_rule?{pricing_rule:price.pricing_rule}:{}),
+      ...(price.discount_percentage?{discount_percentage:price.discount_percentage}:{}),
+    };
   }));
 }
 

@@ -563,6 +563,22 @@ export function deriveLinearSalesBasis(item: { item_name?: unknown; item_code?: 
   return undefined;
 }
 
+function isWidthQuantitySalesItem(item: { item_name?: unknown; item_code?: unknown }): boolean {
+  const itemName = String(item.item_name ?? "").normalize("NFC").trim().toLocaleLowerCase("vi");
+  const itemCode = String(item.item_code ?? "").normalize("NFC").trim().toLocaleLowerCase("vi").replace(/[ _-]+/g, "");
+  return itemName.includes("bộ ba lá đáy")
+    || itemName === "lá đầu"
+    || itemCode.includes("bo3laday")
+    || itemCode === "tpa282"
+    || itemCode.includes("ladau");
+}
+
+function isOrdinaryQuantitySalesItem(item: { item_name?: unknown; item_code?: unknown; inventory_mode?: unknown }): boolean {
+  return String(item.inventory_mode ?? "").normalize("NFC").trim() === "Hàng thường"
+    && !deriveLinearSalesBasis(item)
+    && !isWidthQuantitySalesItem(item);
+}
+
 function nearlyEqual(left: number, right: number): boolean {
   return Math.abs(left - right) <= Math.max(0.000001, Math.abs(right) * 0.000001);
 }
@@ -639,6 +655,8 @@ async function validateTransactionLines(
     const uom = String(row.uom ?? (defaultUom || stockUom)).trim();
     const mode = String(item.inventory_mode ?? "Hàng thường");
     const linearBasis = side === "sales" ? deriveLinearSalesBasis(item) : undefined;
+    const widthQuantityItem = side === "sales" ? isWidthQuantitySalesItem(item) : false;
+    const ordinaryQuantityItem = side === "sales" ? isOrdinaryQuantitySalesItem(item) : false;
     const selected = normalizedUom(uom);
     if (side === "purchase" && mode === "Nhôm cây/lá" && selected !== "kg") {
       return refuse(`${line}: nhôm cây/lá phải nhập theo Kg; số cây và chiều dài chỉ là quy cách đối chiếu.`);
@@ -730,7 +748,28 @@ async function validateTransactionLines(
         return refuse(`${line}: bán theo Bộ thì số lượng tính tiền phải bằng số bộ.`);
       }
     }
-    if (side === "sales" && linearBasis && SALES_METRE_UOMS.has(selected)) {
+    if (side === "sales" && ordinaryQuantityItem) {
+      const enteredCount = Number(row.set_count ?? quantity);
+      if (!Number.isFinite(enteredCount) || enteredCount <= 0) {
+        return refuse(`${line}: Số lượng phải lớn hơn 0.`);
+      }
+      if (!nearlyEqual(quantity, enteredCount)) {
+        return refuse(`${line}: Khối lượng phải bằng Số lượng (${enteredCount}).`);
+      }
+    } else if (side === "sales" && widthQuantityItem && SALES_METRE_UOMS.has(selected)) {
+      const width = Number(row.width_m);
+      const quantityUnits = Number(row.set_count ?? 1);
+      if (!Number.isFinite(width) || width <= 0) {
+        return refuse(`${line}: Bộ 3 lá đáy/Lá đầu cần nhập Rộng lớn hơn 0.`);
+      }
+      if (!Number.isFinite(quantityUnits) || quantityUnits <= 0) {
+        return refuse(`${line}: cần nhập Số lượng lớn hơn 0.`);
+      }
+      const billableLength = width * quantityUnits;
+      if (!nearlyEqual(quantity, billableLength)) {
+        return refuse(`${line}: SL tính tiền phải là ${billableLength.toFixed(6)} Mét = Rộng × Số lượng.`);
+      }
+    } else if (side === "sales" && linearBasis && SALES_METRE_UOMS.has(selected)) {
       const dimension = Number(linearBasis === "RAY" ? row.height_m : row.width_m);
       const quantityUnits = Number(row.set_count);
       if (!Number.isFinite(dimension) || dimension <= 0) {

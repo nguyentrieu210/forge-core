@@ -13,8 +13,8 @@ import {
   Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, FileButton, Input,
   Table, TableHeader, TableBody, TableRow, TableHead, TableCell, useT,
 } from "@metaforge/ui";
-import { defaultSalesDiscountPercent, deriveLinearSalesBasis, type LinearSalesBasis } from "./sales-line-policy.js";
-export { defaultSalesDiscountPercent, deriveLinearSalesBasis, type LinearSalesBasis } from "./sales-line-policy.js";
+import { defaultSalesDiscountPercent, deriveLinearSalesBasis, isOrdinaryQuantitySalesItem, isWidthQuantitySalesItem, type LinearSalesBasis } from "./sales-line-policy.js";
+export { defaultSalesDiscountPercent, deriveLinearSalesBasis, isOrdinaryQuantitySalesItem, isWidthQuantitySalesItem, type LinearSalesBasis } from "./sales-line-policy.js";
 
 interface GridLayout {
   w: Record<string, number>;
@@ -28,11 +28,11 @@ const EMPTY_LAYOUT: GridLayout = { w: {}, order: [], hidden: [], pinned: [], lab
 
 const PURCHASE_COMPACT_FIELDS = ["item_code", "qty", "uom", "rate", "amount"];
 const SALES_COMPACT_FIELDS = [
-  "item_code", "color", "height_m", "width_m", "set_count", "sales_mode", "has_butterfly_bracket",
+  "item_code", "color", "sales_mode", "height_m", "width_m", "set_count", "has_butterfly_bracket",
   "length_m", "qty_bar", "uom", "qty", "rate", "discount_percentage", "amount",
 ];
 const SALES_ORDER_ITEM_FULL_FIELDS = [
-  "item_code", "door_type", "color", "height_m", "width_m", "mesh_height_m", "set_count", "sales_mode",
+  "item_code", "door_type", "color", "sales_mode", "height_m", "width_m", "mesh_height_m", "set_count",
   "has_butterfly_bracket", "leaf_variant", "leaf_height_deduction_m", "leaf_divisor_m", "leaf_rounding",
   "leaf_count", "single_layer_leaf_count", "double_layer_leaf_count", "cut_width_m", "billable_area_sqm",
   "estimated_weight_kg", "estimated_minutes", "formula_policy", "formula_version", "formula_explanation",
@@ -157,6 +157,26 @@ export function deriveSalesQuantity(row: Doc): SalesQuantityPreview {
   const mode = String(row.inventory_mode ?? "").normalize("NFC").trim();
   const uom = normalizedUom(row.uom);
   const sets = salesSetCount(row);
+
+  if (isWidthQuantitySalesItem(row) && METRE_UOMS.has(uom)) {
+    const width = finitePositive(row.width_m);
+    return {
+      policy: "LENGTH_X_PIECES",
+      derived: true,
+      ...(width && sets ? { quantity: roundSalesQuantity(width * sets) } : {}),
+      label: "Rộng × Số lượng (m)",
+    };
+  }
+
+  if (isOrdinaryQuantitySalesItem(row)) {
+    const quantity = row.set_count === undefined ? finitePositive(row.qty) : sets;
+    return {
+      policy: "PIECES",
+      derived: true,
+      ...(quantity ? { quantity } : {}),
+      label: "Số lượng",
+    };
+  }
 
   const linearBasis = deriveLinearSalesBasis(row);
   if (linearBasis && METRE_UOMS.has(uom)) {
@@ -285,12 +305,13 @@ function visibleColumns(
       { doc: row, parent: parentDoc, roles, assumeWritable: true },
     ).visible || (meta.name === "Sales Order Item" && (() => {
       const basis = deriveLinearSalesBasis(row);
+      const widthItem = isWidthQuantitySalesItem(row);
       return column.fieldname === "set_count"
-        ? Boolean(basis)
+        ? Boolean(basis || widthItem || isOrdinaryQuantitySalesItem(row))
         : column.fieldname === "height_m"
           ? basis === "RAY"
           : column.fieldname === "width_m"
-            ? basis === "TRUC"
+            ? basis === "TRUC" || widthItem
             : false;
     })())));
 }
@@ -744,7 +765,7 @@ export function ChildGrid(props: ChildGridProps) {
   ];
   const ITEM_DERIVED_FIELDS = [
   "conversion_factor", "uom", "stock_uom", "stock_qty", "inventory_mode", "measurement_profile", "min_area_sqm",
-  "item_name", "description", "color", "colour", "rate", "amount",
+  "item_name", "description", "color", "colour", "rate", "standard_rate", "rate_requires_approval", "amount",
   "discount_percentage", "discount_amount", "standard_amount",
     "formula_policy", "formula_version", "formula_explanation", "width_basis", "cut_width_m", "billable_area_sqm",
     "door_type", "leaf_variant", "leaf_height_deduction_m", "leaf_divisor_m", "leaf_rounding", "leaf_count",
@@ -779,6 +800,8 @@ export function ChildGrid(props: ChildGridProps) {
       if (isSalesTransactionGrid(childMeta)) {
         const quantity = salesQuantityForRow(row);
         const linearBasis = deriveLinearSalesBasis(row);
+        const widthItem = isWidthQuantitySalesItem(row);
+        const ordinaryItem = isOrdinaryQuantitySalesItem(row);
         if (linearBasis && field.fieldname === "set_count") {
           return {
             ...field,
@@ -794,6 +817,18 @@ export function ChildGrid(props: ChildGridProps) {
         }
         if (linearBasis && field.fieldname === "width_m" && linearBasis === "TRUC") {
           return { ...field, hidden: 0, depends_on: undefined, mandatory_depends_on: undefined, label: "Rộng (m)", reqd: 1 };
+        }
+        if (widthItem && field.fieldname === "set_count") {
+          return { ...field, hidden: 0, depends_on: undefined, mandatory_depends_on: undefined, label: "Số lượng", reqd: 1 };
+        }
+        if (widthItem && field.fieldname === "width_m") {
+          return { ...field, hidden: 0, depends_on: undefined, mandatory_depends_on: undefined, label: "Rộng (m)", reqd: 1 };
+        }
+        if (ordinaryItem && field.fieldname === "set_count") {
+          return { ...field, hidden: 0, depends_on: undefined, mandatory_depends_on: undefined, label: "Số lượng", reqd: 1 };
+        }
+        if (ordinaryItem && field.fieldname === "qty") {
+          return { ...field, read_only: 1, read_only_depends_on: undefined, label: "Khối lượng" };
         }
         if (field.fieldname === "width_m" && row.inventory_mode === "Thành phẩm theo m2") {
         const widthBasis = String(row.width_basis ?? "").normalize("NFC").toLocaleLowerCase("vi");
@@ -834,6 +869,9 @@ export function ChildGrid(props: ChildGridProps) {
           ["UOM", "name", "in", allowed.length ? allowed : ["__NO_CONFIGURED_SALES_UOM__"]],
         ]),
       };
+    }
+    if ((field.fieldname === "color" || field.fieldname === "colour") && deriveLinearSalesBasis(row) === "TRUC") {
+      return { ...field, hidden: 1, reqd: 0, read_only: 1, depends_on: undefined, mandatory_depends_on: undefined };
     }
     if (field.fieldname !== "color" && field.fieldname !== "colour") return field;
     const allowed = allowedColorsByItem[itemCode] ?? [];
@@ -1163,11 +1201,20 @@ export function ChildGrid(props: ChildGridProps) {
         && DOOR_FORMULA_INPUTS.has(fieldname)
         ? Object.fromEntries(DOOR_FORMULA_OUTPUTS.filter((name) => name in r).map((name) => [name, undefined]))
         : {};
+      const rateApproval = childMeta.name === "Sales Order Item" && fieldname === "rate"
+        ? (() => {
+            const entered = Number(value);
+            const baseline = Number(r.standard_rate);
+            if (!Number.isFinite(entered) || !Number.isFinite(baseline)) return false;
+            return Math.abs(entered - baseline) > Math.max(0.000001, Math.abs(baseline) * 0.000001);
+          })()
+        : r.rate_requires_approval;
       const updated = {
         ...r,
         ...reset,
         ...resetDoorFormula,
         [fieldname]: value,
+        ...(fieldname === "rate" ? { rate_requires_approval: rateApproval } : {}),
         // Hệ số thuộc về CẶP Item + UOM. Đổi một trong hai mà giữ hệ số cũ là cách tạo
         // tồn sai nhưng chứng từ vẫn hợp lệ, nên xoá để server tra lại từ master.
         ...((fieldname === "item_code" || fieldname === "uom") && "conversion_factor" in r
@@ -1278,7 +1325,14 @@ export function ChildGrid(props: ChildGridProps) {
     const measurementProfile = profileName && services.fetchDocument
       ? await services.fetchDocument("Measurement Profile", profileName).catch(() => undefined)
       : undefined;
-    const colorPolicy = deriveItemColorPolicy(
+    const isTrucSalesItem = deriveLinearSalesBasis({
+      ...base[rowIdx],
+      item_code: itemCode,
+      item_name: patch.item_name ?? item?.item_name,
+    }) === "TRUC";
+    const colorPolicy = isTrucSalesItem
+      ? { required: false, visible: false }
+      : deriveItemColorPolicy(
       inventoryMode,
       measurementProfile?.require_color,
       allowedColors.length,
@@ -1290,7 +1344,7 @@ export function ChildGrid(props: ChildGridProps) {
         : { ...current, [itemCode]: colorPolicy };
     });
     const currentColor = String(base[rowIdx]?.color ?? base[rowIdx]?.colour ?? "").trim();
-    if (currentColor && !allowedColors.includes(currentColor)) {
+    if (isTrucSalesItem || (currentColor && !allowedColors.includes(currentColor))) {
       if (has("color")) patch.color = undefined;
       if (has("colour")) patch.colour = undefined;
     }
@@ -1381,13 +1435,24 @@ export function ChildGrid(props: ChildGridProps) {
           });
         }
         if (parentDoc?.selling_price_list && has("rate")) {
-          patch.rate = salesContext.price_missing ? undefined : salesContext.rate;
+          const baseline = salesContext.price_missing ? undefined : salesContext.rate;
+          const entered = Number(base[rowIdx]?.rate);
+          const previousBaseline = Number(base[rowIdx]?.standard_rate);
+          const manuallyChanged = Number.isFinite(entered) && Number.isFinite(previousBaseline)
+            && Math.abs(entered - previousBaseline) > Math.max(0.000001, Math.abs(previousBaseline) * 0.000001);
+          patch.standard_rate = baseline;
+          patch.rate_requires_approval = manuallyChanged;
+          if (!manuallyChanged) patch.rate = baseline;
         }
       } catch {
         if (has("available_qty")) patch.available_qty = undefined;
         if (has("available_stock_qty")) patch.available_stock_qty = undefined;
         if (has("available_stock_uom")) patch.available_stock_uom = undefined;
-        if (parentDoc?.selling_price_list && has("rate")) patch.rate = undefined;
+        if (parentDoc?.selling_price_list && has("rate")) {
+          patch.standard_rate = undefined;
+          patch.rate = undefined;
+          patch.rate_requires_approval = false;
+        }
         if (has("availability_status")) patch.availability_status = "Không đọc được tồn / giá";
       }
     }
@@ -1440,7 +1505,8 @@ export function ChildGrid(props: ChildGridProps) {
       "available_qty", "available_stock_qty", "available_stock_uom", "availability_status",
     ]);
     if (parentDoc?.selling_price_list) {
-      authoritativeItemFields.add("rate");
+      authoritativeItemFields.add("standard_rate");
+      authoritativeItemFields.add("rate_requires_approval");
       authoritativeItemFields.add("conversion_factor");
     }
     const safePatch = Object.fromEntries(Object.entries(patch).filter(([fieldname]) => {
@@ -2013,16 +2079,15 @@ export function ChildGrid(props: ChildGridProps) {
                   // KẾ THỪA từ cha (DocType con permissions rỗng) — grid đã gate bằng readOnly field cha
                   // (H1). Vẫn tôn trọng read_only/read_only_depends_on/docstatus + masked_fields server.
                   const rf = resolveField(gridField, childMeta, { doc: row, parent: parentDoc, roles, assumeWritable: true });
-                  // Sales Order prices are authoritative from Item Price (price list + item + UOM).
-                  // Keep this lock in code as well as metadata so stale tenant metadata cannot
-                  // expose a writable rate during a rolling release.
-                  const serverPricedSalesField = childMeta.name === "Sales Order Item"
+                  // Sales Order starts from Item Price (price list + item + UOM), then permits
+                  // an explicit override. The server records the difference for approval.
+                  const manualSalesPriceField = childMeta.name === "Sales Order Item"
                     && Boolean(parentDoc?.selling_price_list)
                     && c.fieldname === "rate";
-                  const cellReadOnly = Boolean(readOnly || rf.readOnly || serverPricedSalesField || (expanded && !rf.visible));
+                  const cellReadOnly = Boolean(readOnly || (rf.readOnly && !manualSalesPriceField) || (expanded && !rf.visible));
                   const cellHint = !rf.visible
                     ? "Không áp dụng cho mặt hàng này"
-                    : (rf.readOnly || serverPricedSalesField)
+                    : (rf.readOnly && !manualSalesPriceField)
                       ? "Hệ thống tự tính hoặc tự điền"
                       : "Có thể nhập";
                   /**
@@ -2341,16 +2406,27 @@ export function ChildGrid(props: ChildGridProps) {
           : [];
       })
     : [];
+  const priceApprovalWarnings = childMeta.name === "Sales Order Item"
+    ? rows.flatMap((row, index) => row.item_code && row.rate_requires_approval === true
+      ? [`Dòng ${index + 1} (${String(row.item_code)}): đơn giá nhập khác bảng giá áp dụng`]
+      : [])
+    : [];
+  const priceApprovalNotice = priceApprovalWarnings.length ? (
+    <div className="animate-pulse rounded-md border-2 border-red-700 bg-red-100 px-3 py-2 text-sm font-medium text-red-950 shadow-sm ring-2 ring-red-600/50 dark:border-red-500 dark:bg-red-950/60 dark:text-red-50 dark:ring-red-400/50" role="alert">
+      <span className="font-semibold">Đơn giá cần duyệt trước khi bán:</span> {priceApprovalWarnings.join(" · ")}
+    </div>
+  ) : null;
   const discountPolicyNotice = discountPolicyWarnings.length ? (
-    <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950" role="status">
+    <div className="animate-pulse rounded-md border-2 border-red-700 bg-red-100 px-3 py-2 text-sm font-medium text-red-950 shadow-sm ring-2 ring-red-600/50 dark:border-red-500 dark:bg-red-950/60 dark:text-red-50 dark:ring-red-400/50" role="alert">
       <span className="font-semibold">Chiết khấu cần duyệt:</span> {discountPolicyWarnings.join(" · ")}
     </div>
   ) : null;
+  const approvalNotice = <>{priceApprovalNotice}{discountPolicyNotice}</>;
 
   if (expanded) {
     return (
       <div className="mf-grid space-y-2">
-        {discountPolicyNotice}
+        {approvalNotice}
         <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
           Đang nhập ở bảng lớn — {rows.length} dòng.
         </div>
@@ -2398,7 +2474,7 @@ export function ChildGrid(props: ChildGridProps) {
 
   return (
     <div className="mf-grid space-y-2">
-      {discountPolicyNotice}
+      {approvalNotice}
       {table}
       {toolbar}
       {columnDialog}

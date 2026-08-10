@@ -194,7 +194,8 @@ export function FormView(props: FormViewProps) {
     if (!form.formState.isDirty) return;
     const requiresApproval = (salesOrderItems ?? []).some((item) => {
       const expected = defaultSalesDiscountPercent(item);
-      return Number(item.discount_percentage ?? 0) !== expected;
+      return item.rate_requires_approval === true
+        || Number(item.discount_percentage ?? 0) !== expected;
     });
     if (Boolean(form.getValues("discount_requires_approval")) !== requiresApproval) {
       form.setValue("discount_requires_approval", requiresApproval, { shouldDirty: true });

@@ -22,6 +22,10 @@ export interface SalesItem extends UomLine {
   batch_no?: string;
   serial_nos?: string[];
   item_price?: string;
+  /** Price-list baseline retained when a salesperson overrides the line rate. */
+  standard_rate?: DecimalInput;
+  /** Server-derived flag: submitted rate differs from the active price list. */
+  rate_requires_approval?: boolean;
   pricing_rule?: string;
   discount_percentage?: string;
   /** Source Quotation child row. Required when a Sales Order declares against_quotation. */
@@ -97,7 +101,7 @@ export interface SalesOrderData extends SalesTotalsData, CurrencyContextData {
   /** Server-owned amendment generation; starts at 1 and increments from amended_from. */
   revision_no?: number;
   items: SalesItem[];
-  /** Server-derived: a line discount differs from Alumdoor's standard policy and needs approval. */
+  /** Server-derived: a line price/discount differs from Alumdoor's standard policy and needs approval. */
   discount_requires_approval?: boolean;
   taxes?: TaxRow[];
   delivered_percentage?: string;
