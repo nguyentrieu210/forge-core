@@ -77,6 +77,9 @@ test("AlumDoor QR station stores a version reference, never signing material", a
   const station = manifest.doctypes.find((meta) => meta.name === "AlumDoor QR Station");
   assert.equal(field(station, "secret_version")?.default, 1);
   assert.equal(field(station, "secret_version")?.read_only, true);
+  assert.equal(field(station, "secret_version")?.hidden, true);
+  assert.equal(field(station, "secret_version")?.editMode, "hidden");
+  assert.equal(field(station, "secret_version")?.serverEnforced, true);
   assert.equal(field(station, "policy")?.options, "AlumDoor Attendance Policy");
   assert.equal(station?.fields.some((entry) => /secret|token|private.?key/i.test(entry.fieldname) && entry.fieldname !== "secret_version"), false);
 });
