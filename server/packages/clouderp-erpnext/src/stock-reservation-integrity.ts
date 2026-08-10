@@ -2,7 +2,7 @@ import type { JsonObject } from "../../contracts/src/index.js";
 import { requireLeafWarehouse } from "../../clouderp-stock/src/index.js";
 import { errors } from "../../core/src/index.js";
 import type { ControllerContext } from "../../document-kernel/src/index.js";
-import { toScaledInt } from "../../money/src/index.js";
+import { fromScaledInt, toScaledInt } from "../../money/src/index.js";
 import { StockReservationController } from "./alumdoor-inventory.js";
 
 type ReservationContext = Parameters<StockReservationController["normalize"]>[0];
@@ -70,6 +70,102 @@ async function assertReservationWarehouseScope(context: ReservationContext, inpu
   );
 }
 
+function reservationsCompete(request: ReservationData, other: ReservationData): boolean {
+  if (other.item_code !== request.item_code) return false;
+  if (request.color && other.color && other.color !== request.color) return false;
+  if (request.condition && other.condition && other.condition !== request.condition) return false;
+  if (request.warehouse && other.warehouse && other.warehouse !== request.warehouse) return false;
+  return true;
+}
+
+/**
+ * A single-threshold availability check is insufficient for variable-length stock.
+ *
+ * Example: one 5m bar exists. A 3m reservation already promises it, then a 5m reservation
+ * arrives. Looking only at the new 5m threshold sees one 5m bar and zero previous >=5m
+ * reservations, so both promises would be accepted against the same physical bar.
+ *
+ * Feasibility for nested length classes is equivalent to checking every active breakpoint:
+ * for each L, demand whose minimum length is >= L must not exceed stock whose length is >= L.
+ */
+export async function assertReservationFeasibleAcrossThresholds(
+  context: ReservationContext,
+  request: ReservationData,
+  excludeName: string,
+): Promise<void> {
+  if (stateOf(request.state) !== "Đang giữ") return;
+
+  const requestThreshold = toScaledInt(request.min_length_m, 6, "min_length_m");
+  const requestQty = toScaledInt(request.qty_reserved, 6, "qty_reserved");
+  const positions = await context.reader.listTrackedStockPositions(
+    context.command.tenant_id,
+    request.item_code,
+  );
+  const eligible: Array<{ qtyMicros: number; lengthMicros: number }> = [];
+
+  for (const position of positions) {
+    if (position.qty_micros <= 0) continue;
+    if (request.warehouse && position.warehouse !== request.warehouse) continue;
+    const batch = await context.reader.getMasterRecordData(
+      context.command.tenant_id,
+      "Batch",
+      position.batch_no,
+    );
+    if (!batch || (batch.item_code && batch.item_code !== request.item_code)) continue;
+    if (request.color && batch.color !== request.color) continue;
+    if (request.condition && batch.condition !== request.condition) continue;
+    const warehouse = await context.reader.getMasterRecordData(
+      context.command.tenant_id,
+      "Warehouse",
+      position.warehouse,
+    );
+    if (warehouse?.stock_role !== "Kho chính") continue;
+    const lengthMicros = toScaledInt(batch.length_m, 6, `Batch ${position.batch_no}.length_m`);
+    eligible.push({ qtyMicros: position.qty_micros, lengthMicros });
+  }
+
+  const documents = await context.reader.listDocumentsByDoctype<ReservationData>(
+    context.command.tenant_id,
+    "Stock Reservation",
+  );
+  const active = documents.filter((document) => {
+    if (document.name === excludeName) return false;
+    if (stateOf(document.data.state) !== "Đang giữ") return false;
+    if (document.data.expires_at && document.data.expires_at <= context.now) return false;
+    return reservationsCompete(request, document.data);
+  });
+
+  const thresholds = new Set<number>([requestThreshold]);
+  for (const document of active) {
+    thresholds.add(toScaledInt(document.data.min_length_m, 6, "min_length_m"));
+  }
+
+  for (const threshold of [...thresholds].sort((left, right) => left - right)) {
+    const stockMicros = eligible
+      .filter((position) => position.lengthMicros >= threshold)
+      .reduce((total, position) => total + position.qtyMicros, 0);
+    const alreadyReservedMicros = active
+      .filter((document) => toScaledInt(document.data.min_length_m, 6, "min_length_m") >= threshold)
+      .reduce((total, document) => total + toScaledInt(document.data.qty_reserved, 6, "qty_reserved"), 0);
+    const newDemandMicros = requestThreshold >= threshold ? requestQty : 0;
+    const demandMicros = alreadyReservedMicros + newDemandMicros;
+
+    if (demandMicros > stockMicros) {
+      throw errors.reference(
+        `Không đủ tồn khả dụng theo cơ cấu khổ: tại ngưỡng ≥ ${fromScaledInt(threshold, 6)} m `
+        + `chỉ có ${fromScaledInt(stockMicros, 6)} lá nhưng tổng giữ sẽ là ${fromScaledInt(demandMicros, 6)} lá`,
+        {
+          min_length_micros: threshold,
+          stock_qty_micros: stockMicros,
+          existing_reserved_qty_micros: alreadyReservedMicros,
+          requested_qty_micros: newDemandMicros,
+          resulting_reserved_qty_micros: demandMicros,
+        },
+      );
+    }
+  }
+}
+
 /**
  * Hardens the reservation lifecycle without creating another stock ledger.
  * Reservation identity is immutable; corrections release the old promise and create a new one.
@@ -86,11 +182,15 @@ export class StockReservationIntegrityController extends StockReservationControl
       if (desiredState !== "Đang giữ") {
         throw errors.lifecycle("Giữ chỗ mới phải bắt đầu ở trạng thái Đang giữ");
       }
-      return super.normalize(context);
+      const normalized = await super.normalize(context);
+      await assertReservationFeasibleAcrossThresholds(context, normalized, context.command.aggregate.name);
+      return normalized;
     }
 
     assertReservationIdentityImmutable(input, previous);
     assertActiveReservationNotZombie(context, previous, desiredState);
-    return super.normalize(context);
+    const normalized = await super.normalize(context);
+    await assertReservationFeasibleAcrossThresholds(context, normalized, context.command.aggregate.name);
+    return normalized;
   }
 }
