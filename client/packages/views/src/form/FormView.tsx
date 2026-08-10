@@ -570,6 +570,12 @@ export function FormView(props: FormViewProps) {
             const salesOrderInfoFields = isSalesOrderHeader
               ? sectionFields.filter((field) => salesOrderHeaderNames.includes(field.field.fieldname) && !["transaction_date", "delivery_date"].includes(field.field.fieldname))
               : [];
+            const salesOrderCustomerFields = isSalesOrderHeader
+              ? salesOrderInfoFields.filter((field) => field.field.fieldname === "customer")
+              : [];
+            const salesOrderOtherInfoFields = isSalesOrderHeader
+              ? salesOrderInfoFields.filter((field) => field.field.fieldname !== "customer")
+              : [];
             const salesOrderRemainderFields = isSalesOrderHeader
               ? sectionFields.filter((field) => !salesOrderHeaderNames.includes(field.field.fieldname))
               : [];
@@ -625,14 +631,6 @@ export function FormView(props: FormViewProps) {
                   </h3>
                   <span className="h-0.5 min-w-8 flex-1 bg-border/80" aria-hidden="true" />
                 </div>
-                {meta.name === "Sales Order" && si === 0 ? (
-                  <div className="mb-3 max-w-sm" data-testid="sales-order-code">
-                    <label className="mb-1.5 block text-sm font-medium text-foreground">Mã đơn hàng</label>
-                    <div className="flex min-h-10 items-center rounded-md border bg-muted/30 px-3 text-sm text-muted-foreground">
-                      {props.isNew || !doc.name || doc.name === "new" ? "Tự sinh khi lưu" : doc.name}
-                    </div>
-                  </div>
-                ) : null}
                 {/* gap-y-2.5 thay vì 4, gap-x-5 thay vì 6 — mật độ dày kiểu ERP, đọc được cả form
                     trong 1 màn thay vì phải cuộn. */}
                 {/* MỘT lưới duy nhất cho cả section (không phải 2 khối dọc lồng nhau) — nhờ vậy
@@ -645,7 +643,16 @@ export function FormView(props: FormViewProps) {
                   <>
                     <div className="grid grid-cols-1 gap-5 md:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)]">
                       <div className="min-w-0">
-                        <div className="mf-form-grid grid items-start gap-x-3 gap-y-3">{renderFields(salesOrderInfoFields)}</div>
+                        <div className="grid grid-cols-1 items-start gap-x-3 gap-y-3 md:grid-cols-2">
+                          <div className="mf-field">
+                            <label className="mb-1.5 block text-sm font-medium text-foreground">Mã đơn hàng</label>
+                            <div className="flex min-h-10 items-center rounded-md border bg-muted/30 px-3 text-sm text-muted-foreground" data-testid="sales-order-code">
+                              {props.isNew || !doc.name || doc.name === "new" ? "Tự sinh khi lưu" : doc.name}
+                            </div>
+                          </div>
+                          {renderFields(salesOrderCustomerFields)}
+                        </div>
+                        <div className="mf-form-grid mt-3 grid items-start gap-x-3 gap-y-3">{renderFields(salesOrderOtherInfoFields)}</div>
                       </div>
                       <div className="min-w-0 border-t pt-4 md:border-l md:border-t-0 md:pl-5 md:pt-0">
                         <div className="mf-form-grid grid w-full max-w-[11rem] items-start gap-y-2">{renderFields(salesOrderDateFields, "aside")}</div>
