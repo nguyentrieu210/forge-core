@@ -1,7 +1,7 @@
 {
   "id": "alumdoor-attendance",
   "name": "AlumDoor — Chấm công QR",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "metaContractVersion": 1,
   "requires": [
     { "id": "hrm", "version": "1.8.0" }
@@ -60,11 +60,23 @@
   ],
   "nav": [
     {
+      "key": "alumdoor-attendance:kiosk",
+      "label": "Màn QR chấm công",
+      "kind": "experience",
+      "icon": "scan-line",
+      "group": "Chấm công & ca",
+      "required_roles": [
+        "AlumDoor Attendance Manager",
+        "HR Manager",
+        "System Manager"
+      ]
+    },
+    {
       "key": "AlumDoor Attendance Day",
       "label": "Công ngày",
       "kind": "doctype",
-      "icon": "calendar-clock",
-      "group": "Chấm công QR",
+      "icon": "calendar",
+      "group": "Chấm công & ca",
       "required_roles": [
         "AlumDoor Attendance Viewer",
         "AlumDoor Attendance Manager",
@@ -76,8 +88,8 @@
       "key": "AlumDoor QR Station",
       "label": "Trạm QR",
       "kind": "doctype",
-      "icon": "qr-code",
-      "group": "Chấm công QR",
+      "icon": "scan-line",
+      "group": "Chấm công & ca",
       "required_roles": [
         "AlumDoor Attendance Manager",
         "HR Manager",
@@ -88,8 +100,8 @@
       "key": "AlumDoor Attendance Policy",
       "label": "Chính sách ca",
       "kind": "doctype",
-      "icon": "clock-3",
-      "group": "Chấm công QR",
+      "icon": "timer",
+      "group": "Chấm công & ca",
       "required_roles": [
         "AlumDoor Attendance Manager",
         "HR Manager",

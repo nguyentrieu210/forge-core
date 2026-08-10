@@ -19,7 +19,7 @@ test("AlumDoor attendance metadata is an isolated HRM-dependent package", async 
   const manifest = parseAppManifest(pkg);
 
   assert.equal(manifest.id, "alumdoor-attendance");
-  assert.equal(manifest.version, "0.1.0");
+  assert.equal(manifest.version, "0.1.2");
   assert.deepEqual(manifest.requires, [{ id: "hrm", version: "1.8.0" }]);
   assert.deepEqual(
     manifest.doctypes.map((meta) => meta.name).sort(),
@@ -48,6 +48,7 @@ test("AlumDoor attendance metadata is an isolated HRM-dependent package", async 
   );
   assert.ok(manifest.custom_fields.every((entry) => entry.dt === "Employee Checkin"), "slice 1 must not overlay Attendance or Payroll DocTypes");
   assert.ok(manifest.externalDocTypes.some((entry) => entry.name === "Employee Checkin" && entry.app === "hrm"));
+  assert.ok(manifest.nav.some((entry) => entry.kind === "experience" && entry.key === "alumdoor-attendance:kiosk"), "the installed package must expose the QR kiosk through the runtime-supported experience");
 });
 
 test("AlumDoor attendance daily projection is system-written and manager read-only", async () => {

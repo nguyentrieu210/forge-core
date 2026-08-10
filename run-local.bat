@@ -105,10 +105,12 @@ if errorlevel 1 (
 
 echo.
 echo === 7. Cai app vao tenant cuc bo ===
-echo   Chuoi phu thuoc: hrm -^> vn-accounting -^> alumdoor
+echo   Chuoi phu thuoc: hrm -^> alumdoor-attendance; hrm -^> vn-accounting -^> alumdoor
 set FORGE_ADMIN_PASSWORD=local-dev-password-1
 call node scripts\forge-app.mjs apps-src\hrm --origin http://127.0.0.1:!PORT! --admin dev@example.com --provision-standard >> "%LOG%" 2>&1
 if errorlevel 1 (echo [LOI] Cai hrm that bai - xem %LOG% & pause & exit /b 1)
+call node scripts\forge-app.mjs apps-src\alumdoor-attendance --origin http://127.0.0.1:!PORT! --admin dev@example.com >> "%LOG%" 2>&1
+if errorlevel 1 (echo [LOI] Cai alumdoor-attendance that bai - xem %LOG% & pause & exit /b 1)
 call node scripts\forge-app.mjs apps-src\vn-accounting --origin http://127.0.0.1:!PORT! --admin dev@example.com >> "%LOG%" 2>&1
 if errorlevel 1 (echo [LOI] Cai vn-accounting that bai - xem %LOG% & pause & exit /b 1)
 call node scripts\forge-app.mjs briefs\alumdoor-v2.json --origin http://127.0.0.1:!PORT! --admin dev@example.com >> "%LOG%" 2>&1
@@ -160,7 +162,7 @@ echo   Backend : http://localhost:!PORT!   (Desk proxy /api sang day)
 echo.
 echo   Dang nhap: dev@example.com / local-dev-password-1
 echo.
-echo   Da cai: hrm (70 doctype) + vn-accounting (13) + alumdoor (74, 57 fixture)
+echo   Da cai: hrm (70 doctype) + alumdoor-attendance (4) + vn-accounting (13) + alumdoor (74, 57 fixture)
 echo   Sales Order render bang MetaForm 4.0 - khong con React bespoke.
 echo.
 echo   Dung lai : dong hai cua so "Forge worker" va "Forge Desk".

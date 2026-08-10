@@ -31,8 +31,12 @@ const ALUMDOOR_SIDEBAR_GROUPS = new Set([
   "bao cao", "danh muc", "he thong", "quy kho",
 ]);
 
-const ALUMDOOR_HR_GROUPS = new Set(["nhan su", "vong doi nhan su", "cham cong & ca"]);
-const ALUMDOOR_HR_KEYS = new Set(["Employee", "Attendance"]);
+const ALUMDOOR_HR_GROUPS = new Set(["nhan su", "vong doi nhan su", "cham cong & ca", "cham cong qr"]);
+const ALUMDOOR_HR_KEYS = new Set([
+  "Employee",
+  "AlumDoor Attendance Day", "AlumDoor QR Station", "AlumDoor Attendance Policy",
+  "alumdoor-attendance:kiosk",
+]);
 
 const ALUMDOOR_REPORT_WORKSPACES: Record<string, string[]> = {
   "report:Đơn hàng theo khách": ["Bán hàng"],

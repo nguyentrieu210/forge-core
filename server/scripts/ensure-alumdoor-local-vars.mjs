@@ -1,12 +1,17 @@
 #!/usr/bin/env node
 /** Keep the local callback Worker on the tenant Worker's exact signing secret. */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { randomBytes } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const serverRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const tenantVars = path.join(serverRoot, "apps", "tenant-worker", ".dev.vars");
 const callbackVars = path.join(serverRoot, "apps", "purchase-qa-callback", ".dev.vars");
+// Wrangler resolves .dev.vars beside each config. The AlumDoor service therefore
+// needs its own local-only file rather than a value in tenant-worker/.dev.vars.
+const alumdoorWorkerVars = path.join(serverRoot, "apps-src", "alumdoor-worker", ".dev.vars");
+const ATTENDANCE_QR_SECRET = "ALUMDOOR_ATTENDANCE_QR_SECRET";
 
 /**
  * Local multi-Worker development shares the platform master secret.
@@ -23,6 +28,28 @@ export function useLocalMasterSecret(text) {
     .replace(/\n{3,}/g, "\n\n");
 }
 
+function isUsableSecret(value) {
+  const normalized = String(value ?? "").trim();
+  return normalized.length >= 32
+    && !/^(?:replace-with|change-me|changeme|example|todo)/i.test(normalized);
+}
+
+/**
+ * Keep an existing local QR secret stable across restarts so an already-open
+ * station does not suddenly become invalid. Generate only when the local file
+ * is missing, blank, a placeholder, or too short for an HMAC secret.
+ */
+export function ensureAttendanceQrSecret(text) {
+  const match = text.match(new RegExp(`^${ATTENDANCE_QR_SECRET}=(.*)$`, "m"));
+  if (match && isUsableSecret(match[1])) return { text, created: false };
+
+  const replacement = `${ATTENDANCE_QR_SECRET}=${randomBytes(32).toString("hex")}`;
+  const next = match
+    ? text.replace(new RegExp(`^${ATTENDANCE_QR_SECRET}=.*$`, "m"), replacement)
+    : `${text.trimEnd()}${text.trim() ? "\n" : ""}${replacement}\n`;
+  return { text: next, created: true };
+}
+
 function main() {
   if (!existsSync(tenantVars)) {
     console.error(`ALUMDOOR_LOCAL_VARS_MISSING Run ensure-dev-vars.mjs first: ${tenantVars}`);
@@ -33,7 +60,14 @@ function main() {
   mkdirSync(path.dirname(callbackVars), { recursive: true });
   writeFileSync(tenantVars, localVars);
   writeFileSync(callbackVars, localVars);
+
+  const existingAlumdoorVars = existsSync(alumdoorWorkerVars) ? readFileSync(alumdoorWorkerVars, "utf8") : "";
+  const attendanceQr = ensureAttendanceQrSecret(existingAlumdoorVars);
+  mkdirSync(path.dirname(alumdoorWorkerVars), { recursive: true });
+  writeFileSync(alumdoorWorkerVars, attendanceQr.text);
+
   console.log("  Alumdoor local Workers share the master signing secret.");
+  console.log(`  Attendance QR local secret ${attendanceQr.created ? "created" : "ready"} (not committed).`);
 }
 
 if (path.resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) main();

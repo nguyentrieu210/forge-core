@@ -32,6 +32,7 @@ const ApprovalInbox = lazy(() => import("./experiences/ApprovalInbox.js").then((
 const SocialCommerce = lazy(() => import("./experiences/SocialCommerce.js").then((module) => ({ default: module.SocialCommerce })));
 const DailyDetailedLedger = lazy(() => import("./experiences/DailyDetailedLedger.js").then((module) => ({ default: module.DailyDetailedLedger })));
 const AlumdoorOperationsCenter = lazy(() => import("./experiences/AlumdoorOperationsCenter.js").then((module) => ({ default: module.AlumdoorOperationsCenter })));
+const AlumdoorAttendanceKiosk = lazy(() => import("./experiences/AlumdoorAttendanceKiosk.js").then((module) => ({ default: module.AlumdoorAttendanceKiosk })));
 
 /**
  * The GENERIC runtime — one bundle that serves every app on the platform.
@@ -81,7 +82,7 @@ function isRenderableExperience(item: AppManifest["nav"][number], manifest: AppM
   if (separator < 1 || separator === item.key.length - 1) return false;
   const kind = item.key.slice(0, separator);
   const argument = item.key.slice(separator + 1);
-  if (kind === "approval" || kind === "calendar" || kind === "social-commerce") return true;
+  if (kind === "approval" || kind === "calendar" || kind === "social-commerce" || kind === "alumdoor-attendance") return true;
   if (kind === "action") return (manifest.actions ?? []).some((action) => action.name === argument);
   if (kind === "screen") return (manifest.screens ?? []).some((screen) => screen.name === argument);
   return false;
@@ -630,6 +631,13 @@ function ExperienceScreen({ manifest, boot, logout, nav }: ScreenProps) {
     return (
       <Shell manifest={manifest} boot={boot} logout={logout} nav={nav} active={experienceKey} breadcrumbs={[{ label: "Trung tâm vận hành" }]}>
         <AlumdoorOperationsCenter />
+      </Shell>
+    );
+  }
+  if (kind === "alumdoor-attendance") {
+    return (
+      <Shell manifest={manifest} boot={boot} logout={logout} nav={nav} active={experienceKey} breadcrumbs={[{ label: "Chấm công QR" }]}>
+        <AlumdoorAttendanceKiosk />
       </Shell>
     );
   }
