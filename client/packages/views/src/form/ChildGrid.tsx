@@ -313,8 +313,8 @@ export function defaultChildGridHiddenColumns(meta: DocTypeMeta, columns: DocFie
 
 function childGridColumnLabel(meta: DocTypeMeta, field: DocField): string {
   if (meta.name === "Sales Order Item") {
-    if (field.fieldname === "set_count") return "Số bộ";
-    if (field.fieldname === "qty") return "Số lượng";
+    if (field.fieldname === "set_count") return "Số lượng";
+    if (field.fieldname === "qty") return "Khối lượng";
   }
   if (isPurchaseGrid(meta)) {
     if (field.fieldname === "qty") return "Số lượng";
@@ -1889,8 +1889,8 @@ export function ChildGrid(props: ChildGridProps) {
                   // Giữ header nghiệp vụ ổn định; nhãn nội bộ của từng mặt hàng
                   // không được làm đổi tên cột trên đơn bán hàng.
                   if (childMeta.name === "Sales Order Item") {
-                    if (c.fieldname === "set_count") headerLabel = "Số bộ";
-                    if (c.fieldname === "qty") headerLabel = "Số lượng";
+                    if (c.fieldname === "set_count") headerLabel = "Số lượng";
+                    if (c.fieldname === "qty") headerLabel = "Khối lượng";
                   }
                   // Bảng có thể vừa có cửa vừa có ray/phụ kiện. Khi đó nhãn chung
                   // "Rộng (m)" của vật tư không được làm mất PB ray/PB nhựa của cửa.
