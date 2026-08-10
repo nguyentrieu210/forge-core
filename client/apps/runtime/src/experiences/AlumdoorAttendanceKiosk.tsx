@@ -49,6 +49,15 @@ function clampRefresh(value: unknown): number {
   return Number.isInteger(seconds) && seconds >= 5 && seconds <= 60 ? seconds : 15;
 }
 
+function refreshDelayMs(challenge: AttendanceChallenge): number {
+  const fallback = clampRefresh(challenge.refresh_after_seconds) * 1_000;
+  const expiresAt = Date.parse(challenge.expires_at);
+  if (!Number.isFinite(expiresAt)) return fallback;
+  // Count from the server-issued expiry, not from the moment the browser receives
+  // the response, so network latency cannot make a 15-second QR linger past TTL.
+  return Math.max(250, Math.min(fallback, expiresAt - Date.now()));
+}
+
 function messageFromError(adapter: { mapError: (error: unknown) => { message: string } }, error: unknown): string {
   const payload = (error as { response?: { data?: unknown } } | undefined)?.response?.data;
   if (payload && typeof payload === "object" && !Array.isArray(payload)) {
@@ -201,7 +210,7 @@ function AttendanceKiosk() {
         if (!active) return;
         setChallenge(result);
         setFailure("");
-        timer = window.setTimeout(() => { void load(true); }, clampRefresh(result.refresh_after_seconds) * 1_000);
+        timer = window.setTimeout(() => { void load(true); }, refreshDelayMs(result));
       } catch (error) {
         if (!active) return;
         setChallenge(undefined);
