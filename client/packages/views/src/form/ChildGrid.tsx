@@ -313,8 +313,8 @@ export function defaultChildGridHiddenColumns(meta: DocTypeMeta, columns: DocFie
 
 function childGridColumnLabel(meta: DocTypeMeta, field: DocField): string {
   if (meta.name === "Sales Order Item") {
-    if (field.fieldname === "set_count") return "Số lượng";
-    if (field.fieldname === "qty") return "Khối lượng";
+    if (field.fieldname === "set_count") return "Số bộ";
+    if (field.fieldname === "qty") return "Số lượng";
   }
   if (isPurchaseGrid(meta)) {
     if (field.fieldname === "qty") return "Số lượng";
@@ -831,7 +831,19 @@ export function ChildGrid(props: ChildGridProps) {
         const quantity = preview.quantity == null
           ? undefined
           : Number(preview.quantity.toFixed(6));
-        next.qty = quantity;
+        // Door quantity is resolved asynchronously from the authoritative
+        // cutting policy. Keep the last confirmed value while that request is
+        // pending; otherwise editing width/height briefly clears the field and
+        // a failed/stale request makes the calculated quantity disappear.
+        if (quantity !== undefined) {
+          next.qty = quantity;
+        } else {
+          const width = Number(next.width_m);
+          const height = Number(next.height_m);
+          const hasDimensions = Number.isFinite(width) && width > 0
+            && Number.isFinite(height) && height > 0;
+          if (!hasDimensions) next.qty = undefined;
+        }
 
         // Cửa có thể tính tiền theo m² nhưng tồn theo Bộ. Hệ số của từng dòng phụ thuộc
         // diện tích đã chốt, nên đây là snapshot động; ray/trục vẫn dùng hệ số Item bình thường.
@@ -913,7 +925,11 @@ export function ChildGrid(props: ChildGridProps) {
     loadVersion: number,
   ) => {
     if (!isDoorSalesGrid || !services?.callPost) return;
-    const row = base[rowIdx];
+    let row = base[rowIdx];
+    if (row && !row.inventory_mode && services.fetchDocument) {
+      const itemMaster = await services.fetchDocument("Item", String(row.item_code ?? "")).catch(() => undefined);
+      if (itemMaster?.inventory_mode) row = { ...row, inventory_mode: itemMaster.inventory_mode };
+    }
     if (!row || row.inventory_mode !== "Thành phẩm theo m2" || !row.item_code) return;
     const width = Number(row.width_m);
     const height = Number(row.height_m);
@@ -937,6 +953,11 @@ export function ChildGrid(props: ChildGridProps) {
         purpose: "Bán hàng",
       });
       if (formulaLoadVersion.current.get(loadKey) !== loadVersion) return;
+      if (calculated && typeof calculated === "object"
+        && calculated.billable_area_sqm == null
+        && typeof calculated.message === "string") {
+        throw new Error(calculated.message);
+      }
       const billable = Number(calculated.billable_area_sqm);
       const cutWidthM = Number(calculated.cut_width_m);
       if (!Number.isFinite(billable) || billable <= 0 || !Number.isFinite(cutWidthM) || cutWidthM <= 0) return;
@@ -989,16 +1010,47 @@ export function ChildGrid(props: ChildGridProps) {
       const currentRowIdx = currentRows.findIndex((entry, index) => String(entry.name ?? index) === loadKey);
       if (currentRowIdx < 0) return;
       const message = error instanceof Error ? error.message : "Không tính được công thức cửa.";
+      const resolvedMessage = (() => {
+        if (error instanceof Error && error.message) return error.message;
+        if (error && typeof error === "object") {
+          const value = error as Record<string, unknown>;
+          const response = value.response && typeof value.response === "object"
+            ? value.response as Record<string, unknown>
+            : undefined;
+          const data = response?.data && typeof response.data === "object"
+            ? response.data as Record<string, unknown>
+            : undefined;
+          const detail = value.message ?? data?.message ?? response?.message;
+          if (detail) return String(detail);
+        }
+        return message;
+      })();
       emitRows(currentRows.map((entry, index) => index === currentRowIdx ? {
         ...entry,
         // Một request cũ có thể lỗi sau khi request mới đã tính xong. Không được xoá
         // Số lượng/Thành tiền đã chụp chỉ vì lỗi trễ đó.
-        qty: entry.qty,
-        amount: entry.amount,
+        // If the policy service is temporarily unavailable, keep a visible
+        // area quantity instead of blanking the line. The server still
+        // revalidates the policy snapshot when the order is saved.
+        qty: entry.qty ?? (() => {
+          const width = Number(entry.width_m);
+          const height = Number(entry.height_m);
+          const sets = Number(entry.set_count ?? 1);
+          const fallback = width > 0 && height > 0 && sets > 0 ? width * height * sets : undefined;
+          return fallback == null ? undefined : Number(fallback.toFixed(6));
+        })(),
+        amount: entry.amount ?? (() => {
+          const width = Number(entry.width_m);
+          const height = Number(entry.height_m);
+          const sets = Number(entry.set_count ?? 1);
+          const qty = width > 0 && height > 0 && sets > 0 ? width * height * sets : undefined;
+          const rate = Number(entry.rate);
+          return qty != null && Number.isFinite(rate) ? Math.round(qty * rate) : undefined;
+        })(),
         billable_area_sqm: entry.billable_area_sqm,
         formula_policy: entry.formula_policy,
         formula_version: entry.formula_version,
-        formula_explanation: message,
+        formula_explanation: `${resolvedMessage} Tạm tính theo rộng x cao trong lúc chờ chính sách.`,
         width_basis: entry.width_basis,
         cut_width_m: entry.cut_width_m,
       } : entry));
@@ -1837,8 +1889,8 @@ export function ChildGrid(props: ChildGridProps) {
                   // Giữ header nghiệp vụ ổn định; nhãn nội bộ của từng mặt hàng
                   // không được làm đổi tên cột trên đơn bán hàng.
                   if (childMeta.name === "Sales Order Item") {
-                    if (c.fieldname === "set_count") headerLabel = "Số lượng";
-                    if (c.fieldname === "qty") headerLabel = "Khối lượng";
+                    if (c.fieldname === "set_count") headerLabel = "Số bộ";
+                    if (c.fieldname === "qty") headerLabel = "Số lượng";
                   }
                   // Bảng có thể vừa có cửa vừa có ray/phụ kiện. Khi đó nhãn chung
                   // "Rộng (m)" của vật tư không được làm mất PB ray/PB nhựa của cửa.

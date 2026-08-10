@@ -224,6 +224,10 @@ async function listDocs<T extends Json>(
     limit_page_length: String(limit),
   });
   const response = await call(`resource/${encodeURIComponent(doctype)}?${query}`);
+  if (!response.ok) {
+    const detail = (await response.text().catch(() => "")).trim().slice(0, 240);
+    throw new Error(`Cutting Policy list failed (HTTP ${response.status})${detail ? `: ${detail}` : ""}`);
+  }
   if (!response.ok) throw new Error(`Không đọc được danh sách ${doctype} (HTTP ${response.status}).`);
   return (((await response.json()) as { data?: T[] }).data ?? []);
 }
@@ -604,9 +608,20 @@ export async function calculateSalesProductionLine(
         "dealer_width_basis", "retail_width_basis", "dealer_cut_deduction_m", "retail_cut_deduction_m",
         "butterfly_cut_deduction_m", "dealer_split_sales_basis", "dealer_full_sales_basis", "retail_sales_basis",
         "manual_pull_sales_basis", "purchase_formula", "purchase_height_basis", "purchase_width_basis",
+        // Keep this projection limited to fields present on the tenant's
+        // Cutting Policy DocType. Leaf-specific values are optional and are
+        // read when the tenant has the extended fields; requesting unknown
+        // columns makes the whole list call fail with HTTP 417 and leaves the
+        // sales quantity blank.
         "priority", "disabled", "note", "ray_type", "leaf_formula", "leaf_height_deduction_m",
-        "leaf_divisor_source", "leaf_divisor_const", "leaf_rounding", "leaf_round_threshold", "leaf_variants",
-      ]),
+        "leaf_divisor_source", "leaf_divisor_const", "leaf_rounding", "leaf_round_threshold",
+      ]).catch(() => listDocs<RawPolicy>(call, "Cutting Policy", [
+        "name", "policy_name", "door_type", "item_group",
+        "dealer_width_basis", "retail_width_basis", "dealer_cut_deduction_m", "retail_cut_deduction_m",
+        "butterfly_cut_deduction_m", "dealer_split_sales_basis", "dealer_full_sales_basis", "retail_sales_basis",
+        "manual_pull_sales_basis", "purchase_formula", "purchase_height_basis", "purchase_width_basis",
+        "priority", "disabled", "note",
+      ])),
       listDocs<ProductionStandard>(call, "Production Standard", [
         "name", "department", "door_type", "operation", "minutes_per_set", "minutes_per_unit", "capacity_basis", "batch_capacity",
         "persons", "shift_hours", "efficiency", "workstation", "default_overtime_hours", "standard_time",
