@@ -559,6 +559,20 @@ export function FormView(props: FormViewProps) {
             const mainFields = sectionFields.filter((field) => field.field.form_region !== "aside" && field.field.form_region !== "full");
             const asideFields = sectionFields.filter((field) => field.field.form_region === "aside");
             const fullFields = sectionFields.filter((field) => field.field.form_region === "full");
+            const isSalesOrderHeader = meta.name === "Sales Order" && si === 0;
+            const salesOrderDateFields = isSalesOrderHeader
+              ? sectionFields.filter((field) => ["transaction_date", "delivery_date"].includes(field.field.fieldname))
+              : [];
+            const salesOrderHeaderNames = [
+              "customer", "transaction_date", "delivery_date", "responsible_person", "manual_note",
+              "operational_change_reason", "selling_price_list", "customer_group", "install_address",
+            ];
+            const salesOrderInfoFields = isSalesOrderHeader
+              ? sectionFields.filter((field) => salesOrderHeaderNames.includes(field.field.fieldname) && !["transaction_date", "delivery_date"].includes(field.field.fieldname))
+              : [];
+            const salesOrderRemainderFields = isSalesOrderHeader
+              ? sectionFields.filter((field) => !salesOrderHeaderNames.includes(field.field.fieldname))
+              : [];
             const renderFields = (fields: typeof sectionFields, region?: "main" | "aside" | "full") => groupCheckFields(fields).map((entry, groupIndex) =>
               Array.isArray(entry) ? (
                 <div key={`checks-${groupIndex}`} className="mf-check-group">
@@ -627,7 +641,21 @@ export function FormView(props: FormViewProps) {
                 {/* Flex-wrap, KHÔNG phải lưới: field tự chảy theo bề rộng của chính nó và tự
                     xuống dòng khi hết chỗ. Lưới cấp khe đều nhau nên ô ngắn nằm giữa khe rộng,
                     hở hai bên — đó là gốc của cảm giác "form quá rộng, kích cỡ không hợp lý". */}
-                {asideFields.length ? (
+                {isSalesOrderHeader ? (
+                  <>
+                    <div className="grid grid-cols-1 gap-5 md:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)]">
+                      <div className="min-w-0">
+                        <div className="mf-form-grid grid items-start gap-x-3 gap-y-3">{renderFields(salesOrderInfoFields)}</div>
+                      </div>
+                      <div className="min-w-0 border-t pt-4 md:border-l md:border-t-0 md:pl-5 md:pt-0">
+                        <div className="mf-form-grid grid items-start gap-y-3">{renderFields(salesOrderDateFields, "aside")}</div>
+                      </div>
+                    </div>
+                    {salesOrderRemainderFields.length ? (
+                      <div className="mt-5 mf-form-grid grid items-start gap-x-3 gap-y-3">{renderFields(salesOrderRemainderFields)}</div>
+                    ) : null}
+                  </>
+                ) : asideFields.length ? (
                   <>
                     <div className="mf-form-split">
                       <div className="mf-form-grid mf-form-grid-main grid items-start gap-x-3 gap-y-3">{renderFields(mainFields, "main")}</div>
