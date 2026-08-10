@@ -20,9 +20,10 @@ function command({ doctype = "Stock Entry", action = "submit", company = "Demo",
   };
 }
 
-function reader({ sourceCompany = "Demo", warehouseCompany = "Demo" } = {}) {
+function reader({ sourceCompany = "Demo", warehouseCompany = "Demo", existing } = {}) {
   return {
     async getDocument(_tenantId, doctype, name) {
+      if (existing && doctype === existing.doctype && name === existing.name) return { data: existing.data };
       if (doctype === "Sales Order" && name === "SO-1") {
         return { data: sourceCompany ? { company: sourceCompany } : {} };
       }
@@ -47,10 +48,18 @@ test("different Stock Entry names in one company share the same inventory coordi
   assert.equal(second, first);
 });
 
-test("Work Order, Cut Order and Stock Reconciliation submit share the Stock Entry company lock", () => {
+test("all stock-affecting submit paths share the company inventory lock", () => {
   const stockEntry = inventoryCoordinatorKey(command({ doctype: "Stock Entry", name: "STE-1" }));
-  for (const doctype of ["Work Order", "Cut Order", "Stock Reconciliation"]) {
+  for (const doctype of [
+    "Delivery Note",
+    "Purchase Receipt",
+    "Stock Return",
+    "Work Order",
+    "Cut Order",
+    "Stock Reconciliation",
+  ]) {
     assert.equal(inventoryCoordinatorKey(command({ doctype, name: `${doctype}-1` })), stockEntry);
+    assert.equal(isInventoryCoordinatedCommand(command({ doctype, name: `${doctype}-1` })), true);
   }
 });
 
@@ -110,9 +119,15 @@ test("companies remain isolated and names are safely encoded", () => {
   );
 });
 
-test("cancel resolves the company from the existing document when payload is empty", () => {
-  const cancel = command({ action: "cancel", company: "", name: "STE-CANCEL" });
-  assert.equal(inventoryCoordinatorKey(cancel, { company: "Demo" }), "inventory:demo:Demo");
+test("cancel resolves the company from the existing stock document when payload is empty", async () => {
+  for (const doctype of ["Stock Entry", "Delivery Note", "Purchase Receipt", "Stock Return", "Cut Order", "Stock Reconciliation"]) {
+    const cancel = command({ doctype, action: "cancel", company: "", name: `${doctype}-CANCEL`, document: {} });
+    assert.equal(inventoryCoordinatorKey(cancel, { company: "Demo" }), "inventory:demo:Demo");
+    assert.equal(
+      await resolveInventoryCoordinatorKey(cancel, reader({ existing: { doctype, name: `${doctype}-CANCEL`, data: { company: "Demo" } } })),
+      "inventory:demo:Demo",
+    );
+  }
 });
 
 test("draft mutations and unrelated doctypes stay on their ordinary document key", () => {
