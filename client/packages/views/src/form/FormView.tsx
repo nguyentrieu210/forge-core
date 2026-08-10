@@ -13,7 +13,7 @@ import { AlertTriangle, X } from "lucide-react";
 import { resolveMeta, collectFetchFrom, type DocTypeMeta, type Doc, type ResolvedField } from "@metaforge/core";
 import { ControlRegistry, FallbackControl, type FieldServices } from "@metaforge/controls";
 import type { WorkflowTransition } from "@metaforge/adapter-frappe";
-import { Button, Badge, toast, cn, useT } from "@metaforge/ui";
+import { Button, Badge, Checkbox, toast, cn, useT } from "@metaforge/ui";
 import { FormGuide } from "./FormGuide.js";
 import { useMetaForgeOptional } from "../container/provider.js";
 import { groupLayout, resolveFormFieldWidth, type FormFieldWidth, type FormTab } from "./layout.js";
@@ -170,6 +170,12 @@ export function FormView(props: FormViewProps) {
   }, [meta, fetchRules]);
   const reactiveValues = useWatch({ control: form.control, name: reactiveFields });
   const salesOrderItems = useWatch({ control: form.control, name: "items", disabled: meta.name !== "Sales Order" }) as Array<Record<string, unknown>> | undefined;
+  const paymentMethod = useWatch({ control: form.control, name: "payment_method", disabled: meta.name !== "Sales Order" }) as string | undefined;
+  useEffect(() => {
+    if (meta.name === "Sales Order" && !form.getValues("payment_method")) {
+      form.setValue("payment_method", "Ghi công nợ", { shouldDirty: false });
+    }
+  }, [form, meta.name]);
   const values = useMemo(() => {
     const current = { ...form.getValues() };
     reactiveFields.forEach((fieldname, index) => {
@@ -273,6 +279,8 @@ export function FormView(props: FormViewProps) {
       // Nếu khách chưa khai báo, giữ giá trị mặc định hiện có của form.
       const accountManager = String(customerDoc.account_manager ?? "").trim();
       if (accountManager) form.setValue("responsible_person", accountManager as never, { shouldDirty: true });
+      const customerAddress = String(customerDoc.address ?? "").trim();
+      if (customerAddress) form.setValue("install_address", customerAddress as never, { shouldDirty: true });
       const group = String(customerDoc.price_group ?? "").trim();
       if (!group) return;
       form.setValue("customer_group", group as never, { shouldDirty: true });
@@ -596,7 +604,7 @@ export function FormView(props: FormViewProps) {
               ? salesOrderOtherInfoFields.filter((field) => !["customer_group", "selling_price_list", "install_address"].includes(field.field.fieldname))
               : [];
             const salesOrderRemainderFields = isSalesOrderHeader
-              ? sectionFields.filter((field) => !salesOrderHeaderNames.includes(field.field.fieldname))
+              ? sectionFields.filter((field) => !salesOrderHeaderNames.includes(field.field.fieldname) && field.field.fieldname !== "payment_method")
               : [];
             const renderFields = (fields: typeof sectionFields, region?: "main" | "aside" | "full") => groupCheckFields(fields).map((entry, groupIndex) =>
               Array.isArray(entry) ? (
@@ -674,6 +682,22 @@ export function FormView(props: FormViewProps) {
                       </div>
                       <div className="min-w-0 border-t pt-4 md:border-l md:border-t-0 md:pl-5 md:pt-0">
                         <div className="mf-form-grid grid w-full max-w-[11rem] items-start gap-y-2">{renderFields(salesOrderDateFields, "aside")}</div>
+                        <div className="mt-5 space-y-2 border-t pt-4">
+                          <div className="text-sm font-medium text-foreground">Thanh toán</div>
+                          {(["Tiền mặt", "Chuyển khoản", "Ghi công nợ"] as const).map((method) => (
+                            <label key={method} className="flex min-h-8 cursor-pointer items-center gap-2 text-sm">
+                              <Checkbox
+                                checked={paymentMethod === method}
+                                onCheckedChange={(checked) => {
+                                  if (checked === true) form.setValue("payment_method", method, { shouldDirty: true });
+                                  else if (paymentMethod === method) form.setValue("payment_method", "Ghi công nợ", { shouldDirty: true });
+                                }}
+                                aria-label={method}
+                              />
+                              <span>{method}</span>
+                            </label>
+                          ))}
+                        </div>
                       </div>
                     </div>
                     {salesOrderRemainderFields.length ? (
