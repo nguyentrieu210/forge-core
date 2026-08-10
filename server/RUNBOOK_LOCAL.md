@@ -187,3 +187,34 @@ vào qua gateway — không cần thiết chỉ để xem UI.
   authorization tường minh theo `RUNBOOK.md` và `DELIVERY_POLICY.md`.
 - Local PASS **không** là bằng chứng release. `docs/VERIFICATION.md` ghi rõ một trường hợp local
   24/24 xanh mà login vẫn hỏng sau deploy.
+
+---
+
+## GitHub main -> local reproducible build
+
+Use this when the local machine must follow the exact `main` commit on GitHub:
+
+```bat
+cd C:\alumdoor
+sync-local.bat
+```
+
+The script only fast-forwards a **clean local `main`**. It refuses to run if
+there are local edits or local commits that GitHub does not have. On an update,
+it stops the local servers, snapshots local Wrangler state into ignored
+`local-backups\`, runs `pnpm install --frozen-lockfile`, then runs the full
+`pnpm run verify` gate before rebuilding, migrating local D1, reinstalling
+metadata and starting the local servers again.
+
+To keep watching GitHub `main` every minute, leave this running:
+
+```bat
+cd C:\alumdoor
+watch-github-local.bat 60
+```
+
+The snapshot contains the local D1, R2 and Durable Object state, together with
+a `manifest.json` recording the source commit. It is intentionally excluded
+from Git: source code and metadata are reproducible from GitHub, but running
+business data must never be committed to the public repository. A remote D1/R2
+copy or deployment is a separate, explicitly approved operation.

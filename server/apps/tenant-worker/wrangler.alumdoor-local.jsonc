@@ -17,6 +17,9 @@
       "migrations_dir": "../../migrations/tenant"
     }
   ],
+  "r2_buckets": [
+    { "binding": "FILES", "bucket_name": "cloudforge-files" }
+  ],
   "durable_objects": {
     "bindings": [
       { "name": "AGGREGATES", "class_name": "AggregateCoordinator" }

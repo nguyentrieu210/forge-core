@@ -110,7 +110,18 @@ export async function ensureCanonicalSocialSalesOrder(
     expectedVersion: draft.version,
     document: draft.data,
   });
-  await executeCanonical(kernel, organizationSecurity, tenantId, actor, submit);
+  try {
+    await executeCanonical(kernel, organizationSecurity, tenantId, actor, submit);
+  } catch (error) {
+    // Two deliveries can read the same draft and race to submit it. The loser
+    // may only be treated as an idempotent replay when the winner committed the
+    // exact same canonical order; every other version conflict remains visible.
+    if (asCloudForgeError(error).code !== "VERSION_CONFLICT") throw error;
+    const concurrent = await store.getDocument<JsonObject>(tenantId, "Sales Order", name);
+    if (!concurrent || concurrent.docstatus !== 1) throw error;
+    assertExistingLineage(concurrent.data, input);
+    return commercialResult(name, concurrent.data, concurrent.status);
+  }
 
   const submitted = await store.getDocument<JsonObject>(tenantId, "Sales Order", name);
   if (!submitted || submitted.docstatus !== 1) throw errors.ledger(`Canonical Sales Order ${name} was not submitted`);
