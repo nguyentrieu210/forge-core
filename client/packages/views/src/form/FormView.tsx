@@ -269,6 +269,10 @@ export function FormView(props: FormViewProps) {
     if (autoPriceListKey.current === key) return;
     autoPriceListKey.current = key;
     void services.fetchDocument("Customer", customer).then(async (customerDoc) => {
+      // Người phụ trách của đơn lấy theo người phụ trách nội bộ trên khách hàng.
+      // Nếu khách chưa khai báo, giữ giá trị mặc định hiện có của form.
+      const accountManager = String(customerDoc.account_manager ?? "").trim();
+      if (accountManager) form.setValue("responsible_person", accountManager as never, { shouldDirty: true });
       const group = String(customerDoc.price_group ?? "").trim();
       if (!group) return;
       form.setValue("customer_group", group as never, { shouldDirty: true });
@@ -643,13 +647,7 @@ export function FormView(props: FormViewProps) {
                   <>
                     <div className="grid grid-cols-1 gap-5 md:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)]">
                       <div className="min-w-0">
-                        <div className="grid grid-cols-1 items-start gap-x-3 gap-y-3 md:grid-cols-2">
-                          <div className="mf-field">
-                            <label className="mb-1.5 block text-sm font-medium text-foreground">Mã đơn hàng</label>
-                            <div className="flex min-h-10 items-center rounded-md border bg-muted/30 px-3 text-sm text-muted-foreground" data-testid="sales-order-code">
-                              {props.isNew || !doc.name || doc.name === "new" ? "Tự sinh khi lưu" : doc.name}
-                            </div>
-                          </div>
+                        <div className="grid grid-cols-1 items-start gap-x-3 gap-y-3">
                           {renderFields(salesOrderCustomerFields)}
                         </div>
                         <div className="mf-form-grid mt-3 grid items-start gap-x-3 gap-y-3">{renderFields(salesOrderOtherInfoFields)}</div>

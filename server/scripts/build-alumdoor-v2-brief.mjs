@@ -129,7 +129,12 @@ addAfter(productionStandard, "minutes_per_set",
 
 const operationalSalesOrder = doctype("Sales Order");
 addAfter(operationalSalesOrder, "delivery_date",
-  "responsible_person:Data Người phụ trách",
+  {
+    fieldname: "responsible_person",
+    fieldtype: "Data",
+    label: "Người phụ trách",
+    fetch_from: "customer.account_manager",
+  },
   "manual_note:Small Text Ghi chú vận hành",
   "operational_change_reason:Small Text- Lý do đổi vận hành",
 );

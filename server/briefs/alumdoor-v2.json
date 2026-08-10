@@ -3026,7 +3026,12 @@
     "currency:Link(Currency)-!=(VND) Tiền tệ",
     "transaction_date:Date!=(Today) Ngày đặt",
     "delivery_date:Date Ngày giao dự kiến",
-    "responsible_person:Data Người phụ trách",
+    {
+     "fieldname": "responsible_person",
+     "fieldtype": "Data",
+     "label": "Người phụ trách",
+     "fetch_from": "customer.account_manager"
+    },
     "manual_note:Small Text Ghi chú vận hành",
     "operational_change_reason:Small Text- Lý do đổi vận hành",
     "selling_price_list:Link(Price List) Bảng giá áp dụng",

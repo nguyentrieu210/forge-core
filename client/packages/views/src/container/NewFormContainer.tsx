@@ -88,13 +88,18 @@ export function NewFormContainer(props: NewFormContainerProps) {
   const [saving, setSaving] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string> | undefined>();
   const [dirty, setDirty] = useState(false);
-  const [currentUser, setCurrentUser] = useState("");
+  const [currentUser, setCurrentUser] = useState<string | null>(doctype === "Sales Order" ? null : "");
   useEffect(() => {
-    if (doctype !== "Sales Order") return;
+    if (doctype !== "Sales Order") {
+      setCurrentUser("");
+      return;
+    }
     let active = true;
     void adapter.getBoot().then((boot) => {
-      if (active) setCurrentUser(boot.user);
-    }).catch(() => undefined);
+      if (active) setCurrentUser(boot.full_name || boot.user || "");
+    }).catch(() => {
+      if (active) setCurrentUser("");
+    });
     return () => { active = false; };
   }, [adapter, doctype]);
   // "Lưu & Tạo tiếp" — nhập liệu hàng loạt (vd 20 Item liên tiếp) không cần đóng/mở lại modal mỗi lần.
@@ -162,6 +167,7 @@ export function NewFormContainer(props: NewFormContainerProps) {
 
   if (metaQ.isLoading) return <div className="grid h-40 place-items-center text-sm text-muted-foreground">{t("common.loading")}</div>;
   if (metaQ.error) return <div className="p-4 text-sm text-destructive" role="alert">{adapter.mapError(metaQ.error).message}</div>;
+  if (doctype === "Sales Order" && currentUser === null) return <div className="grid h-40 place-items-center text-sm text-muted-foreground">{t("common.loading")}</div>;
   if (!metaQ.data || !doc) return <div className="p-4 text-sm text-muted-foreground">{t("common.no_data")}</div>;
   if (renderPolicy && !renderPolicy.enabled) {
     return (
