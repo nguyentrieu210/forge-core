@@ -23,6 +23,11 @@ import {
 } from "../../../apps-src/alumdoor-worker/src/attendance-core.js";
 
 const INTERNAL_SCAN_ROLE = "AlumDoor QR System";
+// Employee Checkin is a standard HRM transaction.  The trusted callback must use
+// its existing create permission without granting the browser or the employee
+// account a generic HR write role.  This role is added only to the synthetic,
+// server-side bundle actor after the QR callback has authenticated the employee.
+const CHECKIN_WRITE_ROLE = "HR User";
 const DAY_DOCTYPE = "AlumDoor Attendance Day";
 const CHECKIN_DOCTYPE = "Employee Checkin";
 
@@ -162,7 +167,7 @@ export async function commitAlumDoorAttendanceScan(
 
   const scanActor: Actor = {
     ...input.actor,
-    roles: [...new Set([...input.actor.roles, INTERNAL_SCAN_ROLE])],
+    roles: [...new Set([...input.actor.roles, INTERNAL_SCAN_ROLE, CHECKIN_WRITE_ROLE])],
   };
   const checkinDocument: JsonObject = {
     employee: employee.name,
