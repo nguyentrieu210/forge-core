@@ -558,7 +558,8 @@ export function deriveLinearSalesBasis(item: { item_name?: unknown; item_code?: 
   const itemName = String(item.item_name ?? "").normalize("NFC").trim().toLocaleLowerCase("vi");
   const itemCode = String(item.item_code ?? "").normalize("NFC").trim().toLocaleLowerCase("vi");
   if (itemName.startsWith("ray") || itemCode.includes("ray")) return "RAY";
-  if (itemName.startsWith("trục") || itemName.startsWith("truc") || itemCode.includes("truc")) return "TRUC";
+  if (itemName.startsWith("trục") || itemName.startsWith("truc")
+    || itemCode.includes("trục") || itemCode.includes("truc")) return "TRUC";
   return undefined;
 }
 

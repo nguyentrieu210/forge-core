@@ -10,5 +10,6 @@ test("only door items default to 15 percent", () => {
 test("ray and trục stay at zero even when their group is a door group", () => {
   assert.equal(defaultAlumdoorDiscountPercent({ item_code: "TP-RAYNHOMUC", item_name: "HH RAY NHÔM ÚC", item_group: "Cửa tấm liền Úc", inventory_mode: "Hàng thường" }), 0);
   assert.equal(defaultAlumdoorDiscountPercent({ item_code: "NVL-TRUC34", item_name: "TRỤC PHI 34", item_group: "Cửa tấm liền Úc", inventory_mode: "Hàng thường" }), 0);
+  assert.equal(defaultAlumdoorDiscountPercent({ item_code: "TRỤC 114_1.8LY", item_group: "Cửa tấm liền Úc", inventory_mode: "Hàng thường" }), 0);
   assert.equal(defaultAlumdoorDiscountPercent({ item_code: "RNHUA/LONG-CR", item_name: "RON NHỰA CẠNH RAY", item_group: "Phụ kiện", inventory_mode: "Hàng thường" }), 0);
 });

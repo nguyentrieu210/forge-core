@@ -214,7 +214,7 @@ function isAlumdoorLinearItem(item: Record<string, unknown>): boolean {
   const name = normalizedAlumdoorText(item.item_name);
   const code = normalizedAlumdoorText(item.item_code);
   return name.startsWith("ray") || code.includes("ray")
-    || name.startsWith("trục") || name.startsWith("truc") || code.includes("truc");
+    || name.startsWith("trục") || name.startsWith("truc") || code.includes("trục") || code.includes("truc");
 }
 
 /** Chỉ mã cửa mặc định 15%; ray/trục và các phụ kiện mặc định 0%. */

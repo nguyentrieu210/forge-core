@@ -18,7 +18,8 @@ export function deriveLinearSalesBasis(row: Doc | Record<string, unknown>): Line
   const itemName = normalized(row.item_name);
   const itemCode = normalized(row.item_code);
   if (itemName.startsWith("ray") || itemCode.includes("ray")) return "RAY";
-  if (itemName.startsWith("trục") || itemName.startsWith("truc") || itemCode.includes("truc")) return "TRUC";
+  if (itemName.startsWith("trục") || itemName.startsWith("truc")
+    || itemCode.includes("trục") || itemCode.includes("truc")) return "TRUC";
   return undefined;
 }
 
