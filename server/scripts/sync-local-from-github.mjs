@@ -6,7 +6,11 @@
  * the checkout is dirty, when local `main` has commits GitHub does not have,
  * or when the remote history cannot be fast-forwarded.
  *
- * Exit status: 0 = already current, 10 = fast-forwarded, 1 = safe refusal/error.
+ * Modes:
+ * - --check: only discover whether origin/main is ahead (never modifies Git).
+ * - --apply (or no mode): fast-forward local main to origin/main.
+ *
+ * Exit status: 0 = already current, 10 = update available/applied, 1 = safe refusal/error.
  */
 import { spawnSync } from "node:child_process";
 import path from "node:path";
@@ -36,8 +40,12 @@ function fail(message) {
   process.exit(1);
 }
 
+const modes = process.argv.filter((value) => value === "--check" || value === "--apply");
+if (modes.length > 1) fail("chỉ dùng một chế độ: --check hoặc --apply");
+const checkOnly = modes[0] === "--check";
+
 if (process.argv.includes("--help")) {
-  console.log("Dùng: node server/scripts/sync-local-from-github.mjs");
+  console.log("Dùng: node server/scripts/sync-local-from-github.mjs [--check|--apply]");
   console.log("Chỉ đồng bộ GitHub main khi working tree sạch và có thể fast-forward an toàn.");
   process.exit(0);
 }
@@ -56,6 +64,11 @@ try {
   if (behind === 0) {
     console.log(`LOCAL_SYNC_NO_CHANGE commit=${git(["rev-parse", "HEAD"]).stdout}`);
     process.exit(0);
+  }
+
+  if (checkOnly) {
+    console.log(`LOCAL_SYNC_UPDATE_AVAILABLE from=${git(["rev-parse", "HEAD"]).stdout} to=${git(["rev-parse", "origin/main"]).stdout}`);
+    process.exit(10);
   }
 
   git(["merge", "--ff-only", "origin/main"]);

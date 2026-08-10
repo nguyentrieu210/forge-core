@@ -5,7 +5,10 @@
  * JavaScript on the server to decide a validation rule would hand every DocType
  * author remote code execution, so this parses a small, closed grammar instead:
  *
- *     condition  := clause (('&&' | '||') clause)*
+ *     condition  := or-expression
+ *     or-expression := and-expression ('||' and-expression)*
+ *     and-expression := primary ('&&' primary)*
+ *     primary    := clause | '(' condition ')'
  *     clause     := ['!'] 'doc.' field [ op value ]
  *     op         := '==' | '===' | '!=' | '!==' | '>' | '>=' | '<' | '<=' | 'in'
  *     value      := number | 'true' | 'false' | quoted string | array of those
@@ -18,9 +21,9 @@
  * believed was in force; refusing the metadata means the rule is either enforced
  * or visibly absent.
  *
- * Mixed `&&`/`||` without parentheses is refused for the same reason: JavaScript
- * would apply its own precedence, and a rule that reads differently to its author
- * than to the engine is worse than no rule.
+ * Mixed `&&`/`||` at the same level is refused. Authors may use parentheses to
+ * make the grouping explicit; those parentheses are parsed by this evaluator,
+ * never handed to JavaScript.
  */
 
 import { errors } from "../../core/src/index.js";
@@ -35,10 +38,10 @@ interface Clause {
   value?: JsonValue;
 }
 
-interface ParsedCondition {
-  joiner: "&&" | "||" | null;
-  clauses: Clause[];
-}
+interface ParsedCondition { root: ConditionNode; }
+type ConditionNode =
+  | { kind: "clause"; clause: Clause }
+  | { kind: "and" | "or"; terms: ConditionNode[] };
 
 const CLAUSE = /^(!?)\s*doc\.([A-Za-z_][A-Za-z0-9_]*)\s*(===|!==|==|!=|>=|<=|>|<|\bin\b)?\s*(.*)$/;
 
@@ -52,20 +55,106 @@ export function parseFieldCondition(expression: string): ParsedCondition {
     if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(trimmed)) {
       throw errors.validation(`Unsupported field condition: ${expression}`);
     }
-    return { joiner: null, clauses: [{ negated: false, field: trimmed }] };
+    return { root: { kind: "clause", clause: { negated: false, field: trimmed } } };
   }
 
   const body = trimmed.slice("eval:".length).trim();
-  const hasAnd = /&&/.test(body);
-  const hasOr = /\|\|/.test(body);
-  if (hasAnd && hasOr) {
+  if (!body) throw errors.validation("A field condition cannot be empty");
+  return { root: parseBooleanExpression(body, expression) };
+}
+
+function parseBooleanExpression(source: string, original: string): ConditionNode {
+  const body = stripOuterParentheses(source.trim(), original);
+  const topLevelOperators = operatorsAtTopLevel(body, original);
+  if (topLevelOperators.has("&&") && topLevelOperators.has("||")) {
     throw errors.validation("A field condition cannot mix && and || without parentheses");
   }
-  if (/[()]/.test(body)) throw errors.validation("Parenthesised field conditions are not supported");
 
-  const joiner: "&&" | "||" | null = hasAnd ? "&&" : hasOr ? "||" : null;
-  const parts = joiner ? body.split(joiner) : [body];
-  return { joiner, clauses: parts.map((part) => parseClause(part, expression)) };
+  const orTerms = splitAtTopLevel(body, "||", original);
+  if (orTerms.length > 1) return { kind: "or", terms: orTerms.map((term) => parseBooleanExpression(term, original)) };
+
+  const andTerms = splitAtTopLevel(body, "&&", original);
+  if (andTerms.length > 1) return { kind: "and", terms: andTerms.map((term) => parseBooleanExpression(term, original)) };
+
+  return { kind: "clause", clause: parseClause(body, original) };
+}
+
+function stripOuterParentheses(source: string, original: string): string {
+  let body = source;
+  while (body.startsWith("(")) {
+    const close = matchingClosingParen(body, 0, original);
+    if (close !== body.length - 1) break;
+    body = body.slice(1, -1).trim();
+    if (!body) throw errors.validation(`Unsupported field condition: ${original}`);
+  }
+  return body;
+}
+
+function operatorsAtTopLevel(source: string, original: string): Set<"&&" | "||"> {
+  const operators = new Set<"&&" | "||">();
+  visitTopLevel(source, original, (index) => {
+    const token = source.slice(index, index + 2);
+    if (token === "&&" || token === "||") operators.add(token);
+  });
+  return operators;
+}
+
+function splitAtTopLevel(source: string, operator: "&&" | "||", original: string): string[] {
+  const parts: string[] = [];
+  let cursor = 0;
+  visitTopLevel(source, original, (index) => {
+    if (source.slice(index, index + 2) !== operator) return;
+    const part = source.slice(cursor, index).trim();
+    if (!part) throw errors.validation(`Unsupported field condition: ${original}`);
+    parts.push(part);
+    cursor = index + 2;
+  });
+  const finalPart = source.slice(cursor).trim();
+  if (!finalPart) throw errors.validation(`Unsupported field condition: ${original}`);
+  parts.push(finalPart);
+  return parts;
+}
+
+function visitTopLevel(source: string, original: string, onOperator: (index: number) => void): void {
+  let parentheses = 0;
+  let brackets = 0;
+  let quote: "'" | '"' | null = null;
+  for (let index = 0; index < source.length; index += 1) {
+    const character = source[index]!;
+    if (quote) {
+      if (character === "\\") { index += 1; continue; }
+      if (character === quote) quote = null;
+      continue;
+    }
+    if (character === "'" || character === '"') { quote = character; continue; }
+    if (character === "[") { brackets += 1; continue; }
+    if (character === "]") { brackets -= 1; if (brackets < 0) throw errors.validation(`Unsupported field condition: ${original}`); continue; }
+    if (character === "(") { parentheses += 1; continue; }
+    if (character === ")") { parentheses -= 1; if (parentheses < 0) throw errors.validation(`Unsupported field condition: ${original}`); continue; }
+    if (parentheses === 0 && brackets === 0 && (source.startsWith("&&", index) || source.startsWith("||", index))) onOperator(index);
+  }
+  if (quote || parentheses !== 0 || brackets !== 0) throw errors.validation(`Unsupported field condition: ${original}`);
+}
+
+function matchingClosingParen(source: string, start: number, original: string): number {
+  let depth = 0;
+  let quote: "'" | '"' | null = null;
+  for (let index = start; index < source.length; index += 1) {
+    const character = source[index]!;
+    if (quote) {
+      if (character === "\\") { index += 1; continue; }
+      if (character === quote) quote = null;
+      continue;
+    }
+    if (character === "'" || character === '"') { quote = character; continue; }
+    if (character === "(") depth += 1;
+    if (character === ")") {
+      depth -= 1;
+      if (depth === 0) return index;
+      if (depth < 0) break;
+    }
+  }
+  throw errors.validation(`Unsupported field condition: ${original}`);
 }
 
 function parseClause(part: string, original: string): Clause {
@@ -131,9 +220,13 @@ export function evaluateFieldCondition(expression: string, submitted: JsonObject
     // rather than throwing, so a legacy row can never make a document unsavable.
     return false;
   }
-  const results = parsed.clauses.map((clause) => evaluateClause(clause, submitted, existing));
-  if (parsed.joiner === "||") return results.some(Boolean);
-  return results.every(Boolean);
+  return evaluateNode(parsed.root, submitted, existing);
+}
+
+function evaluateNode(node: ConditionNode, submitted: JsonObject, existing?: JsonObject): boolean {
+  if (node.kind === "clause") return evaluateClause(node.clause, submitted, existing);
+  if (node.kind === "and") return node.terms.every((term) => evaluateNode(term, submitted, existing));
+  return node.terms.some((term) => evaluateNode(term, submitted, existing));
 }
 
 function evaluateClause(clause: Clause, submitted: JsonObject, existing?: JsonObject): boolean {

@@ -29,7 +29,7 @@ test("currency metric refuses cross-currency aggregation without group or single
   const grouped = compiler.compile({
     model: "finance.entries", tenant_id: "tenant-a", dimensions: ["account", "currency"], metrics: ["amount_minor"],
   });
-  assert.match(grouped.sql, /GROUP BY "account", "currency"/);
+  assert.match(grouped.sql, /GROUP BY s\."account", s\."currency"/);
 
   const scoped = compiler.compile({
     model: "finance.entries", tenant_id: "tenant-a", dimensions: ["account"], metrics: ["amount_minor"],

@@ -25,7 +25,7 @@ test("dead-letter contract preserves immutable delivery task and no secret value
   const dlq = await createWebhookDeadLetter({ task, attempts: 8, reason: "retry_exhausted", now: new Date("2026-08-03T01:00:00Z") });
   assert.match(dlq.dead_letter_id, /^dlq_[a-f0-9]{48}$/);
   assert.equal(dlq.delivery_id, task.delivery_id);
-  assert.equal(dlq.task, task);
+  assert.deepEqual(dlq.task, task);
   assert.equal(dlq.replay_count, 0);
   assert.equal(JSON.stringify(dlq).includes("actual-secret"), false);
   assert.equal(validateWebhookDeadLetter(dlq).dead_letter_id, dlq.dead_letter_id);

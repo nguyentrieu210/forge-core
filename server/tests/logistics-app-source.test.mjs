@@ -15,7 +15,7 @@ async function manifest() {
 test("logistics app owns logistics masters/trip while ERP fulfillment stays external", async () => {
   const app = await manifest();
   assert.equal(app.id, "logistics");
-  assert.equal(app.version, "0.2.0");
+  assert.equal(app.version, "0.3.0");
   assert.equal(app.metaContractVersion, 1);
   assert.ok(app.roles.some((role) => role.role === "Logistics User"));
   assert.ok(app.roles.some((role) => role.role === "Logistics Manager"));

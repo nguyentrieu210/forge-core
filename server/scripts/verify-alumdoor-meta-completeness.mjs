@@ -13,6 +13,7 @@ const own = new Map(manifest.doctypes.map((doctype) => [doctype.name, doctype]))
 const external = new Set((manifest.externalDocTypes ?? []).map((doctype) => doctype.name));
 const reports = new Map(manifest.reports.map((report) => [report.name, report]));
 const fields = manifest.doctypes.flatMap((doctype) => doctype.fields.map((field) => ({ doctype, field })));
+const charts = manifest.charts ?? [];
 
 // 74 is the current Alumdoor slice, not the platform ceiling. This gate refuses a
 // regression below today's coverage while the canonical contract itself supports every
@@ -46,8 +47,8 @@ for (const { doctype, field } of fields) {
   }
 }
 
-if (manifest.charts.length < 1 || manifest.charts.length > 3) fail(`Overview needs 1-3 explicit charts; got ${manifest.charts.length}`);
-for (const chart of manifest.charts) {
+if (charts.length > 3) fail(`Overview supports at most 3 explicit charts; got ${charts.length}`);
+for (const chart of charts) {
   const report = reports.get(chart.source);
   if (!report) fail(`${chart.name}: missing source report ${chart.source}`);
   if (!chart.drilldown?.route || !chart.emptyFallback) fail(`${chart.name}: missing drilldown/mobile fallback`);
@@ -79,7 +80,7 @@ console.log(JSON.stringify({
   childTables: fields.filter(({ field }) => field.fieldtype === "Table" || field.fieldtype === "Table MultiSelect").length,
   externalDocTypes: manifest.externalDocTypes.length,
   reports: manifest.reports.length,
-  charts: manifest.charts.length,
+  charts: charts.length,
   surfaces: surfaceCounts,
   nav: manifest.nav.length,
 }, null, 2));

@@ -2,13 +2,14 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { compileBrief } from "../scripts/lib/compile-brief.mjs";
+import { readBriefSource } from "../scripts/lib/read-brief-source.mjs";
 import alumdoorWorker, { allocateBarsFifo } from "../dist/apps-src/alumdoor-worker/src/index.js";
 
 const brief = JSON.parse(await readFile(new URL("../briefs/alumdoor.json", import.meta.url), "utf8"));
 const app = compileBrief(brief);
 const doctype = (name) => app.doctypes.find((entry) => entry.name === name);
 const field = (doctypeName, fieldname) => doctype(doctypeName)?.fields.find((entry) => entry.fieldname === fieldname);
-const v2Brief = JSON.parse(await readFile(new URL("../briefs/alumdoor-v2.json", import.meta.url), "utf8"));
+const v2Brief = await readBriefSource(new URL("../briefs/alumdoor-v2.json", import.meta.url));
 const v2App = compileBrief(v2Brief);
 const v2Doctype = (name) => v2App.doctypes.find((entry) => entry.name === name);
 const v2Field = (doctypeName, fieldname) =>
@@ -184,7 +185,7 @@ test("purchase rows expose aluminium dimensions only for aluminium items", () =>
 });
 
 test("V2 purchase receipt exposes dimensions and area weight without mixing kg/m", () => {
-  assert.equal(v2Brief.version, "2.2.1");
+  assert.equal(v2Brief.version, "2.2.3");
   const receiptItem = v2Doctype("Purchase Receipt Item");
   for (const fieldname of [
     "height_m", "width_m", "set_count", "actual_weight_kg", "actual_kg_per_m", "actual_kg_per_sqm",

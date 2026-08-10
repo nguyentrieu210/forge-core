@@ -164,7 +164,7 @@ test("ray/trục bán Mét bắt buộc qty = chiều dài × số cây", async 
     },
   }) };
   const line = {
-    item_code: "TRUC-114", color: "GS", uom: "Mét", length_m: 5.3, qty_bar: 3,
+    item_code: "TRUC-114", uom: "Mét", width_m: 5.3, set_count: 3,
     qty: 15.9, conversion_factor: 2.1, stock_qty: 33.39,
   };
   const accepted = await alumdoorWorker.fetch(salesLineRequest(line), env, {});

@@ -29,7 +29,7 @@ test("correction dataset includes confirmed failures only", async () => {
   assert.equal(dataset.failed_rows[0].__error, "Item Group missing");
   assert.equal(dataset.failed_rows[0].item_name, "Alpha");
   const csv = renderMigrationCorrectionCsv(dataset);
-  assert.match(csv, /__source_row,__row_key,__error,item_name,meta/);
+  assert.match(csv, /__source_row,__row_key,__error,name,item_name,meta/);
   assert.match(csv, /Item Group missing/);
   assert.match(csv, /\{\"\"source\"\":\"\"old\"\"\}/);
 });

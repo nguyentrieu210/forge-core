@@ -3,6 +3,10 @@ dist/
 .wrangler/
 .dev.vars
 *.log
+run-local.log.smoke
+**/.dev.vars.recreated-*
+.tmp-ChildGrid-before-encoding-repair.tsx
+client/apps/demo/.*-selfcheck.cjs
 .DS_Store
 coverage/
 *.tsbuildinfo

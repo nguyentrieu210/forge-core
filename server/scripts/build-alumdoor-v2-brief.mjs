@@ -906,8 +906,6 @@ action("tra-hang").description =
 const doc = action("doc-anh-chung-tu");
 doc.permission = "Purchase Receipt"; // V2 nhận hàng là nhánh MVP, không phải đơn mua
 doc.description = "AI đọc ảnh chứng từ và chỉ dựng bản NHÁP. Không bao giờ tự ghi sổ — người vẫn phải bấm duyệt.";
-action("tinh-cong-thuc-cua").fields.splice(4, 0, "ray_type:Select(Ray thường,Ray âm,Ray nghiêng) Loại ray");
-
 brief.actions.push(
   {
     "//": "Xem trước rồi mới ra phiếu — máy KHÔNG tự ghi sổ. Ra bản nháp, người bấm Cắt sau.",

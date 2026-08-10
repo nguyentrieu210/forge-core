@@ -178,6 +178,15 @@ function normalizedStringArray(value: unknown, field: string): string[] {
   let raw: unknown = value;
   if (typeof value === "string") { try { raw = JSON.parse(value); } catch { throw errors.validation(`${field} must be valid JSON`); } }
   if (!Array.isArray(raw) || raw.some((item) => typeof item !== "string" || !item.trim())) throw errors.validation(`${field} must be an array of non-empty strings`);
-  const unique = [...new Map(raw.map((item) => [item.trim().toLowerCase(), item.trim()])).values()];
+  // Preserve the first spelling supplied by HR while deduplicating case-insensitively.
+  // Overwriting with a later duplicate turns `TypeScript` into `typescript` for no
+  // business reason and makes a saved candidate profile look unnecessarily changed.
+  const uniqueByKey = new Map<string, string>();
+  for (const item of raw) {
+    const normalized = item.trim();
+    const key = normalized.toLowerCase();
+    if (!uniqueByKey.has(key)) uniqueByKey.set(key, normalized);
+  }
+  const unique = [...uniqueByKey.values()];
   return unique.sort((a, b) => a.localeCompare(b));
 }

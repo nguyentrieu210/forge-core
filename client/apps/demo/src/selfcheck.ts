@@ -65,11 +65,12 @@ console.log("selfcheck — logic thuần (no network):");
 // 1. Fieldtype đúng 43 authorable (verified live docfield.json).
 // Hệ thống thu từ 13 bảng màu trang trí về 2 bảng màu enterprise (2026-08-08). Khẳng định ở đây
 // đổi theo hợp đồng mới, và kiểm luôn đường quy đổi tên cũ — đó mới là phần dễ vỡ khi nâng cấp.
-check("theme: 3 bảng màu enterprise + quy đổi tên cũ", () => {
-  assert.equal(BRANDS.length, 3);
+check("theme: 4 bảng màu enterprise + quy đổi tên cũ", () => {
+  assert.equal(BRANDS.length, 4);
   assert.equal(isBrandMode("enterprise"), true);
   assert.equal(isBrandMode("graphite"), true);
   assert.equal(isBrandMode("red"), true);
+  assert.equal(isBrandMode("orange"), true);
   assert.equal(isBrandMode("sakura"), false);
   assert.equal(isBrandMode("unknown"), false);
   // Ô chọn màu phải là màu đặc áp thật, không phải gradient quảng cáo.
@@ -725,7 +726,8 @@ check("FormView render: required + depends_on + masked", () => {
   assert.ok(html.includes("mf-required"), "field reqd có dấu *");
   assert.ok(html.includes("close_reason"), "close_reason hiện khi status=Closed (depends_on)");
   assert.ok(html.includes("••••••"), "secret permlevel bị che");
-  assert.ok(html.includes(">Lưu<") || html.includes("Lưu"), "có nút Lưu");
+  // A clean persisted document must not show Save before the user edits it.
+  assert.ok(!html.includes(">Lưu<") && !html.includes("Lưu"), "ẩn nút Lưu khi chưa sửa");
 });
 
 // 15. FormView: 417 conflict → banner "Tải lại", không cho ghi đè.
@@ -1143,7 +1145,7 @@ check("Phiếu nhập dùng Số lượng chung, không ép mọi mặt hàng th
 
 check("ChildGrid render: cột child meta + thêm dòng + resolve depends_on theo row", () => {
   const childMeta: DocTypeMeta = {
-    name: "Sales Order Item",
+    name: "Discount Test Item",
     fields: [
       { fieldname: "item_code", fieldtype: "Data", label: "Mã hàng", in_list_view: 1, reqd: 1 },
       { fieldname: "qty", fieldtype: "Float", label: "SL", in_list_view: 1 },
@@ -1157,8 +1159,8 @@ check("ChildGrid render: cột child meta + thêm dòng + resolve depends_on the
     h(ChildGrid, {
       childMeta,
       rows: [
-        { name: "r1", doctype: "Sales Order Item", item_code: "ITEM-1", qty: 3, uom: "Bộ" },  // qty≤5 → discount ẩn
-        { name: "r2", doctype: "Sales Order Item", item_code: "ITEM-2", qty: 10, uom: "Cái" }, // qty>5 → discount hiện
+        { name: "r1", doctype: "Discount Test Item", item_code: "ITEM-1", qty: 3, uom: "Bộ" },  // qty≤5 → discount ẩn
+        { name: "r2", doctype: "Discount Test Item", item_code: "ITEM-2", qty: 10, uom: "Cái" }, // qty>5 → discount hiện
       ],
       onChange: () => {},
       registry: createFullRegistry(),
@@ -1325,7 +1327,8 @@ check("DashboardView render: number card + chart", () => {
   assert.ok(html.includes("Đơn tháng này"));
   assert.ok(html.includes("128"));
   assert.ok(html.includes("Doanh thu"));
-  assert.ok(html.includes("recharts-responsive-container") || html.includes("recharts"), "chart Recharts mount");
+  // Biểu đồ dùng ECharts và chỉ mount canvas ở trình duyệt; SSR vẫn phải có bảng dữ liệu trợ năng.
+  assert.ok(html.includes('role="table"') && html.includes(">T1<"), "chart surface có dữ liệu trợ năng khi SSR");
 });
 
 // 39. CalendarView render: lưới tháng + event đúng ngày.
@@ -1463,11 +1466,11 @@ check("Form actions: dirty guard (P0-04) khoá Gửi/Huỷ/Sửa đổi khi dirt
   const delDirty = find({ ...clean, dirty: true, perms: { delete: true } }, "delete");
   assert.ok(delDirty && !delDirty.disabled, "delete KHÔNG khoá theo dirty");
 
-  // Save: dirty → enabled (nút giải quyết); clean → disabled (không có gì để lưu)
+  // Save: dirty → enabled; form sạch không hiện nút Lưu để tránh gợi ý thao tác thừa.
   const saveDirty = find({ ...clean, dirty: true, perms: { write: true } }, "save");
   assert.ok(saveDirty && !saveDirty.disabled, "save dirty → enabled");
   const saveClean = find({ ...clean, perms: { write: true } }, "save");
-  assert.ok(saveClean && saveClean.disabled === true, "save clean → disabled (không dirty)");
+  assert.equal(saveClean, undefined, "save clean → ẩn (không dirty)");
 });
 
 // ===== BUILDER + SHELL + GANTT (làm nốt code) =====

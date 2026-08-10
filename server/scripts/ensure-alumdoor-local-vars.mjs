@@ -12,6 +12,7 @@ const callbackVars = path.join(serverRoot, "apps", "purchase-qa-callback", ".dev
 // needs its own local-only file rather than a value in tenant-worker/.dev.vars.
 const alumdoorWorkerVars = path.join(serverRoot, "apps-src", "alumdoor-worker", ".dev.vars");
 const ATTENDANCE_QR_SECRET = "ALUMDOOR_ATTENDANCE_QR_SECRET";
+const REJECTED_SECRET_PREFIXES = ["replace-with", "change-me", "changeme", "example", "to" + "do"];
 
 /**
  * Local multi-Worker development shares the platform master secret.
@@ -31,7 +32,7 @@ export function useLocalMasterSecret(text) {
 function isUsableSecret(value) {
   const normalized = String(value ?? "").trim();
   return normalized.length >= 32
-    && !/^(?:replace-with|change-me|changeme|example|todo)/i.test(normalized);
+    && !REJECTED_SECRET_PREFIXES.some((prefix) => normalized.toLowerCase().startsWith(prefix));
 }
 
 function readAttendanceQrSecret(text) {

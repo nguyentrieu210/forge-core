@@ -108,7 +108,6 @@ async function resolveItemPriceRecord(
   if (compatibleLegacy && !truthy(compatibleLegacy.disabled)) {
     return { price: compatibleLegacy, name: legacyName, sourceUom: selectedUom };
   }
-
   let rows: Json[];
   try {
     rows = await listResources(

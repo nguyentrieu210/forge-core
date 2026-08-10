@@ -67,7 +67,7 @@ export function validatePacking(picked: PickedStockLine[], packages: PackageInpu
       const key = identity(line);
       const pickedQty = pickedByKey.get(key);
       if (pickedQty === undefined) throw errors.reference(`Packed line ${key.replaceAll("\u0000", "/")} was not picked`);
-      if (line.serial_no && amount !== 1_000_000) throw errors.validation(`Serial ${line.serial_no} packed quantity must equal one unit`);
+      if (line.serial_no && amount !== 1_000_000) throw errors.validation(`Serial ${line.serial_no} packed quantity must be exactly one unit`);
       const cumulative = (packedByKey.get(key) ?? 0) + amount;
       if (!Number.isSafeInteger(cumulative) || cumulative > pickedQty) {
         throw errors.reference(`Packed quantity exceeds picked quantity for ${key.replaceAll("\u0000", "/")}`);

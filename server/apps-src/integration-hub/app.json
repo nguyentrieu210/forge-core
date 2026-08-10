@@ -8,9 +8,9 @@
   ],
   "hooks": [],
   "client": {
-    "brand": "neutral",
+    "brand": "zinc",
     "domain": "platform",
     "home": { "route": "/app/Integration%20Subscription", "doctype": "Integration Subscription" },
-    "catalog_mode": "native"
+    "catalog_mode": "workspace"
   }
 }

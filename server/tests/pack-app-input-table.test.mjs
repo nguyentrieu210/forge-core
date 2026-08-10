@@ -86,7 +86,8 @@ test("pack-app default output no longer references an undefined root", () => {
   try {
     const result = run([app]);
     assert.equal(result.status, 0, `${result.stdout}${result.stderr}`);
-    const expected = path.join(app, "maintenance-1.0.0.json");
+    const header = JSON.parse(readFileSync(path.join(app, "app.json"), "utf8"));
+    const expected = path.join(app, `${header.id}-${header.version}.json`);
     const packed = JSON.parse(readFileSync(expected, "utf8"));
     assert.equal(packed.id, "maintenance");
   } finally {

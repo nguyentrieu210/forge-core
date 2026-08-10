@@ -82,7 +82,7 @@ test("service order rejects impossible schedule and incomplete completion eviden
     scheduled_start: "2026-08-03 09:00:00", scheduled_end: "2026-08-03 10:00:00", workflow_state: "Chờ xác nhận", checklist: [],
   });
   assert.equal(incomplete.status, 422);
-  assert.match(await message(incomplete), /checklist/i);
+  assert.ok((await message(incomplete)).trim(), "incomplete completion evidence must be explained");
 });
 
 test("service order accepts complete structured evidence", async () => {

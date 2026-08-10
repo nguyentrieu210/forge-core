@@ -54,7 +54,8 @@ if defined VERIFY (
 echo.
 echo === 1.8. Dung local server cu truoc khi cap nhat du lieu ===
 REM D1/R2/DO local nam trong .wrangler; khong duoc migrate khi workerd dang ghi state.
-powershell -NoProfile -Command "$ports=@(8799,5173); foreach($port in $ports){$processIds=Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique; foreach($processId in $processIds){Stop-Process -Id $processId -Force -ErrorAction Stop}}" >> "%LOG%" 2>&1
+REM Khong chi giet workerd con: Wrangler cha co the giu va chiem lai cong 8799.
+call node server\scripts\stop-local-dev.mjs --ports=8799,5173 >> "%LOG%" 2>&1
 if errorlevel 1 (echo [LOI] Khong dung duoc local server cu - xem %LOG% & call :pause_if_interactive & exit /b 1)
 
 echo.
@@ -76,7 +77,8 @@ echo === 5. Chay worker ===
 REM Alumdoor validator can ba Worker noi nhau. Cau hinh nay co PUBLIC_ORIGIN co dinh 8799.
 set PORT=8799
 set REUSE=
-node -e "fetch('http://127.0.0.1:8799/api/method/metaforge.api.get_boot').then(r=>process.exit(r.status===403?0:2)).catch(()=>process.exit(1))" >nul 2>&1
+REM Moi ket noi deu co timeout: Workerd treo phai bi thay the, khong duoc lam script dung vo han.
+node -e "fetch('http://127.0.0.1:8799/api/method/metaforge.api.get_boot',{signal:AbortSignal.timeout(5000)}).then(r=>process.exit((r.status===401||r.status===403||r.ok)?0:1)).catch(()=>process.exit(1))" >nul 2>&1
 if not errorlevel 1 (
   powershell -NoProfile -Command "$ok=Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*wrangler.alumdoor-local.jsonc*' }; if($ok){exit 0}else{exit 1}" >nul 2>&1
   if not errorlevel 1 set REUSE=1
@@ -84,12 +86,9 @@ if not errorlevel 1 (
 if defined REUSE (
   echo   Dung lai cum Alumdoor worker dang chay tren 8799.
 ) else (
-  node -e "fetch('http://127.0.0.1:8799/').then(()=>process.exit(2)).catch(()=>process.exit(0))" >nul 2>&1
-  if errorlevel 2 (
-    echo [LOI] Cong 8799 dang bi worker cu chiem. Dong cua so Forge worker cu roi chay lai.
-    call :pause_if_interactive
-    exit /b 1
-  )
+  REM Neu co cum cu/treo tren 8799 thi ket thuc CA CAY tien trinh truoc khi khoi dong lai.
+  call node server\scripts\stop-local-dev.mjs --ports=8799 >> "%LOG%" 2>&1
+  if errorlevel 1 (echo [LOI] Khong the giai phong cong 8799 - xem %LOG% & call :pause_if_interactive & exit /b 1)
   echo   Khoi dong worker tren cong !PORT! ...
   start "Forge workers Alumdoor (local)" cmd /k "cd /d C:\alumdoor\server && pnpm run dev:alumdoor-local"
 )
@@ -98,7 +97,7 @@ echo   Cho worker san sang ^(toi da 180 giay^)...
 set READY=
 for /l %%i in (1,1,90) do (
   if not defined READY (
-    node -e "fetch('http://127.0.0.1:!PORT!/api/method/metaforge.api.get_boot').then(r=>process.exit(r.status===403?0:1)).catch(()=>process.exit(1))" >nul 2>&1
+    node -e "fetch('http://127.0.0.1:!PORT!/api/method/metaforge.api.get_boot',{signal:AbortSignal.timeout(5000)}).then(r=>process.exit((r.status===401||r.status===403||r.ok)?0:1)).catch(()=>process.exit(1))" >nul 2>&1
     if not errorlevel 1 (set READY=1) else (timeout /t 2 /nobreak >nul)
   )
 )

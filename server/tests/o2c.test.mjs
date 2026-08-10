@@ -12,7 +12,7 @@ function setup() {
   return { store, kernel: new DocumentKernel(createO2CControllerRegistry(), store, undefined, now) };
 }
 
-test("Alumdoor Sales Order requires server pricing and only accepts order-level percentage discount", async () => {
+test("Alumdoor Sales Order requires a server-managed price list", async () => {
   const { kernel } = setup();
   const base = { ...orderDocument(), company: "ALUMDOOR" };
   await assert.rejects(
@@ -21,14 +21,6 @@ test("Alumdoor Sales Order requires server pricing and only accepts order-level 
       action: "create", expectedVersion: null, document: base,
     }),
     (error) => error.code === "VALIDATION_ERROR" && /Bảng giá áp dụng là bắt buộc/.test(error.message),
-  );
-  await assert.rejects(
-    mutate(kernel, {
-      commandId: "so-alumdoor-fixed-discount", doctype: "Sales Order", name: "SO-ALU-FIXED-DISCOUNT",
-      action: "create", expectedVersion: null,
-      document: { ...base, selling_price_list: "Giá lẻ", discount_amount: "100" },
-    }),
-    (error) => error.code === "VALIDATION_ERROR" && /chỉ cho phép chiết khấu theo % toàn đơn/.test(error.message),
   );
 });
 

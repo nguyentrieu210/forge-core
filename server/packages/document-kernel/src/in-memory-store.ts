@@ -502,13 +502,19 @@ export class InMemoryMutationStore implements MutationStore {
   private commitPlan<T extends JsonObject>(plan: MutationPlan<T>): MutationReceipt {
     const command = plan.command;
     const key = this.docKey(command.tenant_id, command.aggregate.doctype, command.aggregate.name);
+    const previous = this.documents.get(key);
     // Attribution is stamped by the store, not the controller, so the in-memory
     // adapter must match D1 exactly or tests would pass against behaviour that
     // does not exist in production.
     this.documents.set(key, {
       ...structuredClone(plan.document),
       modified_by: command.actor.user_id,
-      ...(command.amended_from ? { amended_from: command.amended_from } : {}),
+      // Amendment lineage is supplied only by the create command.  Later submit/save
+      // commands must retain it, exactly as the D1 UPDATE does by not changing its
+      // `amended_from` column.
+      ...(command.amended_from
+        ? { amended_from: command.amended_from }
+        : previous?.amended_from ? { amended_from: previous.amended_from } : {}),
     });
     this.glEntries.push(...structuredClone(plan.gl_entries));
     this.voucherGlEntries.push(...plan.gl_entries.map((line) => ({

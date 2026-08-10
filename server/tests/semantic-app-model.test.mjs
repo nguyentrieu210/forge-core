@@ -40,7 +40,7 @@ test("app semantic parser produces a doctype-only permission-bound model", () =>
     dimensions: ["class_group", "currency"],
     metrics: ["fee_total"],
   });
-  assert.match(compiled.sql, /FROM documents WHERE tenant_id=\?1 AND doctype=\?2 AND docstatus=1/);
+  assert.match(compiled.sql, /FROM documents AS s WHERE s\.tenant_id=\?1 AND s\.doctype=\?2 AND s\.docstatus=1/);
   assert.deepEqual(compiled.params.slice(0, 2), ["tenant-a", "Enrollment"]);
 });
 

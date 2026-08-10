@@ -34,6 +34,9 @@ function fixture(tolerancePct = 5) {
     measurement_profile: "AL-BAR",
     has_catch_weight: true,
     weight_uom: "Kg",
+    purchase_stock_qty_field: "qty_bar",
+    purchase_allocation_qty_field: "qty_bar",
+    purchase_allocation_uom: "CÃ¢y",
   });
   const registry = new ControllerRegistry()
     .register(new RolloutPurchaseOrderController())
@@ -65,7 +68,7 @@ function purchaseOrderData(qtyBar, transactionDate, rowId = "ROW-1") {
       is_stamped: "Có",
       uom: "Kg",
       stock_uom: "Cây",
-      conversion_factor: (qtyBar / theoreticalKg).toFixed(6),
+      conversion_factor: (qtyBar / Number(theoreticalKg.toFixed(3))).toFixed(6),
       rate: 100_000,
     }],
   };
@@ -92,7 +95,7 @@ function receiptData(qtyBar, rowId, actualWeightKg, postingAt = "2026-07-03T00:0
       is_stamped: "Có",
       uom: "Kg",
       stock_uom: "Cây",
-      conversion_factor: (qtyBar / theoreticalKg).toFixed(6),
+      conversion_factor: (qtyBar / Number(theoreticalKg.toFixed(3))).toFixed(6),
       rate: 100_000,
       valuation_rate: 100_000,
     }],

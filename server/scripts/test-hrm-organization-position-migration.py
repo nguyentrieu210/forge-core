@@ -24,9 +24,10 @@ def rejected(fn,marker):
         assert marker in str(error),(marker,str(error)); db.execute("ROLLBACK TO fail"); db.execute("RELEASE fail"); return
     db.execute("ROLLBACK TO fail"); db.execute("RELEASE fail"); raise AssertionError(marker)
 
-insert_doc("Organization Position","ENG",0,{"company":"Demo","branch":"BR-A","department":"OPS","designation":"Engineer","planned_seats":1,"active":1})
+insert_doc("Organization Position","ENG",0,{"company":"Demo","branch":"BR-A","department":"OPS","designation":"Engineer","planned_seats":2,"active":1})
 insert_doc("Employee Position Assignment","PA-1",1,{"employee":"EMP-1","position":"ENG","from_date":"2026-01-01","to_date":"2026-12-31"})
 rejected(lambda: insert_doc("Employee Position Assignment","PA-2",1,{"employee":"EMP-1","position":"ENG","from_date":"2026-06-01","to_date":"2026-06-30"}),"HR_POSITION_ASSIGNMENT_OVERLAP")
+insert_doc("Employee Position Assignment","PA-CAPACITY-SEED",1,{"employee":"EMP-SEED","position":"ENG","from_date":"2026-06-01","to_date":"2026-06-30"})
 rejected(lambda: insert_doc("Employee Position Assignment","PA-3",1,{"employee":"EMP-2","position":"ENG","from_date":"2026-06-01","to_date":"2026-06-30"}),"HR_POSITION_CAPACITY_EXCEEDED")
 rejected(lambda: db.execute("UPDATE documents SET payload_json=? WHERE tenant_id='demo' AND doc_key='Organization Position:ENG'",(json.dumps({"company":"Demo","branch":"BR-B","department":"OPS","designation":"Engineer","planned_seats":1}),)),"HR_POSITION_SCOPE_LOCKED")
 rejected(lambda: db.execute("DELETE FROM documents WHERE tenant_id='demo' AND doc_key='Organization Position:ENG'"),"HR_POSITION_IN_USE")

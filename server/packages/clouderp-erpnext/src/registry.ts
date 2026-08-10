@@ -13,6 +13,7 @@ import {
 } from "./pos-session-hardening.js";
 import { ExactCancelPosInvoiceController } from "./pos-cancel-exact.js";
 import { DeliveryTripController, ProofOfDeliveryController } from "./logistics-controllers.js";
+import { LoadingPlanController } from "./loading-plan-controller.js";
 import { FreightEstimateController, TransportContractController } from "./freight-controllers.js";
 import {
   BankReconciliationController, BankTransactionController, EInvoiceSubmissionController, PayrollEntryController,
@@ -170,6 +171,7 @@ export function registerErpNextCoreControllers(registry: ControllerRegistry): Co
     .register(new ExactCancelPosInvoiceController())
     .register(new HardenedPosClosingEntryController())
     .register(new DeliveryTripController())
+    .register(new LoadingPlanController())
     .register(new ProofOfDeliveryController())
     .register(new TransportContractController())
     .register(new FreightEstimateController())

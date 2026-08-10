@@ -17,6 +17,7 @@ import {
 
 const SECRET = "platform-session-secret-value";
 const TENANT = "acme";
+const AUTH_NOW = Math.floor(Date.parse("2026-07-26T12:00:00.000Z") / 1000);
 // Real work factor is 210k; most tests use a smaller one so the suite stays fast,
 // which is safe because the count is stored per hash.
 //
@@ -318,7 +319,7 @@ test("no cookie means no session, which is different from a broken one", async (
 test("roles come from the directory, so revoking a role takes effect immediately", async () => {
   const user = await makeUser();
   const store = userStore([user]);
-  const minted = await mintSession({ tenantId: TENANT, userId: user.user_id, roles: ["Sales User", "Sales Manager"], epoch: 1, secret: SECRET });
+  const minted = await mintSession({ tenantId: TENANT, userId: user.user_id, roles: ["Sales User", "Sales Manager"], epoch: 1, secret: SECRET, now: AUTH_NOW });
   const request = new Request("https://x/api/method/anything", { headers: { cookie: `sid=${minted.sid}` } });
 
   // The token still claims Sales Manager; the directory no longer grants it.
@@ -331,7 +332,7 @@ test("roles come from the directory, so revoking a role takes effect immediately
 test("bumping the epoch revokes every outstanding session", async () => {
   const user = await makeUser();
   const store = userStore([user]);
-  const minted = await mintSession({ tenantId: TENANT, userId: user.user_id, roles: user.roles, epoch: 1, secret: SECRET });
+  const minted = await mintSession({ tenantId: TENANT, userId: user.user_id, roles: user.roles, epoch: 1, secret: SECRET, now: AUTH_NOW });
   const request = new Request("https://x/api/method/anything", { headers: { cookie: `sid=${minted.sid}` } });
 
   assert.ok(await establishSession(request, authContext(store)));
@@ -342,7 +343,7 @@ test("bumping the epoch revokes every outstanding session", async () => {
 test("a session for a deleted or disabled user stops working despite a valid signature", async () => {
   const user = await makeUser();
   const store = userStore([user]);
-  const minted = await mintSession({ tenantId: TENANT, userId: user.user_id, roles: user.roles, epoch: 1, secret: SECRET });
+  const minted = await mintSession({ tenantId: TENANT, userId: user.user_id, roles: user.roles, epoch: 1, secret: SECRET, now: AUTH_NOW });
   const request = new Request("https://x/api/method/anything", { headers: { cookie: `sid=${minted.sid}` } });
 
   user.enabled = false;

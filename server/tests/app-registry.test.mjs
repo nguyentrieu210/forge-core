@@ -472,7 +472,7 @@ test("app reports compile against documents, scoped to tenant and doctype", asyn
   assert.match(compiled.sql, /doctype=\?2/, "a report can only ever read the doctype it names");
   // A cancelled document still exists. Counting it makes every total quietly too big.
   assert.match(compiled.sql, /docstatus<>2/);
-  assert.match(compiled.sql, /COUNT\(\*\) AS "count_name"/, "count counts ROWS, not a JSON field that may be absent");
+  assert.match(compiled.sql, /COUNT\(\*\) AS "name"/, "count counts ROWS while preserving the declared report-column key");
   assert.deepEqual(compiled.params.slice(0, 3), ["t1", "Stock Request", "A"], "filter values are bound, never concatenated");
   assert.equal(compiled.columns[0].options, "Stock Request", "the Link target reaches the Frappe facade");
 });

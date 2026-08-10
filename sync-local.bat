@@ -4,7 +4,7 @@ REM Safe one-shot GitHub -> local refresh. It only accepts a clean local main.
 cd /d C:\alumdoor
 if errorlevel 1 (echo [LOI] Khong vao duoc C:\alumdoor & exit /b 1)
 
-call node server\scripts\sync-local-from-github.mjs
+call node server\scripts\sync-local-from-github.mjs --check
 set "SYNC_RESULT=%ERRORLEVEL%"
 if "%SYNC_RESULT%"=="0" (
   echo [OK] Local da dung commit main tren GitHub. Khong can build lai.
@@ -26,11 +26,16 @@ call node server\scripts\backup-local-state.mjs
 if errorlevel 1 (echo [LOI] Sao luu local state that bai & exit /b 1)
 
 echo.
-echo === 3. Dong bo dependency dung lockfile ===
+echo === 3. Dong bo main tu GitHub ===
+call node server\scripts\sync-local-from-github.mjs --apply
+if errorlevel 1 (echo [LOI] Khong the fast-forward main tu GitHub & exit /b 1)
+
+echo.
+echo === 4. Dong bo dependency dung lockfile ===
 call pnpm install --frozen-lockfile
 if errorlevel 1 (echo [LOI] Dependency khong khop lockfile & exit /b 1)
 
 echo.
-echo === 4. Build, test day du, migrate va cai metadata ===
+echo === 5. Build, test day du, migrate va cai metadata ===
 call run-local.bat --noninteractive --verify
 exit /b %ERRORLEVEL%

@@ -356,10 +356,10 @@ query = (ROOT / "packages/query/src/index.ts").read_text(encoding="utf-8")
 period_meta = (ROOT / "apps-src/vn-accounting/doctypes/vn-accounting-period.json").read_text(encoding="utf-8")
 assert 'context.command.action === "cancel" ? reverseGl(lines) : lines' in controllers
 assert 'const previousReceipt = await this.store.getReceipt(command.tenant_id, command.command_id);' in kernel
-assert 'if (previousReceipt)' in kernel and 'return previousReceipt;' in kernel
-assert 'this.permission.assert({' in kernel
+assert 'if (previousReceipt) return this.assertMatchingReceipt(command, previousReceipt);' in kernel
+assert 'this.permissions.assert({' in kernel
 assert "INSERT INTO versions" in store and "INSERT INTO gl_entries" in store and "INSERT INTO mutation_receipts" in store
-assert "await database.batch(statements)" in store
+assert "await database.batch(executions.flatMap((execution) => execution.statements))" in store
 assert store.index("INSERT INTO documents") < store.index("INSERT INTO gl_entries")
 assert "getVoucherGlEntries" in store and "FROM gl_entries" in store
 assert '"General Ledger"' in query and '"Trial Balance"' in query

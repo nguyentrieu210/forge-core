@@ -103,6 +103,13 @@ async function seed(): Promise<void> {
      VALUES('demo','sales@example.com','Sales Person','sales@example.com',?1,'vi','Asia/Ho_Chi_Minh',?2,?2)
      ON CONFLICT(tenant_id,user_id) DO UPDATE SET password_hash=excluded.password_hash`,
   ).bind(await hashPassword(PASSWORD, 1_000), NOW).run();
+  // A document share must target an active account; that is enforced by the
+  // collaboration-integrity trigger in the tenant schema.
+  await env.DB.prepare(
+    `INSERT INTO users(tenant_id,user_id,full_name,email,created_at,modified_at)
+     VALUES('demo','colleague@example.com','Colleague','colleague@example.com',?1,?1)
+     ON CONFLICT(tenant_id,user_id) DO UPDATE SET enabled=1,user_type='System User'`,
+  ).bind(NOW).run();
   await env.DB.prepare(
     `INSERT INTO user_roles(tenant_id,user_id,role) VALUES('demo','sales@example.com','System Manager')
      ON CONFLICT DO NOTHING`,
@@ -394,6 +401,7 @@ describe("frappe facade over real workerd, D1 and Durable Objects", () => {
 
     const payload = await unwrap(await method("frappe.desk.form.load.getdoc", { doctype: "Field Visit", name: createdName }, "GET"));
     expect(payload.docs[0].subject).toBe("First visit");
+    expect(payload.docs[0].modified).toBe(createdModified);
     expect(payload.docinfo.permissions.read).toBe(1);
     expect(payload.docinfo.permissions.submit).toBe(1);
     expect(Array.isArray(payload.docinfo.comments)).toBe(true);
@@ -408,6 +416,8 @@ describe("frappe facade over real workerd, D1 and Durable Objects", () => {
     expect(stale.status).toBe(417);
     // TimestampMismatchError is the only exception the client maps to "conflict".
     expect((await stale.json() as any).exc_type).toBe("TimestampMismatchError");
+    const unchanged = await unwrap(await method("frappe.desk.form.load.getdoc", { doctype: "Field Visit", name: createdName }, "GET"));
+    expect(unchanged.docs[0].modified).toBe(createdModified);
 
     const fresh = await call(`/api/resource/Field Visit/${createdName}`, {
       method: "PUT",
@@ -784,7 +794,7 @@ describe("frappe facade over real workerd, D1 and Durable Objects", () => {
     expect(String((await missing.json() as any).message)).toMatch(/Unknown report/i);
 
     const badFilter = await method("frappe.desk.query_report.run", {
-      report_name: "General Ledger", filters: { company: "Demo" },
+      report_name: "General Ledger", filters: { not_an_allowed_filter: "Demo" },
     }, "GET");
     expect(badFilter.status).toBeGreaterThanOrEqual(400);
     expect(String((await badFilter.json() as any).message)).toMatch(/Filter is not allowed/i);
@@ -1062,7 +1072,8 @@ describe("frappe facade over real workerd, D1 and Durable Objects", () => {
     const owned = await env.DB.prepare(
       `SELECT count(*) AS total FROM app_objects WHERE tenant_id='demo' AND app_id='bulk'`,
     ).first<{ total: number }>();
-    expect(owned!.total).toBe(127);
+    // Roles are shared grants, not exclusive app-owned rows: 69 DocTypes + 57 fixtures.
+    expect(owned!.total).toBe(126);
     const sample = await env.DB.prepare(
       `SELECT object_type FROM app_objects WHERE tenant_id='demo' AND app_id='bulk' AND object_name='Bulk Doc 69'`,
     ).first<{ object_type: string }>();
@@ -1534,6 +1545,9 @@ describe("frappe facade over real workerd, D1 and Durable Objects", () => {
     const response = await call("/api/method/logout", { method: "POST" });
     expect(response.status).toBe(200);
     expect(response.headers.get("set-cookie")).toMatch(/Max-Age=0/);
+    // Keep the following authenticated façade contracts independent from this
+    // explicit logout check.
+    expect((await switchSession("sales@example.com")).status).toBe(200);
   });
 
   it("keeps the native API working alongside the frappe surface", async () => {
@@ -1701,6 +1715,14 @@ describe("mechanisms that must actually run, not merely exist", () => {
       channel: "Notification",
       recipients: [{ kind: "user", value: "sales@example.com" }],
     })).run();
+
+    // The runner authorizes against the committed source document, not merely
+    // the event payload, so the event cannot disclose a guessed document name.
+    await env.DB.prepare(
+      `INSERT INTO documents(
+         tenant_id,doc_key,doctype,name,owner,docstatus,status,version,created_at,modified_at,payload_json
+       ) VALUES('demo','Field Visit:FV-NOTIFY','Field Visit','FV-NOTIFY','sales@example.com',1,'Submitted',2,?1,?1,?2)`,
+    ).bind(NOW, JSON.stringify({ subject: "Kiểm tra kho", is_billable: 1 })).run();
 
     const event = {
       event_id: "evt-notify-1", event_type: "field_visit.submitted", tenant_id: "demo",

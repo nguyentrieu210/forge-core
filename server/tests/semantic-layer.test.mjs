@@ -56,9 +56,9 @@ test("semantic compiler binds tenant, allowlists members and preserves exact sca
     limit: 250,
   });
 
-  assert.match(compiled.sql, /FROM "daily_detailed_ledger" WHERE "tenant_id"=\?1/);
-  assert.match(compiled.sql, /COALESCE\(SUM\("debit_minor"\),0\) AS "debit"/);
-  assert.match(compiled.sql, /GROUP BY "account", "currency"/);
+  assert.match(compiled.sql, /FROM "daily_detailed_ledger" AS s WHERE s\."tenant_id"=\?1/);
+  assert.match(compiled.sql, /COALESCE\(SUM\(s\."debit_minor"\),0\) AS "debit"/);
+  assert.match(compiled.sql, /GROUP BY s\."account", s\."currency"/);
   assert.doesNotMatch(compiled.sql, /CAST\(.+ AS REAL\)/i);
   assert.ok(!compiled.sql.includes("OR 1=1"));
   assert.equal(compiled.params[1], "111' OR 1=1 --");
@@ -138,8 +138,8 @@ test("doctype semantic source makes draft/submitted state explicit", () => {
     filters: [{ dimension: "posting_date", operator: ">=", value: "2026-08-01" }],
   });
 
-  assert.match(compiled.sql, /FROM documents WHERE tenant_id=\?1 AND doctype=\?2 AND docstatus=1/);
-  assert.match(compiled.sql, /json_extract\(payload_json,'\$\.customer'\)/);
+  assert.match(compiled.sql, /FROM documents AS s WHERE s\.tenant_id=\?1 AND s\.doctype=\?2 AND s\.docstatus=1/);
+  assert.match(compiled.sql, /json_extract\(s\.payload_json,'\$\.customer'\)/);
   assert.deepEqual(compiled.params.slice(0, 3), ["tenant-b", "Sales Invoice", "2026-08-01"]);
 
   const drafts = new SemanticQueryCompiler(new SemanticModelRegistry([{

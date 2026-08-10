@@ -2052,6 +2052,13 @@ export function ChildGrid(props: ChildGridProps) {
                 : undefined;
               const DiscountControl = discountColumn ? registry.resolve(discountColumn.fieldtype) ?? FallbackControl : null;
               const DiscountAmountControl = discountAmountColumn ? registry.resolve(discountAmountColumn.fieldtype) ?? FallbackControl : null;
+              // The dedicated discount row obeys the same row-scoped metadata contract as ordinary cells.
+              const discountField = discountColumn
+                ? fieldForRow(discountColumn.list_only ? { ...discountColumn, list_only: 0 } : discountColumn, row)
+                : undefined;
+              const resolvedDiscount = discountField
+                ? resolveField(discountField, childMeta, { doc: row, parent: parentDoc, roles, assumeWritable: true })
+                : undefined;
               const rateNeedsApproval = childMeta.name === "Sales Order Item" && row.rate_requires_approval === true;
               const discountNeedsApproval = childMeta.name === "Sales Order Item"
                 && Boolean(row.item_code)
@@ -2153,7 +2160,7 @@ export function ChildGrid(props: ChildGridProps) {
                   </TableCell>
                 ) : null}
               </TableRow>
-              {discountColumn && discountAmountColumn && DiscountControl && DiscountAmountControl ? (
+              {discountColumn && discountAmountColumn && DiscountControl && DiscountAmountControl && resolvedDiscount?.visible ? (
                 <TableRow className="hover:bg-transparent">
                   <TableCell
                     colSpan={(readOnly ? 1 : 2) + discountColumnIndex}
@@ -2161,10 +2168,11 @@ export function ChildGrid(props: ChildGridProps) {
                   />
                   <TableCell className={`border-t-0 px-1 py-0.5 text-center [&_input]:!h-8 [&_input]:!text-center [&_button]:!h-8 [&_.mf-control]:!min-h-8 [&_.mf-control]:!justify-center ${discountNeedsApproval ? "animate-pulse !bg-red-700 text-white ring-2 ring-inset ring-red-950 [&_*]:!text-white [&_.mf-control]:!border-red-950 [&_.mf-control]:!bg-red-700" : "bg-muted/20"}`} style={stickyColumn(discountColumn.fieldname).style}>
                     <DiscountControl
-                      field={fieldForRow(discountColumn.list_only ? { ...discountColumn, list_only: 0 } : discountColumn, row)}
+                      field={discountField!}
                       value={row.discount_percentage ?? 0}
                       onChange={(value: unknown) => setCell(ri, "discount_percentage", value)}
-                      readOnly={readOnly}
+                      readOnly={readOnly || Boolean(resolvedDiscount?.readOnly)}
+                      masked={resolvedDiscount?.masked}
                       services={services}
                       docname={String(row.name ?? "")}
                       parentDoctype={childMeta.name}

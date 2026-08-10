@@ -21,21 +21,56 @@ if (existsSync(hiddenDevVarsPath)) {
 
 const hadLocalDevVars = existsSync(devVarsPath);
 let verificationStatus = 1;
-try {
-  if (hadLocalDevVars) renameSync(devVarsPath, hiddenDevVarsPath);
+
+function restoreLocalDevVars() {
+  if (!hadLocalDevVars || !existsSync(hiddenDevVarsPath)) return;
+  // A nested local helper may recreate .dev.vars while the original is hidden.
+  // Never overwrite either secret: retain that new copy outside Git, then restore
+  // the pre-verification file the running local cluster was configured with.
+  if (existsSync(devVarsPath)) {
+    const preservedPath = `${devVarsPath}.recreated-during-verify-${Date.now()}`;
+    renameSync(devVarsPath, preservedPath);
+    console.warn(`LOCAL_VERIFY_PRESERVED_RECREATED_DEV_VARS path=${preservedPath}`);
+  }
+  renameSync(hiddenDevVarsPath, devVarsPath);
+}
+
+function runPnpm(args) {
   const command = process.platform === "win32" ? (process.env.ComSpec || "cmd.exe") : "pnpm";
-  const args = process.platform === "win32" ? ["/d", "/s", "/c", "pnpm run verify"] : ["run", "verify"];
-  const result = spawnSync(command, args, {
+  const commandArgs = process.platform === "win32"
+    ? ["/d", "/s", "/c", `pnpm ${args.join(" ")}`]
+    : args;
+  const result = spawnSync(command, commandArgs, {
     cwd: repositoryRoot,
     stdio: "inherit",
   });
-  verificationStatus = result.status ?? 1;
   if (result.error) {
     console.error(`LOCAL_VERIFY_FAILED: ${result.error.message}`);
-    verificationStatus = 1;
+    return 1;
   }
+  return result.status ?? 1;
+}
+
+try {
+  if (hadLocalDevVars) renameSync(devVarsPath, hiddenDevVarsPath);
+  // `wrangler types` must not see local secret declarations, but Worker integration
+  // tests intentionally load the local development actor from .dev.vars. Run the
+  // generated-type/business suite first, then restore local variables for the rest.
+  verificationStatus = runPnpm(["run", "server:check"]);
 } finally {
-  if (hadLocalDevVars && existsSync(hiddenDevVarsPath)) renameSync(hiddenDevVarsPath, devVarsPath);
+  restoreLocalDevVars();
+}
+
+if (verificationStatus === 0) {
+  for (const args of [
+    ["--filter", "cloudforge", "run", "test:workers"],
+    ["run", "client:typecheck"],
+    ["run", "client:test"],
+    ["run", "client:build"],
+  ]) {
+    verificationStatus = runPnpm(args);
+    if (verificationStatus !== 0) break;
+  }
 }
 
 process.exit(verificationStatus);

@@ -52,7 +52,10 @@ describe("Frappe Core Beta routes over real workerd D1", () => {
     expect(body.imported).toBe(1);
     expect(body.failed).toBe(1);
     expect(body.results.map((entry) => entry.status)).toEqual(["imported", "failed"]);
-    expect(body.results[1]?.error?.code).toBe("VALIDATION_ERROR");
+    // Import reports per-row failures through its stable envelope; the detailed
+    // validation message remains available to the caller without exposing a
+    // transport-specific error code.
+    expect(body.results[1]?.error?.code).toBe("MIGRATION_ROW_FAILED");
 
     const stored = await request(`/api/v1/documents/${encodeURIComponent(DOCTYPE)}/CB-IMP-1`);
     expect(stored.status).toBe(200);

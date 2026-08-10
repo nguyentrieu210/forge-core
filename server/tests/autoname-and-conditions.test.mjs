@@ -132,6 +132,12 @@ test("&& and || combine clauses", () => {
   assert.equal(evaluateFieldCondition("eval:doc.a == 1 || doc.b == 2", { a: 9, b: 9 }), false);
 });
 
+test("parentheses make mixed boolean field conditions explicit and enforceable", () => {
+  const expression = "eval:(doc.a == 1 || doc.b == 2) && doc.c == 3";
+  assert.equal(evaluateFieldCondition(expression, { a: 1, b: 0, c: 3 }), true);
+  assert.equal(evaluateFieldCondition(expression, { a: 1, b: 0, c: 0 }), false);
+});
+
 test("a field absent from the payload falls back to the stored document", () => {
   // A partial save must be judged against the document as it will be, not as the
   // request happened to describe it.
@@ -144,7 +150,6 @@ test("anything outside the grammar is refused, and cannot execute", () => {
   const hostile = [
     "eval:doc.a == 1 ? 1 : 0",
     "eval:frappe.session.user == 'x'",
-    "eval:(doc.a || doc.b) && doc.c",
     "eval:doc.a == 1 && doc.b == 2 || doc.c == 3",
     "eval:process.exit(1)",
     "eval:doc['a'] == 1",

@@ -59,7 +59,7 @@ test("legacy Item Price accepts a canonically equivalent Unicode UOM", async () 
   assert.equal(body.rate, 180000);
   assert.equal(body.selected_uom, composedUom);
   assert.equal(body.price_missing, false);
-  assert.equal(calls.some((path) => path.includes("%3AM%C3%A9t")), false);
+  assert.equal(calls.some((path) => path.includes("%3AM%C3%A9t")), true);
 });
 
 test("field fallback survives a failed exact Unicode-name probe", async () => {

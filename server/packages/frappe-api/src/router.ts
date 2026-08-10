@@ -4203,7 +4203,12 @@ function documentArgument(args: FrappeArgs): JsonObject {
 }
 
 function toKernelPayload(submitted: JsonObject, meta: DocTypeMeta): JsonObject {
-  return stripServerOwnedFields(fromFrappeDoc(submitted, tableFieldNames(meta)));
+  const payload = stripServerOwnedFields(fromFrappeDoc(submitted, tableFieldNames(meta)));
+  // `toFrappeDoc` always exposes the derived lifecycle status.  Preserve a submitted
+  // status only when the DocType explicitly owns a business field with that name;
+  // otherwise a round-tripped framework value would be rejected as an unknown field.
+  if (!meta.fields.some((field) => field.fieldname === "status")) delete payload.status;
+  return payload;
 }
 
 /**

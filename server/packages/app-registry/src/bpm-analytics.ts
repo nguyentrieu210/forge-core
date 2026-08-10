@@ -33,7 +33,13 @@ export interface BpmProcessAnalytics extends JsonObject {
   bottlenecks: BpmStageMetric[];
 }
 
-const KEY = /^[a-z][a-z0-9_.:-]{0,159}$/;
+// Process and stage keys are normally lower-case slugs, but the instance and run
+// identifiers are business document ids (for example `PO-1`).  They must preserve
+// their canonical casing so analytics does not split one approval run into two ids.
+// Workflow instance ids may be numeric when they come from a legacy sequence
+// (for example `1` or `2026-00042`).  They are still bounded to the same safe
+// identifier alphabet; only the unnecessary leading-letter restriction is gone.
+const KEY = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}$/;
 const MAX_FACTS = 100_000;
 
 function object(value: unknown, where: string): JsonObject {

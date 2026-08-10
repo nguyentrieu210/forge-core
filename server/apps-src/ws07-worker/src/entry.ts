@@ -527,7 +527,13 @@ export default {
       if (scoped) return deny(scoped);
       const closure = await closureViolation(request, env, subject, doc);
       if (closure) return deny(closure);
-      return baseWorker.fetch(request, env);
+      // The scope layer validates the merged server document for a partial save.
+      // Forward that same merged payload to the base validator; otherwise an
+      // innocuous note edit is checked as a brand-new incomplete document.
+      const normalizedRequest = new Request(request, {
+        body: JSON.stringify({ ...subject, payload: doc }),
+      });
+      return baseWorker.fetch(normalizedRequest, env);
     } catch (error) {
       const message = error instanceof Error ? error.message : "WS07 scope validator không thể kiểm tra thay đổi.";
       return new Response(JSON.stringify({ message }), { status: 503, headers: { "content-type": "application/json" } });

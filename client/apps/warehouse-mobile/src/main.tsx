@@ -54,11 +54,12 @@ import {
   toast,
 } from "@metaforge/ui";
 import { CustomerReceivablesScreen, DeliveryNotesScreen } from "./SalesMobileScreens.js";
+import { PurchaseFundingScreen } from "./PurchaseFundingScreen.js";
 import "./styles.css";
 
 const adapter = new FrappeAdapterImpl({});
 
-type MobileTab = "home" | "actions" | "deliveries" | "debt" | "stock" | "account";
+type MobileTab = "home" | "actions" | "deliveries" | "debt" | "stock" | "funding" | "account";
 type Operation = "receipt" | "issue" | "transfer" | "count";
 
 interface WarehouseHistoryState {
@@ -161,7 +162,7 @@ function WarehouseMobileApp({ boot, logout }: { boot: MetaForgeBootDTO; logout: 
   const params = useMemo(() => new URLSearchParams(window.location.search), []);
   const requestedAction = params.get("action") as Operation | null;
   const requestedTab = params.get("tab") as MobileTab | null;
-  const validTabs: MobileTab[] = ["home", "deliveries", "debt", "stock", "account"];
+  const validTabs: MobileTab[] = ["home", "deliveries", "debt", "stock", "funding", "account"];
   const [tab, setTab] = useState<MobileTab>(requestedTab && validTabs.includes(requestedTab) ? requestedTab : "home");
   const [operation, setOperation] = useState<Operation | null>(requestedAction && requestedAction in OPERATION_META ? requestedAction : null);
   const [passwordOpen, setPasswordOpen] = useState(false);
@@ -249,6 +250,7 @@ function WarehouseMobileApp({ boot, logout }: { boot: MetaForgeBootDTO; logout: 
     : tab === "deliveries" ? "Phiếu xuất kho"
       : tab === "debt" ? "Công nợ chi tiết"
         : tab === "stock" ? "Tồn nhôm"
+          : tab === "funding" ? "Đề xuất mua"
           : tab === "account" ? "Tài khoản" : "Alumdoor Sale";
   const pageSubtitle = operation ? "Nghiệp vụ kho" : "Ứng dụng sale trên điện thoại";
 
@@ -287,6 +289,8 @@ function WarehouseMobileApp({ boot, logout }: { boot: MetaForgeBootDTO; logout: 
           <CustomerReceivablesScreen adapter={adapter} boot={boot} />
         ) : tab === "stock" ? (
           <StockLookup />
+        ) : tab === "funding" ? (
+          <PurchaseFundingScreen adapter={adapter} boot={boot} />
         ) : (
           <AccountScreen
             boot={boot}
@@ -621,6 +625,7 @@ function AccountRow({ icon, label, onClick, destructive }: { icon: ReactNode; la
 
 function BottomNavigation({ active, pending, onChange }: { active: MobileTab; pending: number; onChange: (tab: MobileTab) => void }) {
   const items: Array<{ key: MobileTab; label: string; icon: ReactNode }> = [
+    { key: "funding", label: "Đề xuất", icon: <WalletCards /> },
     { key: "home", label: "Trang chủ", icon: <Home /> },
     { key: "deliveries", label: "Xuất kho", icon: <ClipboardCheck /> },
     { key: "debt", label: "Công nợ", icon: <WalletCards /> },
@@ -628,7 +633,7 @@ function BottomNavigation({ active, pending, onChange }: { active: MobileTab; pe
     { key: "account", label: "Tôi", icon: <UserRound /> },
   ];
   return (
-    <nav className="forge-mobile-bottom grid grid-cols-5 gap-1" aria-label="Điều hướng app sale">
+    <nav className="forge-mobile-bottom grid grid-cols-6 gap-1" aria-label="Điều hướng app sale">
       {items.map((item) => (
         <Button key={item.key} variant="ghost" className={`relative h-14 flex-col gap-1 rounded-xl px-1 text-[10px] ${active === item.key ? "bg-primary/10 text-primary" : "text-muted-foreground"}`} onClick={() => onChange(item.key)}>
           <span className="[&_svg]:size-5">{item.icon}</span><span>{item.label}</span>

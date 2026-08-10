@@ -185,13 +185,15 @@ test("sales grid clears authoritative preview values when item context cannot be
     new URL("../../client/packages/views/src/form/ChildGrid.tsx", import.meta.url),
     "utf8",
   );
-  const failureBlock = source.match(/\} catch \{([\s\S]*?)Không đọc được tồn \/ giá/);
-
-  assert.ok(failureBlock, "sales item context failure handler must remain present");
-  assert.match(failureBlock[1], /patch\.available_qty = undefined/);
-  assert.match(failureBlock[1], /patch\.available_stock_qty = undefined/);
-  assert.match(failureBlock[1], /patch\.available_stock_uom = undefined/);
-  assert.match(failureBlock[1], /patch\.rate = undefined/);
+  const computeItemPatchStart = source.indexOf("const computeItemPatch");
+  const failureStart = source.indexOf("} catch {", computeItemPatchStart);
+  const failureEnd = source.indexOf("\n    // Item", failureStart);
+  assert.ok(computeItemPatchStart >= 0 && failureStart >= 0 && failureEnd > failureStart, "sales item context failure handler must remain present");
+  const failureBlock = source.slice(failureStart, failureEnd);
+  assert.match(failureBlock, /patch\.available_qty = undefined/);
+  assert.match(failureBlock, /patch\.available_stock_qty = undefined/);
+  assert.match(failureBlock, /patch\.available_stock_uom = undefined/);
+  assert.match(failureBlock, /patch\.rate = undefined/);
 });
 
 test("sales item context rejects an Item Price whose currency differs from the document", async () => {

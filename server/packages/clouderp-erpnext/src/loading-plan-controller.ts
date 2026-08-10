@@ -28,8 +28,8 @@ export class LoadingPlanController extends SuiteController<LoadingPlanData> {
     if (!Number.isFinite(Date.parse(input.loaded_at))) throw errors.validation("loaded_at must be a valid timestamp");
 
     const baseName = `LOAD-${input.delivery_trip}`;
-    if (!context.command.amended_from && context.command.aggregate.name !== baseName) throw errors.validation(`Initial Loading Plan name must be ${baseName}`);
-    if (context.command.amended_from && !context.command.aggregate.name.startsWith(`${baseName}-`)) throw errors.validation(`Amended Loading Plan name must start with ${baseName}-`);
+    if (context.command.action === "create" && !context.command.amended_from && context.command.aggregate.name !== baseName) throw errors.validation(`Initial Loading Plan name must be ${baseName}`);
+    if (context.command.action === "create" && context.command.amended_from && !context.command.aggregate.name.startsWith(`${baseName}-`)) throw errors.validation(`Amended Loading Plan name must start with ${baseName}-`);
 
     const trip = await submitted<JsonObject>(context as unknown as ControllerContext<JsonObject>, "Delivery Trip", input.delivery_trip);
     const stops = Array.isArray(trip.data.delivery_stops) ? trip.data.delivery_stops : [];

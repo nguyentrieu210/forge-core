@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import queryWorker from "../dist/apps/query-worker/src/index.js";
 
 function createFakeDatabase(row) {
-  const capture = { sql: "", params: [] };
+  const capture = { sql: "", params: [], statements: [] };
   const statement = {
     bind(...params) {
       capture.params = params;
@@ -18,6 +18,7 @@ function createFakeDatabase(row) {
     db: {
       prepare(sql) {
         capture.sql = sql;
+        capture.statements.push(sql);
         return statement;
       },
     },
@@ -71,10 +72,11 @@ test("Query Worker routes AR aging through FinanceQueryCompiler and D1ReportServ
   assert.deepEqual(body.result, [expectedRow]);
   assert.ok(body.columns.some((column) => column.field === "due_date_source"));
 
-  assert.match(capture.sql, /payment_ledger_entries/);
-  assert.match(capture.sql, /finance_invoice_terms/);
-  assert.match(capture.sql, /p\.tenant_id\s*=\s*\?1/);
-  assert.match(capture.sql, /date\(p\.posting_at\)\s*<=\s*date\(\?2\)/);
+  const agingSql = capture.statements.find((sql) => sql.includes("payment_ledger_entries")) ?? "";
+  assert.match(agingSql, /payment_ledger_entries/);
+  assert.match(agingSql, /finance_invoice_terms/);
+  assert.match(agingSql, /p\.tenant_id\s*=\s*\?1/);
+  assert.match(agingSql, /date\(p\.posting_at\)\s*<=\s*date\(\?2\)/);
   assert.deepEqual(capture.params.slice(0, 3), [
     "demo",
     "2026-07-31",

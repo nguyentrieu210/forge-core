@@ -17,7 +17,7 @@ test("HRM package exposes complete operational HR, time and payroll dimensions",
   const parsed = parseAppManifest(source);
 
   assert.equal(parsed.id, "hrm");
-  assert.equal(parsed.version, "1.5.0");
+  assert.equal(parsed.version, "1.8.0");
   for (const key of [
     "Branch", "Department", "Job Opening", "Job Applicant", "Job Offer", "Employee", "Employment Contract",
     "Employee Transfer", "Employee Separation", "Leave Policy", "Leave Allocation", "Leave Application", "Holiday List",
@@ -110,7 +110,7 @@ test("Vietnam accounting package versions legal rules and traces payroll posting
   const parsed = parseAppManifest(source);
 
   assert.equal(parsed.id, "vn-accounting");
-  assert.equal(parsed.version, "1.2.0");
+  assert.equal(parsed.version, "1.6.1");
   assert.deepEqual(parsed.requires, [{ id: "hrm", version: ">=1.3.0" }]);
   assert.ok(parsed.nav.some((item) => item.key === "TT99 Account Map"));
   assert.ok(parsed.roles.some((item) => item.role === "Tax Specialist"));

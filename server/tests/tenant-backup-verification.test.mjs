@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import {
   allowedTenantIdsForBackupTable,
   assertRestoreVerification,
@@ -54,7 +55,7 @@ INSERT INTO installed_apps (tenant_id,app_id,manifest_json) VALUES ('${tenant}',
 }
 
 function runVerifier(item, output) {
-  const serverRoot = path.resolve(new URL("..", import.meta.url).pathname);
+  const serverRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
   return spawnSync(
     process.execPath,
     [
@@ -152,7 +153,7 @@ test("backup and remote restore use the same tenant scope policy", () => {
     "__standard__",
   ]);
 
-  const serverRoot = path.resolve(new URL("..", import.meta.url).pathname);
+  const serverRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
   const drillSource = readFileSync(path.join(serverRoot, "scripts", "restore-tenant-drill.mjs"), "utf8");
   assert.match(drillSource, /allowedTenantIdsForBackupTable/);
   assert.match(drillSource, /tenant_id NOT IN/);

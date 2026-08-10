@@ -233,7 +233,6 @@
     "customer_group:Select(Đại lý,Lẻ)! Nhóm giá",
     "width_pb_ray_m:Float! Rộng PB ray (m)",
     "width_pb_nhua_m:Float! Rộng PB nhựa (m)",
-    "ray_type:Select(Ray thường,Ray âm,Ray nghiêng) Loại ray",
     "height_m:Float Cao phủ bì (m)",
     "set_count:Int!=(1) Số bộ",
     "selling_rate:Currency Đơn giá bán / m2"

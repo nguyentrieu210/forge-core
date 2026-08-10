@@ -6,6 +6,7 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { normalizeCatalogFixture, planAlumdoorCatalogAudit } from "./alumdoor-catalog-audit-planner.mjs";
+import { readBriefSource } from "./lib/read-brief-source.mjs";
 
 const FORBIDDEN_WRITE_FLAGS = new Set(["--execute", "--apply", "--fix", "--write-back"]);
 const AUDITED_DOCTYPES = [
@@ -31,7 +32,7 @@ async function main() {
     const source = args.input
       ? readFixture(args.input)
       : args.brief
-        ? readBrief(args.brief)
+        ? await readBrief(args.brief)
         : await readRemote(args.tenant);
     cleanup = source.cleanup ?? null;
     const redacted = args.redacted || (Boolean(args.tenant) && !args.includeNames);
@@ -65,9 +66,9 @@ function readFixture(file) {
   return { metadataVersion: normalized.metadataVersion, records: normalized.records };
 }
 
-function readBrief(file) {
+async function readBrief(file) {
   const absolute = path.resolve(process.cwd(), file);
-  const brief = JSON.parse(readFileSync(absolute, "utf8"));
+  const brief = await readBriefSource(absolute);
   if (!brief || typeof brief !== "object" || Array.isArray(brief)) fail("Alumdoor brief must be a JSON object.");
   if (!Array.isArray(brief.fixtures)) fail("Alumdoor brief does not contain a fixtures array.");
   const records = brief.fixtures

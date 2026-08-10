@@ -398,7 +398,12 @@ export class PosInvoiceController extends SuiteController<PosInvoiceData> {
       if (priceList) {
         const customerGroup = typeof customer.customer_group === "string" ? customer.customer_group : null;
         const resolved = await resolveServerPrice(context as unknown as ControllerContext<JsonObject>, { priceList, itemCode: raw.item_code, documentCurrency: currency, partyType: "Customer", party: input.customer, ...(customerGroup ? { customerGroup } : {}), postingDate: input.posting_at, qtyMicros: qty });
-        rate = resolved.rate_minor; pricing = { item_price: resolved.item_price, ...(resolved.pricing_rule ? { pricing_rule: resolved.pricing_rule } : {}) };
+        rate = resolved.rate_minor;
+        pricing = {
+          item_price: resolved.item_price,
+          ...(resolved.pricing_rule ? { pricing_rule: resolved.pricing_rule } : {}),
+          ...(resolved.discount_percentage ? { discount_percentage: resolved.discount_percentage } : {}),
+        };
       }
       items.push({ ...raw, ...pricing, row_id: raw.row_id || `ROW-${index + 1}`, qty: fromScaledInt(qty, 6), qty_micros: qty, rate: fromScaledInt(rate, scale), rate_minor: rate, warehouse, income_account: incomeAccount });
     }

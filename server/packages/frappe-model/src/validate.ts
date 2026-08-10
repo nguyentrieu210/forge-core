@@ -52,7 +52,7 @@ const LAYOUT_FIELDS = new Set<MetaFieldType>([
  * regression suite. Until then an app names the field `<thing>_status`, which works
  * today and reads no worse.
  */
-const SYSTEM_FIELDS = new Set(["name", "owner", "creation", "modified", "modified_by", "docstatus", "idx", "doctype", "version", "status"]);
+const SYSTEM_FIELDS = new Set(["name", "owner", "creation", "modified", "modified_by", "docstatus", "idx", "doctype", "version"]);
 const DOCTYPE_KINDS = new Set<DocTypeKind>(["transaction", "master", "child_table", "single", "tree", "virtual", "system"]);
 const VALUE_SOURCES = new Set(["user", "default", "link", "formula", "system", "workflow"]);
 const EDIT_MODES = new Set(["editable", "readonly", "set_once", "immutable_after_submit", "hidden"]);

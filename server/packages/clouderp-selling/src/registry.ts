@@ -1,13 +1,15 @@
 import { ControllerRegistry } from "../../document-kernel/src/index.js";
 import { CrmChannelPartnerController, CrmFieldCheckInController, CrmSalesRouteController, CrmSalesRouteStopController, CrmSellOutReportController } from "./crm-channel-controllers.js";
+import { CrmGeoVerifiedPromotionExecutionController, CrmSubmittedSellInSnapshotController } from "./crm-channel-evidence-guards.js";
 import { CrmActivityController } from "./crm-controllers.js";
 import { CrmCustomer360Controller } from "./crm-customer-360-controller.js";
 import { CrmContactController, CrmOrganizationController } from "./crm-directory-controllers.js";
+import { CrmDeduplicatingLeadController } from "./crm-lead-dedupe-controller.js";
 import { CrmConsentAwareMarketingListMemberController } from "./crm-marketing-consent-controller.js";
 import { CrmCampaignAttributionController, CrmCampaignController, CrmMarketingListController, CrmSegmentController } from "./crm-marketing-controllers.js";
 import { CrmCommissionAccrualController, CrmCommissionRuleController, CrmSalesTargetController } from "./crm-performance-controllers.js";
 import { CrmLeadScoreRuleController, CrmLeadScoreSnapshotController } from "./crm-scoring-controllers.js";
-import { CrmSalesTeamController, CrmSalesTeamMemberController, CrmTeamAwareDealController, CrmTeamAwareLeadController } from "./crm-team-controllers.js";
+import { CrmSalesTeamController, CrmSalesTeamMemberController, CrmTeamAwareDealController } from "./crm-team-controllers.js";
 import { ArSalesInvoiceController } from "./ar-sales-invoice-controller.js";
 import { DeliveryNoteController } from "./controllers.js";
 import { PaymentAllocationController } from "./finance-controllers.js";
@@ -17,7 +19,7 @@ import { SalesOrderClosureController } from "./sales-order-closure-controller.js
 
 export function createO2CControllerRegistry(): ControllerRegistry {
   return new ControllerRegistry()
-    .register(new CrmTeamAwareLeadController())
+    .register(new CrmDeduplicatingLeadController())
     .register(new CrmTeamAwareDealController())
     .register(new CrmActivityController())
     .register(new CrmCustomer360Controller())
@@ -40,6 +42,8 @@ export function createO2CControllerRegistry(): ControllerRegistry {
     .register(new CrmSalesRouteStopController())
     .register(new CrmFieldCheckInController())
     .register(new CrmSellOutReportController())
+    .register(new CrmSubmittedSellInSnapshotController())
+    .register(new CrmGeoVerifiedPromotionExecutionController())
     .register(new QuotationController())
     .register(new SalesOrderClosureController())
     .register(new DeliveryNoteController())

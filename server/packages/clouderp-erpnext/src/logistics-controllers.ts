@@ -194,10 +194,10 @@ export class ProofOfDeliveryController extends SuiteController<ProofOfDeliveryDa
     if (!["Delivered", "Partial", "Failed"].includes(input.outcome)) throw errors.validation("Invalid Proof of Delivery outcome");
 
     const baseName = `POD-${input.delivery_trip}-${input.stop_row_id}`;
-    if (!context.command.amended_from && context.command.aggregate.name !== baseName) {
+    if (context.command.action === "create" && !context.command.amended_from && context.command.aggregate.name !== baseName) {
       throw errors.validation(`Initial Proof of Delivery name must be ${baseName}`);
     }
-    if (context.command.amended_from && !context.command.aggregate.name.startsWith(`${baseName}-`)) {
+    if (context.command.action === "create" && context.command.amended_from && !context.command.aggregate.name.startsWith(`${baseName}-`)) {
       throw errors.validation(`Amended Proof of Delivery name must start with ${baseName}-`);
     }
 

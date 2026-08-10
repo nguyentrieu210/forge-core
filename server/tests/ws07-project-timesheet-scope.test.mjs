@@ -40,7 +40,7 @@ test("project user cannot edit another user's timesheet but manager can", async 
       project: "PROJ-1",
       period_start: "2026-08-01",
       period_end: "2026-08-07",
-      details: [{ task: "TASK-1", from_time: "2026-08-03 09:00:00", to_time: "2026-08-03 10:00:00", hours: 1 }],
+      details: [{ task: "TASK-1", activity_type: "Work", from_time: "2026-08-03 09:00:00", to_time: "2026-08-03 10:00:00", hours: 1 }],
     },
   };
 
