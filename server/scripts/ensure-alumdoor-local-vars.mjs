@@ -34,6 +34,19 @@ function isUsableSecret(value) {
     && !/^(?:replace-with|change-me|changeme|example|todo)/i.test(normalized);
 }
 
+function readAttendanceQrSecret(text) {
+  const match = text.match(new RegExp(`^${ATTENDANCE_QR_SECRET}=(.*)$`, "m"));
+  return match && isUsableSecret(match[1]) ? match[1].trim() : undefined;
+}
+
+function withAttendanceQrSecret(text, secret) {
+  const replacement = `${ATTENDANCE_QR_SECRET}=${secret}`;
+  const pattern = new RegExp(`^${ATTENDANCE_QR_SECRET}=.*$`, "m");
+  return pattern.test(text)
+    ? text.replace(pattern, replacement)
+    : `${text.trimEnd()}${text.trim() ? "\n" : ""}${replacement}\n`;
+}
+
 /**
  * Keep an existing local QR secret stable across restarts so an already-open
  * station does not suddenly become invalid. Generate only when the local file
@@ -57,17 +70,24 @@ function main() {
   }
 
   const localVars = useLocalMasterSecret(readFileSync(tenantVars, "utf8"));
-  mkdirSync(path.dirname(callbackVars), { recursive: true });
-  writeFileSync(tenantVars, localVars);
-  writeFileSync(callbackVars, localVars);
-
   const existingAlumdoorVars = existsSync(alumdoorWorkerVars) ? readFileSync(alumdoorWorkerVars, "utf8") : "";
-  const attendanceQr = ensureAttendanceQrSecret(existingAlumdoorVars);
+  const appQr = ensureAttendanceQrSecret(existingAlumdoorVars);
+  const tenantQr = ensureAttendanceQrSecret(localVars);
+  // Wrangler's multi-config local runner reads the primary tenant .dev.vars file
+  // for the merged worker. Keep the app-specific file too, but use one value in both
+  // places so challenge signing and verification cannot drift after a restart.
+  const qrSecret = readAttendanceQrSecret(appQr.text) ?? readAttendanceQrSecret(tenantQr.text);
+  if (!qrSecret) throw new Error("Unable to initialize the local attendance QR secret");
+  const tenantVarsWithQr = withAttendanceQrSecret(localVars, qrSecret);
+  mkdirSync(path.dirname(callbackVars), { recursive: true });
+  writeFileSync(tenantVars, tenantVarsWithQr);
+  writeFileSync(callbackVars, tenantVarsWithQr);
+
   mkdirSync(path.dirname(alumdoorWorkerVars), { recursive: true });
-  writeFileSync(alumdoorWorkerVars, attendanceQr.text);
+  writeFileSync(alumdoorWorkerVars, withAttendanceQrSecret(appQr.text, qrSecret));
 
   console.log("  Alumdoor local Workers share the master signing secret.");
-  console.log(`  Attendance QR local secret ${attendanceQr.created ? "created" : "ready"} (not committed).`);
+  console.log(`  Attendance QR local secret ${appQr.created || tenantQr.created ? "created" : "ready"} (not committed).`);
 }
 
 if (path.resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) main();
