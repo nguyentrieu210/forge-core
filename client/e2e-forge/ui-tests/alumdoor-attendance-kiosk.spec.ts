@@ -16,6 +16,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8" };
 const KIOSK_ROUTE = "/x/alumdoor-attendance%3Akiosk";
+const MOBILE_ROUTE = "/x/alumdoor-attendance%3Amobile";
 
 const manifest = {
   id: "alumdoor",
@@ -172,7 +173,7 @@ test.describe("Alumdoor attendance kiosk", () => {
       });
     });
 
-    await page.goto(`${KIOSK_ROUTE}?token=qa-signed-scan-token`, { waitUntil: "domcontentloaded" });
+    await page.goto(`${MOBILE_ROUTE}?token=qa-signed-scan-token`, { waitUntil: "domcontentloaded" });
     await expect.poll(() => scanBodies.length).toBe(1);
     // This also fails if UI code tries to supply an employee, device clock, or shift.
     expect(scanBodies).toEqual([{ token: "qa-signed-scan-token" }]);
@@ -190,7 +191,7 @@ test.describe("Alumdoor attendance kiosk", () => {
       }),
     }));
 
-    await page.goto(`${KIOSK_ROUTE}?token=qa-expired-scan-token`, { waitUntil: "domcontentloaded" });
+    await page.goto(`${MOBILE_ROUTE}?token=qa-expired-scan-token`, { waitUntil: "domcontentloaded" });
     await expect(page.getByText("Mã QR vừa hết hạn, hãy hướng camera vào mã mới.")).toBeVisible();
     await expect(page.getByText(/đã ghi nhận|chấm công thành công/i)).toHaveCount(0);
   });

@@ -30,7 +30,7 @@ interface AttendanceScanResult {
 }
 
 const STATION_STORAGE_KEY = "alumdoor-attendance-kiosk-station";
-const KIOSK_PATH = `/x/${encodeURIComponent("alumdoor-attendance:kiosk")}`;
+const MOBILE_PATH = `/x/${encodeURIComponent("alumdoor-attendance:mobile")}`;
 const inFlightChallenges = new Map<string, Promise<AttendanceChallenge>>();
 const recentChallenges = new Map<string, { challenge: AttendanceChallenge; reusableUntil: number }>();
 
@@ -126,7 +126,7 @@ function displayMinutes(value: number | undefined): string {
 }
 
 function scanHref(token: string): string {
-  const url = new URL(KIOSK_PATH, window.location.origin);
+  const url = new URL(MOBILE_PATH, window.location.origin);
   url.searchParams.set("token", token);
   return url.toString();
 }
@@ -370,5 +370,6 @@ function AttendanceScan() {
 /** A single experience serves the manager's station screen and the employee scan deep-link. */
 export function AlumdoorAttendanceKiosk() {
   const [params] = useSearchParams();
-  return params.get("token") ? <AttendanceScan /> : <AttendanceKiosk />;
+  const mobileRoute = decodeURIComponent(window.location.pathname).endsWith("alumdoor-attendance:mobile");
+  return params.get("token") || mobileRoute ? <AttendanceScan /> : <AttendanceKiosk />;
 }
