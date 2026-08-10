@@ -1,3 +1,5 @@
+import { inferDoorType } from "./door-formulas.js";
+
 /**
  * Read-only sales item context for the metadata-driven sales grids.
  *
@@ -199,6 +201,10 @@ export async function salesItemContext(call: SalesPlatformCall, args: Json): Pro
   }
 
   const stockUom = normalizedText(item.stock_uom);
+  const inventoryMode = normalizedText(item.inventory_mode);
+  const explicitDoorType = normalizedText(item.door_type);
+  const effectiveDoorType = explicitDoorType
+    || (inventoryMode === "thành phẩm theo m2" ? (inferDoorType(undefined, item.item_group) ?? "") : "");
   const defaultSalesUom = normalizedText(item.default_sales_uom) || stockUom;
   const conversions = Array.isArray(item.uom_conversions)
     ? item.uom_conversions.filter((row): row is Json => Boolean(row) && typeof row === "object" && !Array.isArray(row))
@@ -216,7 +222,7 @@ export async function salesItemContext(call: SalesPlatformCall, args: Json): Pro
   // Cửa bán m² nhưng tồn Bộ có hệ số theo TỪNG kích thước dòng, nên Item không được phép
   // khai một conversion tĩnh. Vẫn mở ĐVT bán và tra giá/m²; conversion thật sẽ được máy
   // tính cửa chụp sau khi có rộng, cao và số bộ.
-  const dynamicAreaToSet = normalizedText(item.inventory_mode) === "Thành phẩm theo m2"
+  const dynamicAreaToSet = inventoryMode === "Thành phẩm theo m2"
     && AREA_UOMS.has(normalizedUom(defaultSalesUom))
     && SET_UOMS.has(normalizedUom(stockUom));
   if (dynamicAreaToSet && defaultSalesUom && !factorByUom.has(defaultSalesUom)) {
@@ -322,8 +328,8 @@ export async function salesItemContext(call: SalesPlatformCall, args: Json): Pro
   return json({
     item_code: itemCode,
     item_group: normalizedText(item.item_group),
-    door_type: normalizedText(item.door_type) || null,
-    inventory_mode: normalizedText(item.inventory_mode),
+    door_type: effectiveDoorType || null,
+    inventory_mode: inventoryMode,
     measurement_profile: normalizedText(item.measurement_profile) || null,
     min_area_sqm: Number(item.min_area_sqm ?? 0) || 0,
     purchase_kg_per_m2: positive(item.purchase_kg_per_m2),

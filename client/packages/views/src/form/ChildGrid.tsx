@@ -13,6 +13,8 @@ import {
   Button, Checkbox, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, FileButton, Input,
   Table, TableHeader, TableBody, TableRow, TableHead, TableCell, useT,
 } from "@metaforge/ui";
+import { defaultSalesDiscountPercent, deriveLinearSalesBasis, type LinearSalesBasis } from "./sales-line-policy.js";
+export { defaultSalesDiscountPercent, deriveLinearSalesBasis, type LinearSalesBasis } from "./sales-line-policy.js";
 
 interface GridLayout {
   w: Record<string, number>;
@@ -100,21 +102,6 @@ const PIECE_UOMS = new Set(["cây", "cay", "lá", "la", "đoạn", "doan"]);
 
 function normalizedUom(value: unknown): string {
   return String(value ?? "").normalize("NFC").trim().toLocaleLowerCase("vi");
-}
-
-export type LinearSalesBasis = "RAY" | "TRUC";
-
-/**
- * Ray/trục trong danh mục hiện có thể vẫn để Kiểu quản lý tồn = Hàng thường.
- * Đây là quy cách bán của dòng hàng, không được bắt người dùng đổi cả mô hình tồn kho
- * chỉ để nhập kích thước tính tiền.
- */
-export function deriveLinearSalesBasis(row: Doc): LinearSalesBasis | undefined {
-  const itemName = String(row.item_name ?? "").normalize("NFC").trim().toLocaleLowerCase("vi");
-  const itemCode = String(row.item_code ?? "").normalize("NFC").trim().toLocaleLowerCase("vi");
-  if (itemName.startsWith("ray") || itemCode.includes("ray")) return "RAY";
-  if (itemName.startsWith("trục") || itemName.startsWith("truc") || itemCode.includes("truc")) return "TRUC";
-  return undefined;
 }
 
 function checkedValue(value: unknown): boolean {
@@ -1385,7 +1372,13 @@ export function ChildGrid(props: ChildGridProps) {
         // Chỉ mồi khi đổi mặt hàng (ô cũ đã được reset phía trên), không ghi đè mức giảm
         // mà người dùng chủ động sửa để đơn đó đi vào luồng cần duyệt.
         if (childMeta.name === "Sales Order Item" && has("discount_percentage")) {
-          patch.discount_percentage = String(salesContext.door_type ?? "").trim() === "Cửa Đức" ? 15 : 0;
+          patch.discount_percentage = defaultSalesDiscountPercent({
+            ...base[rowIdx],
+            item_code: itemCode,
+            item_group: salesContext.item_group,
+            inventory_mode: salesContext.inventory_mode,
+            door_type: salesContext.door_type,
+          });
         }
         if (parentDoc?.selling_price_list && has("rate")) {
           patch.rate = salesContext.price_missing ? undefined : salesContext.rate;
@@ -2341,8 +2334,7 @@ export function ChildGrid(props: ChildGridProps) {
 
   const discountPolicyWarnings = childMeta.name === "Sales Order Item"
     ? rows.flatMap((row, index) => {
-        const doorType = String(row.door_type ?? "").trim();
-        const expected = doorType === "Cửa Đức" ? 15 : 0;
+        const expected = defaultSalesDiscountPercent(row);
         const actual = Number(row.discount_percentage ?? 0);
         return row.item_code && Number.isFinite(actual) && actual !== expected
           ? [`Dòng ${index + 1} (${String(row.item_code)}): ${actual}% thay vì ${expected}%`]

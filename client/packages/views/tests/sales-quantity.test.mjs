@@ -1,6 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { deriveItemColorPolicy, deriveSalesQuantity } from "../dist/form/ChildGrid.js";
+import { defaultSalesDiscountPercent, deriveItemColorPolicy, deriveSalesQuantity } from "../dist/form/ChildGrid.js";
+
+test("only door items default to 15 percent while ray/trục stay at zero", () => {
+  assert.equal(defaultSalesDiscountPercent({ item_code: "TP-AL752N", item_group: "Cửa CN Đức", inventory_mode: "Thành phẩm theo m2" }), 15);
+  assert.equal(defaultSalesDiscountPercent({ item_code: "TP-RAYNHOMUC", item_name: "HH RAY NHÔM ÚC", item_group: "Cửa tấm liền Úc", inventory_mode: "Hàng thường" }), 0);
+  assert.equal(defaultSalesDiscountPercent({ item_code: "NVL-TRUC34", item_name: "TRỤC PHI 34", item_group: "Cửa tấm liền Úc", inventory_mode: "Hàng thường" }), 0);
+});
 
 test("ray/trục bán Mét derives total billable metres", () => {
   const result = deriveSalesQuantity({

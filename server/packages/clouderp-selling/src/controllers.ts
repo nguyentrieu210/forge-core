@@ -200,9 +200,36 @@ export class SalesOrderController extends BaseController<SalesOrderData> {
   }
 }
 
+const ALUMDOOR_DOOR_TYPES = new Set([
+  "cửa đức", "cửa úc", "cửa lưới", "cửa đài loan", "cửa siêu trường", "cửa tấm liền úc",
+]);
+const ALUMDOOR_DOOR_GROUPS = new Set([
+  "cửa cn đức", "cửa tấm liền úc", "cửa lưới", "cửa đài loan", "cửa đài loan inox",
+  "cửa kéo đài loan", "cửa siêu trường",
+]);
+
+const normalizedAlumdoorText = (value: unknown) => String(value ?? "").normalize("NFC").trim().toLocaleLowerCase("vi");
+
+function isAlumdoorLinearItem(item: Record<string, unknown>): boolean {
+  const name = normalizedAlumdoorText(item.item_name);
+  const code = normalizedAlumdoorText(item.item_code);
+  return name.startsWith("ray") || code.includes("ray")
+    || name.startsWith("trục") || name.startsWith("truc") || code.includes("truc");
+}
+
+/** Chỉ mã cửa mặc định 15%; ray/trục và các phụ kiện mặc định 0%. */
+export function defaultAlumdoorDiscountPercent(item: Record<string, unknown>): number {
+  if (isAlumdoorLinearItem(item)) return 0;
+  if (ALUMDOOR_DOOR_TYPES.has(normalizedAlumdoorText(item.door_type))) return 15;
+  return normalizedAlumdoorText(item.inventory_mode) === "thành phẩm theo m2"
+    && ALUMDOOR_DOOR_GROUPS.has(normalizedAlumdoorText(item.item_group))
+    ? 15
+    : 0;
+}
+
 /**
  * Chính sách chiết khấu của Alumdoor được suy từ Item master, không tin `door_type` do client gửi:
- * Cửa Đức mặc định 15%, các mặt hàng còn lại 0%. Mức khác vẫn được giữ để người có quyền duyệt
+ * chỉ mã cửa mặc định 15%, còn ray/trục và mặt hàng khác 0%. Mức khác vẫn được giữ để người có quyền duyệt
  * quyết định, đồng thời cờ trên đầu đơn được máy chủ ghi lại cho danh sách và audit.
  */
 async function applyAlumdoorDiscountPolicy(
@@ -212,7 +239,10 @@ async function applyAlumdoorDiscountPolicy(
   let requiresApproval = false;
   const normalized = await Promise.all(items.map(async (item) => {
     const master = await context.reader.getMasterRecordData(context.command.tenant_id, "Item", item.item_code);
-    const expectedMicros = String(master?.door_type ?? "").trim() === "Cửa Đức" ? 15_000_000 : 0;
+    const expectedMicros = defaultAlumdoorDiscountPercent({
+      ...master,
+      item_code: item.item_code,
+    }) * 1_000_000;
     const requestedMicros = item.discount_percentage === undefined || item.discount_percentage === null || item.discount_percentage === ""
       ? expectedMicros
       : toScaledInt(item.discount_percentage, 6, "discount_percentage");

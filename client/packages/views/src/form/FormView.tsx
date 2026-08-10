@@ -19,6 +19,7 @@ import { useMetaForgeOptional } from "../container/provider.js";
 import { groupLayout, resolveFormFieldWidth, type FormFieldWidth, type FormTab } from "./layout.js";
 import { WorkflowActionBar, FormActionBar } from "../detail/WorkflowActionBar.js";
 import { DIRTY_GUARD_REASON, type FormActionKind, type FormPerms, type FormActionCtx } from "../detail/formActions.js";
+import { defaultSalesDiscountPercent } from "./sales-line-policy.js";
 
 export interface FormViewProps {
   meta: DocTypeMeta;
@@ -192,7 +193,7 @@ export function FormView(props: FormViewProps) {
     // hàng, `items` đã làm form dirty rồi thì mới đồng bộ cờ đi kèm vào lần lưu đó.
     if (!form.formState.isDirty) return;
     const requiresApproval = (salesOrderItems ?? []).some((item) => {
-      const expected = String(item.door_type ?? "").trim() === "Cửa Đức" ? 15 : 0;
+      const expected = defaultSalesDiscountPercent(item);
       return Number(item.discount_percentage ?? 0) !== expected;
     });
     if (Boolean(form.getValues("discount_requires_approval")) !== requiresApproval) {
