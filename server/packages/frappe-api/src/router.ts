@@ -700,6 +700,12 @@ async function createDocument(doctype: string, args: FrappeArgs, context: Frappe
       payload[field.fieldname] = structuredClone(field.default);
     }
   }
+  // Sales Order ownership follows the authenticated operator by default.  Keep
+  // the field editable for exceptional hand-offs, but never leave a new order
+  // without an accountable person when the client omits it.
+  if (doctype === "Sales Order" && (payload.responsible_person == null || payload.responsible_person === "")) {
+    payload.responsible_person = context.actor.user_id;
+  }
   if (amendedFrom) {
     const source = await loadReadable(doctype, amendedFrom, context);
     if (source.docstatus !== 2) throw errors.lifecycle("Only a cancelled document can be amended");

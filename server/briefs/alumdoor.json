@@ -2657,7 +2657,6 @@
         "currency:Link(Currency)-!=(VND) Tiền tệ",
         "transaction_date:Date!=(Today) Ngày đặt",
         "delivery_date:Date Ngày giao dự kiến",
-        "against_quotation:Link(Quotation) Theo báo giá",
         "selling_price_list:Link(Price List) Bảng giá áp dụng",
         {
           "//": "Ảnh chụp nhóm giá của khách — xem chú thích cùng trường ở Báo giá.",

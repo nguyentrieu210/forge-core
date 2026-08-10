@@ -88,12 +88,26 @@ export function NewFormContainer(props: NewFormContainerProps) {
   const [saving, setSaving] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string> | undefined>();
   const [dirty, setDirty] = useState(false);
+  const [currentUser, setCurrentUser] = useState("");
+  useEffect(() => {
+    if (doctype !== "Sales Order") return;
+    let active = true;
+    void adapter.getBoot().then((boot) => {
+      if (active) setCurrentUser(boot.user);
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, [adapter, doctype]);
   // "Lưu & Tạo tiếp" — nhập liệu hàng loạt (vd 20 Item liên tiếp) không cần đóng/mở lại modal mỗi lần.
   // resetSeq đổi ⇒ doc mới (blankDoc lại) + key FormView đổi ⇒ remount sạch (RHF defaultValues chỉ
   // chụp 1 lần lúc mount nên PHẢI remount, không thể chỉ đổi prop `doc` mà form tự nhận ra).
   const [resetSeq, setResetSeq] = useState(0);
   const saveIntentRef = useRef<"close" | "continue" | "preview">("close");
-  const contextDefaults = useMemo(() => applyContextPolicy(doctype, businessContext, contextPolicies).defaults, [doctype, businessContext, contextPolicies]);
+  const contextDefaults = useMemo(() => {
+    const defaults = applyContextPolicy(doctype, businessContext, contextPolicies).defaults;
+    return doctype === "Sales Order" && currentUser && !defaults.responsible_person
+      ? { ...defaults, responsible_person: currentUser }
+      : defaults;
+  }, [doctype, businessContext, contextPolicies, currentUser]);
   // Nhân bản (Duplicate) — form "new" mở từ FormContainer.onAction("duplicate") có thể mang theo
   // prefill qua sessionStorage. Tiêu thụ ĐÚNG 1 LẦN (ref, không phải mỗi lần useMemo chạy lại) —
   // "Lưu & Tạo tiếp" (resetSeq đổi) sau đó phải là blankDoc SẠCH, không lặp lại bản nhân bản cũ.
@@ -204,7 +218,9 @@ export function NewFormContainer(props: NewFormContainerProps) {
   return (
     <>
       <FormView
-        key={resetSeq}
+        // Boot defaults arrive asynchronously; include the user in the key so the
+        // responsible-person field remounts once and visibly receives that default.
+        key={`${resetSeq}-${currentUser}`}
         meta={renderPolicy?.meta ?? metaQ.data}
         doc={doc}
         registry={registry}

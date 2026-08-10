@@ -553,7 +553,9 @@ export function FormView(props: FormViewProps) {
           {activeIdx === 0 ? <FormGuide doctype={meta.name} guide={formGuides?.[meta.name]} className="mb-1" /> : null}
           {tab?.sections.map((section, si) => {
             if (section.hidden) return null;
-            const sectionFields = section.columns.flatMap((col) => col.fields);
+            const sectionFields = section.columns.flatMap((col) => col.fields).filter((field) =>
+              meta.name !== "Sales Order" || !["product_group", "against_quotation"].includes(field.field.fieldname),
+            );
             const mainFields = sectionFields.filter((field) => field.field.form_region !== "aside" && field.field.form_region !== "full");
             const asideFields = sectionFields.filter((field) => field.field.form_region === "aside");
             const fullFields = sectionFields.filter((field) => field.field.form_region === "full");
@@ -609,6 +611,14 @@ export function FormView(props: FormViewProps) {
                   </h3>
                   <span className="h-0.5 min-w-8 flex-1 bg-border/80" aria-hidden="true" />
                 </div>
+                {meta.name === "Sales Order" && si === 0 ? (
+                  <div className="mb-3 max-w-sm" data-testid="sales-order-code">
+                    <label className="mb-1.5 block text-sm font-medium text-foreground">Mã đơn hàng</label>
+                    <div className="flex min-h-10 items-center rounded-md border bg-muted/30 px-3 text-sm text-muted-foreground">
+                      {props.isNew || !doc.name || doc.name === "new" ? "Tự sinh khi lưu" : doc.name}
+                    </div>
+                  </div>
+                ) : null}
                 {/* gap-y-2.5 thay vì 4, gap-x-5 thay vì 6 — mật độ dày kiểu ERP, đọc được cả form
                     trong 1 màn thay vì phải cuộn. */}
                 {/* MỘT lưới duy nhất cho cả section (không phải 2 khối dọc lồng nhau) — nhờ vậy
