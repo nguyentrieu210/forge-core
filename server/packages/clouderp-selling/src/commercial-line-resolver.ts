@@ -2,7 +2,7 @@ import type { JsonObject } from "../../contracts/src/index.js";
 import { errors } from "../../core/src/index.js";
 import type { ControllerContext } from "../../document-kernel/src/index.js";
 import { fromScaledInt, toScaledInt } from "../../money/src/index.js";
-import { resolveServerPrice, type ResolvedPrice } from "../../clouderp-pricing/src/index.js";
+import { normalizePriceVariant, resolveServerPrice } from "../../clouderp-pricing/src/index.js";
 import {
   resolveCommercialPricingPolicy,
   type AppliedPricingAdjustment,
@@ -18,6 +18,9 @@ export interface ResolveCommercialLineInput {
   documentCurrency: string;
   postingDate: string;
   uom?: string;
+  priceVariant?: string;
+  /** Optional independent Item Price variant used only as the discount base. */
+  discountBasisVariant?: string;
   pricedQty: number;
   partyType?: "Customer" | "Supplier";
   party?: string;
@@ -27,13 +30,13 @@ export interface ResolveCommercialLineInput {
   areaSqm?: number;
   lengthM?: number;
   setCount?: number;
-  /** Approved/manual commercial overrides are still calculated by the server. */
   sellingRateOverride?: string | number;
   discountPercentageOverride?: string | number;
 }
 
 export interface ResolvedCommercialLine extends JsonObject {
   item_price: string;
+  price_variant: string;
   base_rate: string;
   base_rate_minor: number;
   selling_rate: string;
@@ -42,6 +45,8 @@ export interface ResolvedCommercialLine extends JsonObject {
   priced_qty_micros: number;
   gross_amount: string;
   gross_amount_minor: number;
+  discount_basis_item_price: string;
+  discount_basis_variant: string;
   discount_basis_rate: string;
   discount_basis_rate_minor: number;
   discount_basis_amount: string;
@@ -60,32 +65,39 @@ export interface ResolvedCommercialLine extends JsonObject {
   applied_adjustments: AppliedPricingAdjustment[];
 }
 
-/**
- * Single server-authoritative commercial calculation for one sales line.
- *
- * Item Price supplies the base price. Pricing Rule supplies all conditional money effects.
- * The client may request an override, but the amount is always recomputed here and the
- * controller remains responsible for approval/permission before submit.
- */
 export async function resolveCommercialLine(
   context: ControllerContext<JsonObject>,
   input: ResolveCommercialLineInput,
 ): Promise<ResolvedCommercialLine> {
   const pricedQtyMicros = quantityMicros(input.pricedQty, "pricedQty");
-  const rawPrice = await resolveServerPrice(context, {
+  const requestedVariant = normalizePriceVariant(input.priceVariant);
+  const requestedBasisVariant = normalizePriceVariant(input.discountBasisVariant ?? requestedVariant);
+  const sharedPriceContext = {
     itemCode: input.itemCode,
     qtyMicros: pricedQtyMicros,
     postingDate: input.postingDate,
     priceList: input.priceList,
     documentCurrency: input.documentCurrency,
     ...(input.uom ? { uom: input.uom } : {}),
-    applyPricingRules: false,
+    applyPricingRules: false as const,
     ...(input.partyType ? { partyType: input.partyType } : {}),
     ...(input.party ? { party: input.party } : {}),
     ...(input.customerGroup ? { customerGroup: input.customerGroup } : {}),
     ...(input.supplierGroup ? { supplierGroup: input.supplierGroup } : {}),
-  });
+  };
+  const rawPrice = await resolveServerPrice(context, { ...sharedPriceContext, priceVariant: requestedVariant });
+  const discountBasisPrice = requestedBasisVariant === rawPrice.price_variant
+    ? rawPrice
+    : await resolveServerPrice(context, { ...sharedPriceContext, priceVariant: requestedBasisVariant });
+  if (discountBasisPrice.currency !== rawPrice.currency || discountBasisPrice.currency_scale !== rawPrice.currency_scale) {
+    throw errors.validation("Selling price and discount-basis price must use the same currency and scale");
+  }
 
+  const facts = {
+    ...input.facts,
+    price_variant: rawPrice.price_variant,
+    discount_basis_variant: discountBasisPrice.price_variant,
+  };
   const policy = await resolveCommercialPricingPolicy(context, {
     itemCode: input.itemCode,
     priceList: input.priceList,
@@ -98,7 +110,7 @@ export async function resolveCommercialLine(
     ...(input.party ? { party: input.party } : {}),
     ...(input.customerGroup ? { customerGroup: input.customerGroup } : {}),
     ...(input.supplierGroup ? { supplierGroup: input.supplierGroup } : {}),
-    facts: input.facts,
+    facts,
     ...(input.areaSqm === undefined ? {} : { areaSqm: input.areaSqm }),
     ...(input.lengthM === undefined ? {} : { lengthM: input.lengthM }),
     ...(input.setCount === undefined ? {} : { setCount: input.setCount }),
@@ -111,11 +123,10 @@ export async function resolveCommercialLine(
     : nonNegativeMoneyMinor(input.sellingRateOverride, scale, "sellingRateOverride");
   const grossMinor = multiplyMinorByQuantity(sellingRateMinor, pricedQtyMicros, "selling rate");
 
-  // PR1 has a single price dimension. PR2 may supply an independent variant as the discount
-  // basis; this field is already explicit so adding that dimension does not change totals.
-  const discountBasisRateMinor = canonicalSellingRateMinor;
+  // Discount basis is deliberately independent of the selected selling rate. This handles
+  // cases such as selling WITH_RAIL while discounting from the STANDARD/NO_RAIL list price.
+  const discountBasisRateMinor = discountBasisPrice.rate_minor;
   const discountBasisAmountMinor = multiplyMinorByQuantity(discountBasisRateMinor, pricedQtyMicros, "discount basis");
-
   const discountPercentageMicros = input.discountPercentageOverride === undefined
     ? (policy.discount_percentage_micros ?? 0)
     : percentageMicros(input.discountPercentageOverride, "discountPercentageOverride");
@@ -137,6 +148,7 @@ export async function resolveCommercialLine(
 
   return {
     item_price: rawPrice.item_price,
+    price_variant: rawPrice.price_variant,
     base_rate: rawPrice.rate,
     base_rate_minor: rawPrice.rate_minor,
     selling_rate: fromScaledInt(sellingRateMinor, scale),
@@ -145,6 +157,8 @@ export async function resolveCommercialLine(
     priced_qty_micros: pricedQtyMicros,
     gross_amount: fromScaledInt(grossMinor, scale),
     gross_amount_minor: grossMinor,
+    discount_basis_item_price: discountBasisPrice.item_price,
+    discount_basis_variant: discountBasisPrice.price_variant,
     discount_basis_rate: fromScaledInt(discountBasisRateMinor, scale),
     discount_basis_rate_minor: discountBasisRateMinor,
     discount_basis_amount: fromScaledInt(discountBasisAmountMinor, scale),
