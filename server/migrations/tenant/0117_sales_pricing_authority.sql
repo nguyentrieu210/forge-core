@@ -23,19 +23,19 @@ WHERE doctype='Pricing Rule' AND json_valid(metadata_json)
   AND NOT EXISTS (SELECT 1 FROM json_each(metadata_json,'$.fields') f WHERE json_extract(f.value,'$.fieldname')='effect_type');
 
 UPDATE doctype_definitions
-SET metadata_json = json_insert(metadata_json, '$.fields[#]', json('{"fieldname":"discount_amount","label":"Discount Amount","fieldtype":"Currency","non_negative":true,"depends_on":"eval:doc.effect_type == \'DISCOUNT_AMOUNT\'"}')),
+SET metadata_json = json_insert(metadata_json, '$.fields[#]', json('{"fieldname":"discount_amount","label":"Discount Amount","fieldtype":"Currency","non_negative":true,"depends_on":"eval:doc.effect_type == \"DISCOUNT_AMOUNT\""}')),
     revision = revision + 1, modified_by = 'migration-0117', modified_at = '2026-08-11T00:00:00.000Z'
 WHERE doctype='Pricing Rule' AND json_valid(metadata_json)
   AND NOT EXISTS (SELECT 1 FROM json_each(metadata_json,'$.fields') f WHERE json_extract(f.value,'$.fieldname')='discount_amount');
 
 UPDATE doctype_definitions
-SET metadata_json = json_insert(metadata_json, '$.fields[#]', json('{"fieldname":"adjustment_basis","label":"Adjustment Basis","fieldtype":"Select","options":"FIXED\nPRICED_QTY\nAREA_SQM\nLENGTH_M\nSET_COUNT","depends_on":"eval:doc.effect_type == \'ADJUSTMENT\'","in_standard_filter":true}')),
+SET metadata_json = json_insert(metadata_json, '$.fields[#]', json('{"fieldname":"adjustment_basis","label":"Adjustment Basis","fieldtype":"Select","options":"FIXED\nPRICED_QTY\nAREA_SQM\nLENGTH_M\nSET_COUNT","depends_on":"eval:doc.effect_type == \"ADJUSTMENT\"","in_standard_filter":true}')),
     revision = revision + 1, modified_by = 'migration-0117', modified_at = '2026-08-11T00:00:00.000Z'
 WHERE doctype='Pricing Rule' AND json_valid(metadata_json)
   AND NOT EXISTS (SELECT 1 FROM json_each(metadata_json,'$.fields') f WHERE json_extract(f.value,'$.fieldname')='adjustment_basis');
 
 UPDATE doctype_definitions
-SET metadata_json = json_insert(metadata_json, '$.fields[#]', json('{"fieldname":"adjustment_rate","label":"Adjustment Rate","fieldtype":"Currency","non_negative":true,"depends_on":"eval:doc.effect_type == \'ADJUSTMENT\'"}')),
+SET metadata_json = json_insert(metadata_json, '$.fields[#]', json('{"fieldname":"adjustment_rate","label":"Adjustment Rate","fieldtype":"Currency","non_negative":true,"depends_on":"eval:doc.effect_type == \"ADJUSTMENT\""}')),
     revision = revision + 1, modified_by = 'migration-0117', modified_at = '2026-08-11T00:00:00.000Z'
 WHERE doctype='Pricing Rule' AND json_valid(metadata_json)
   AND NOT EXISTS (SELECT 1 FROM json_each(metadata_json,'$.fields') f WHERE json_extract(f.value,'$.fieldname')='adjustment_rate');
