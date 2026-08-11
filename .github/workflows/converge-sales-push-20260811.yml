@@ -1,0 +1,106 @@
+name: Forge Sales Convergence Push 2026-08-11
+
+on:
+  push:
+    branches:
+      - converge/forge-20260811
+
+permissions:
+  contents: write
+
+concurrency:
+  group: forge-sales-convergence-push-20260811
+  cancel-in-progress: false
+
+jobs:
+  converge:
+    if: contains(github.event.head_commit.message, 'trigger Sales authority merge') && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: converge/forge-20260811
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Merge canonical Sales head with bounded conflict policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "Forge Convergence Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git fetch origin feat/sales-commercial-complete-20260811
+          set +e
+          git merge --no-ff --no-commit origin/feat/sales-commercial-complete-20260811
+          merge_rc=$?
+          set -e
+          conflicts="$(git diff --name-only --diff-filter=U | sort || true)"
+          printf 'Conflicts:\n%s\n' "$conflicts"
+          expected="$(printf '%s\n' \
+            server/apps-src/alumdoor-worker/src/index.ts \
+            server/briefs/alumdoor-v2.json \
+            server/packages/clouderp-erpnext/src/registry.ts \
+            server/packages/frappe-api/src/router.ts \
+            server/scripts/build-alumdoor-v2-brief.mjs | sort)"
+          if [ "$merge_rc" -ne 0 ] && [ "$conflicts" != "$expected" ]; then
+            echo "Unexpected conflict set; refusing automatic convergence."
+            diff -u <(printf '%s\n' "$expected") <(printf '%s\n' "$conflicts") || true
+            exit 1
+          fi
+          if [ -n "$conflicts" ]; then
+            git checkout --theirs -- \
+              server/apps-src/alumdoor-worker/src/index.ts \
+              server/packages/clouderp-erpnext/src/registry.ts \
+              server/packages/frappe-api/src/router.ts \
+              server/scripts/build-alumdoor-v2-brief.mjs
+            git checkout --ours -- server/briefs/alumdoor-v2.json
+            git add \
+              server/apps-src/alumdoor-worker/src/index.ts \
+              server/packages/clouderp-erpnext/src/registry.ts \
+              server/packages/frappe-api/src/router.ts \
+              server/scripts/build-alumdoor-v2-brief.mjs \
+              server/briefs/alumdoor-v2.json
+          fi
+      - name: Reapply converged authorities
+        run: |
+          python .github/scripts/converge-sales-20260811.py
+          node server/scripts/build-alumdoor-v2-brief.mjs
+          git add \
+            server/apps-src/alumdoor-worker/src/index.ts \
+            server/packages/clouderp-erpnext/src/registry.ts \
+            server/packages/frappe-api/src/router.ts \
+            server/scripts/build-alumdoor-v2-brief.mjs \
+            server/briefs/alumdoor-v2.json
+          if git diff --name-only --diff-filter=U | grep -q .; then
+            echo "Unresolved conflicts remain"
+            git diff --name-only --diff-filter=U
+            exit 1
+          fi
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Combined server build and critical regressions
+        working-directory: server
+        run: |
+          pnpm run build
+          node --test \
+            tests/aluminum-purchase-closure.test.mjs \
+            tests/aluminum-supply-demand.test.mjs \
+            tests/alumdoor-payroll-integration.test.mjs \
+            tests/alumdoor-payroll-coordinator.test.mjs \
+            tests/commercial-line-authority.test.mjs \
+            tests/sales-option-resolver.test.mjs \
+            tests/outbound-reservation-guard.test.mjs \
+            tests/o2c.test.mjs
+      - name: Commit and push combined Sales convergence
+        shell: bash
+        run: |
+          set -euo pipefail
+          git status --short
+          git commit -m "converge: sales commercial with inventory and payroll authorities"
+          git push origin HEAD:converge/forge-20260811
