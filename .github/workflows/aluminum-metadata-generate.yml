@@ -27,6 +27,8 @@ jobs:
         run: node server/scripts/build-alumdoor-v2-brief.mjs
       - name: Verify internal-field and child-presentation contracts
         run: node --test server/tests/alumdoor-internal-surface-contract.test.mjs server/tests/alumdoor-child-presentation.test.mjs server/tests/alumdoor-ui-rec-convergence-metadata.test.mjs
+      - name: Verify exact R6 AlumDoor package dry-run
+        run: node server/scripts/forge-app.mjs server/briefs/alumdoor-v2.json --dry-run
       - name: Commit generated V2 metadata to coordinator branch
         env:
           HEAD_BRANCH: ${{ github.head_ref }}
