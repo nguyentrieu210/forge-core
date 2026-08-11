@@ -1,10 +1,10 @@
 # PROJECT UI COVERAGE SUMMARY
 
-Program: `backend-ui-reconciliation-20260811`  
-Worker: `UI-REC-04 COVERAGE`  
-Branch: `agent/ui-rec-04-project-coverage-20260811`  
-Audit baseline: `main@cecb19c51855ab3e6a05ce84261d717c630c96b7` plus worker topology forked from `program/backend-ui-reconciliation-20260811@c4209b8318ac36110ca84094d905ce724ffae3d5`  
-Status: `READY_FOR_ROUTING`  
+Program: `backend-ui-reconciliation-20260811`
+Worker: `UI-REC-04 COVERAGE`
+Branch: `agent/ui-rec-04-project-coverage-20260811`
+Audit baseline: `main@cecb19c51855ab3e6a05ce84261d717c630c96b7` plus worker topology forked from `program/backend-ui-reconciliation-20260811@c4209b8318ac36110ca84094d905ce724ffae3d5`
+Status: `READY_FOR_ROUTING`
 Risk: audit/docs only; no runtime, schema, migration, merge or production mutation in this worker.
 
 ## 1. Executive conclusion
@@ -65,16 +65,16 @@ Selling/Buying/Stock/Accounts/Manufacturing canonical transaction DocTypes also 
 
 #### REC4-P0-01 — Procurement core Source-to-Pay transaction paths are not discoverable
 
-**Capability:** NS-03 Procurement 360 / ordinary Source-to-Pay operator flow.  
-**App:** `procurement`.  
-**DocTypes:** `Supplier`, `Request for Quotation`, `Supplier Quotation`, `Purchase Order`, `Purchase Receipt`, `Purchase Invoice`, `Payment Entry`.  
-**Surface:** sidebar/navigation/operator entry path.  
-**Classification:** `NAV_MISSING`.  
+**Capability:** NS-03 Procurement 360 / ordinary Source-to-Pay operator flow.
+**App:** `procurement`.
+**DocTypes:** `Supplier`, `Request for Quotation`, `Supplier Quotation`, `Purchase Order`, `Purchase Receipt`, `Purchase Invoice`, `Payment Entry`.
+**Surface:** sidebar/navigation/operator entry path.
+**Classification:** `NAV_MISSING`.
 **Evidence:** `procurement/app.json` declares the transaction chain as external authorities but nav contains only `Supplier Qualification`, `Supplier Rating`, `Supplier Contract`, `Supplier Selection`. The generic runtime skips the current app's catalog workspace and appends only `manifest.nav`, so `hybrid` does not fill the missing paths. The dedicated procurement source test currently locks the four-entry nav as expected behavior, proving the gap is encoded rather than accidental parser loss.
 
 **Required remediation:** add explicit role-gated operator routes for the core Source-to-Pay chain, or an equivalent app-owned screen that makes the same authoritative DocTypes reachable. Do not create shadow purchasing DocTypes and do not auto-expose every external dependency.
 
-**Owner:** Procurement/domain UI owner, assigned by reconciliation coordinator.  
+**Owner:** Procurement/domain UI owner, assigned by reconciliation coordinator.
 **REC-04 action:** Dependency Request only.
 
 ### P1
@@ -95,8 +95,8 @@ Consequences:
 - `integration-hub/app-factory/workplace` get pack checks but no Meta-v1 verifier coverage;
 - additional real first-party apps such as `crm`, `procurement`, `logistics`, `social-commerce`, `plastic-erp`, `alumdoor-attendance` rely on dedicated tests and are not represented by one central coverage inventory.
 
-**Classification:** coverage/gate drift.  
-**Owner:** UI-REC-05 QA.  
+**Classification:** coverage/gate drift.
+**Owner:** UI-REC-05 QA.
 **Required remediation:** one machine-readable first-party source registry consumed by pack, Meta-v1 verification and the reconciliation coverage gate; app-specific tests remain additive, not the inventory mechanism.
 
 #### REC4-P1-02 — Server/client Experience allowlists disagree
@@ -105,24 +105,24 @@ Server supports `approval`, `calendar`, `social-commerce`, `daily-ledger`, `alum
 
 Client `isRenderableExperience()` accepts `approval`, `calendar`, `social-commerce`, `alumdoor-attendance`, plus declared `action`/`screen`; it does **not** accept `daily-ledger` or `alumdoor-operations`. The AlumDoor V2 generator emits both omitted kinds. Therefore valid manifest entries are filtered out before sidebar construction even though `ExperienceScreen` can render them when reached directly.
 
-**Classification:** `NAV_MISSING` / contract drift.  
-**Owner:** shared runtime owner/coordinator.  
+**Classification:** `NAV_MISSING` / contract drift.
+**Owner:** shared runtime owner/coordinator.
 **Required remediation:** eliminate duplicated allowlists or derive client renderability from one shared contract; add a regression proving every server-supported Experience that has a renderer survives nav construction.
 
 #### REC4-P1-03 — Manufacturing/QMS core execution reachability is ambiguous
 
 `manufacturing-qms` owns routing/capacity/QMS metadata but declares `Operation`, `Workstation`, `Work Order`, `Job Card`, `Quality Inspection`, `Asset` as external ERP authority. Only Quality Inspection is explicitly routed from this app. In contrast, `plastic-erp` explicitly routes Production Plan, Work Order and Quality Inspection.
 
-**Classification:** `NAV_MISSING` risk, pending owner contract.  
-**Owner:** Manufacturing/QMS domain owner.  
+**Classification:** `NAV_MISSING` risk, pending owner contract.
+**Owner:** Manufacturing/QMS domain owner.
 **Required remediation:** declare whether the app is intentionally QMS-only/compositional. If it is an operator Manufacturing app, expose Work Order/Job Card and setup routes with role gates; if not, document/install dependency on the owning Manufacturing workspace so a standalone install cannot imply unavailable execution.
 
 #### REC4-P1-04 — HRM Salary Component ordinary-maintainer reachability needs proof
 
 HRM exposes Salary Structure and Salary Structure Assignment but keeps `Salary Component` as external ERP authority and does not declare a direct nav entry. This may be valid if users maintain components only through a linked workflow, but that reachability is not proven by the manifest itself.
 
-**Classification:** `REACHABILITY_REVIEW` (do not call P0 without UI-REC-01 truth/flow evidence).  
-**Owner:** HRM/domain UI owner with UI-REC-01 evidence.  
+**Classification:** `REACHABILITY_REVIEW` (do not call P0 without UI-REC-01 truth/flow evidence).
+**Owner:** HRM/domain UI owner with UI-REC-01 evidence.
 **Required remediation:** prove linked reachability for payroll maintainers, or add an explicit role-gated route.
 
 ### P2
@@ -131,7 +131,7 @@ HRM exposes Salary Structure and Salary Structure Assignment but keeps `Salary C
 
 The generic runtime imports and branches on `SocialCommerce`, `DailyDetailedLedger`, `AlumdoorOperationsCenter`, `AlumdoorAttendanceKiosk`, `AlumdoorAttendanceOperations`, and sets a mobile app href using `manifest.id === "alumdoor"`.
 
-**Classification:** `LEGACY_SPECIAL_CASE`.  
+**Classification:** `LEGACY_SPECIAL_CASE`.
 **Risk:** every new vertical is tempted to add another branch to the supposedly generic bundle; product-specific behavior becomes deploy-coupled instead of metadata/install-coupled.
 
 **Recommendation:**
@@ -157,62 +157,62 @@ No evidence supports creating a second Form, List, Grid, purchasing engine, payr
 
 ### DR-REC4-01 — UI-REC-01 truth matrix
 
-Dependency Request  
-Owner: UI-REC-01 TRUTH  
-Need: machine-readable backend/schema/meta/nav/form/list/action/permission surface matrix for the current reconciliation baseline, including installed first-party app identity.  
-Why: REC-04 can prove source-level gaps independently, but exact closure/counts and `OK` certification require the canonical matrix owned by REC-01.  
-Blocked scope: exact project-wide row counts and final severity confirmation for conditional cases such as HRM Salary Component reachability.  
-Can continue independently: yes.  
+Dependency Request
+Owner: UI-REC-01 TRUTH
+Need: machine-readable backend/schema/meta/nav/form/list/action/permission surface matrix for the current reconciliation baseline, including installed first-party app identity.
+Why: REC-04 can prove source-level gaps independently, but exact closure/counts and `OK` certification require the canonical matrix owned by REC-01.
+Blocked scope: exact project-wide row counts and final severity confirmation for conditional cases such as HRM Salary Component reachability.
+Can continue independently: yes.
 Next independent work: publish source-app coverage findings and route proven P0/P1 defects.
 
 ### DR-REC4-02 — Procurement operator navigation
 
-Dependency Request  
-Owner: Procurement/domain UI owner via reconciliation coordinator  
-Need: explicit role-gated operator paths for Supplier/RFQ/Supplier Quotation/Purchase Order/Purchase Receipt/Purchase Invoice/Payment Entry, or an equivalent authoritative app-owned Source-to-Pay screen.  
-Why: Procurement owns business composition; REC-04 must not create shadow purchasing surfaces or edit another owner's hotspot.  
-Blocked scope: P0 Procurement UI closure.  
-Can continue independently: yes.  
+Dependency Request
+Owner: Procurement/domain UI owner via reconciliation coordinator
+Need: explicit role-gated operator paths for Supplier/RFQ/Supplier Quotation/Purchase Order/Purchase Receipt/Purchase Invoice/Payment Entry, or an equivalent authoritative app-owned Source-to-Pay screen.
+Why: Procurement owns business composition; REC-04 must not create shadow purchasing surfaces or edit another owner's hotspot.
+Blocked scope: P0 Procurement UI closure.
+Can continue independently: yes.
 Next independent work: retain P0 evidence and hand to UI-REC-05 for eventual browser verification.
 
 ### DR-REC4-03 — Experience contract alignment
 
-Dependency Request  
-Owner: shared runtime owner / reconciliation coordinator  
-Need: align client renderable Experience kinds with server manifest support; specifically cover `daily-ledger` and `alumdoor-operations`, preferably from one shared contract.  
-Why: valid server/brief metadata is currently filtered out by client navigation.  
-Blocked scope: P1 navigation closure for these Experiences.  
-Can continue independently: yes.  
+Dependency Request
+Owner: shared runtime owner / reconciliation coordinator
+Need: align client renderable Experience kinds with server manifest support; specifically cover `daily-ledger` and `alumdoor-operations`, preferably from one shared contract.
+Why: valid server/brief metadata is currently filtered out by client navigation.
+Blocked scope: P1 navigation closure for these Experiences.
+Can continue independently: yes.
 Next independent work: inventory remaining product-identity branches without editing runtime.
 
 ### DR-REC4-04 — Unified first-party coverage gate
 
-Dependency Request  
-Owner: UI-REC-05 QA  
-Need: a static gate that discovers/loads the canonical first-party app-source registry and runs pack + Meta-v1/surface checks across the same app set.  
-Why: current central scripts encode different source arrays and leave several apps to isolated tests.  
-Blocked scope: reproducible project-wide coverage gate.  
-Can continue independently: yes.  
+Dependency Request
+Owner: UI-REC-05 QA
+Need: a static gate that discovers/loads the canonical first-party app-source registry and runs pack + Meta-v1/surface checks across the same app set.
+Why: current central scripts encode different source arrays and leave several apps to isolated tests.
+Blocked scope: reproducible project-wide coverage gate.
+Can continue independently: yes.
 Next independent work: provide this summary as expected coverage inventory.
 
 ### DR-REC4-05 — Manufacturing/QMS composition contract
 
-Dependency Request  
-Owner: Manufacturing/QMS domain owner  
-Need: declare and test whether Work Order/Job Card/Operation/Workstation are reachable operator surfaces of `manufacturing-qms` or intentionally supplied by another installed workspace.  
-Why: app manifest currently advertises a Manufacturing domain but only Quality Inspection among core external execution DocTypes is routed.  
-Blocked scope: final P1 classification.  
-Can continue independently: yes.  
+Dependency Request
+Owner: Manufacturing/QMS domain owner
+Need: declare and test whether Work Order/Job Card/Operation/Workstation are reachable operator surfaces of `manufacturing-qms` or intentionally supplied by another installed workspace.
+Why: app manifest currently advertises a Manufacturing domain but only Quality Inspection among core external execution DocTypes is routed.
+Blocked scope: final P1 classification.
+Can continue independently: yes.
 Next independent work: use `plastic-erp` as a positive explicit-route reference, not as a shared authority.
 
 ### DR-REC4-06 — Grid convergence
 
-Dependency Request  
-Owner: GRID program / UI-REC-05 QA  
-Need: exact Grid candidate and child-table parity evidence before certifying Sales/Purchase/Inventory/Payroll line-entry surfaces.  
-Why: REC-04/REC-03 may validate metadata reachability but Grid smart interaction belongs to the separate Grid workstream.  
-Blocked scope: final child-table operator parity.  
-Can continue independently: yes.  
+Dependency Request
+Owner: GRID program / UI-REC-05 QA
+Need: exact Grid candidate and child-table parity evidence before certifying Sales/Purchase/Inventory/Payroll line-entry surfaces.
+Why: REC-04/REC-03 may validate metadata reachability but Grid smart interaction belongs to the separate Grid workstream.
+Blocked scope: final child-table operator parity.
+Can continue independently: yes.
 Next independent work: all non-Grid coverage routing is complete.
 
 ## 7. Shared primitive recommendation
