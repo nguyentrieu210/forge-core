@@ -56,5 +56,10 @@ jobs:
           git config user.email "actions@users.noreply.github.com"
           git add client/packages client/scripts
           git commit -m "refactor(sales-ui): use options and server money [skip ci]"
-          git pull --rebase origin feat/sales-commercial-complete-20260811
+          # Build/typecheck may leave tracked generated files outside the intended patch.
+          # The validated source commit is already safe, so clean the worktree before rebasing.
+          git reset --hard HEAD
+          git clean -fd
+          git fetch origin feat/sales-commercial-complete-20260811
+          git rebase origin/feat/sales-commercial-complete-20260811
           git push origin HEAD:feat/sales-commercial-complete-20260811
