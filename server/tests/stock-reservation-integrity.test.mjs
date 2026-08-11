@@ -78,7 +78,7 @@ test("reservation key và source không được đổi trên cùng audit record
   await assert.rejects(() => controller.normalize(context({ existing, document: reservation({ item_code: "AL71" }) })), /không được đổi item_code/);
 });
 
-test("nhả một phần phải có lý do và server chụp lượng nhả nhưng giữ trạng thái active", async () => {
+test("nhả một phần giữ active và luôn có audit actor/time/delta/reason", async () => {
   const controller = new StockReservationIntegrityController();
   const existing = reservation({
     initial_qty_reserved: "51.000000",
@@ -86,20 +86,23 @@ test("nhả một phần phải có lý do và server chụp lượng nhả như
     cumulative_released_qty: "0.000000",
     cumulative_released_qty_micros: 0,
   });
-  await assert.rejects(
-    () => controller.normalize(context({ existing, document: reservation({ qty_reserved: "21" }) })),
-    /Giảm một phần giữ chỗ phải nhập lý do/,
-  );
-  const normalized = await controller.normalize(context({
+  const defaultReason = await controller.normalize(context({
+    existing,
+    document: reservation({ qty_reserved: "21" }),
+  }));
+  assert.equal(defaultReason.qty_reserved, "21.000000");
+  assert.equal(defaultReason.state, "Đang giữ");
+  assert.equal(defaultReason.last_partial_release_qty_micros, 30_000_000);
+  assert.equal(defaultReason.cumulative_released_qty_micros, 30_000_000);
+  assert.equal(defaultReason.partial_release_reason, "Điều chỉnh giảm giữ chỗ");
+  assert.equal(defaultReason.last_partial_released_by, "planner@example.test");
+  assert.equal(defaultReason.last_partial_released_at, NOW);
+
+  const explicitReason = await controller.normalize(context({
     existing,
     document: reservation({ qty_reserved: "21", partial_release_reason: "Khách giảm số lượng" }),
   }));
-  assert.equal(normalized.qty_reserved, "21.000000");
-  assert.equal(normalized.state, "Đang giữ");
-  assert.equal(normalized.last_partial_release_qty_micros, 30_000_000);
-  assert.equal(normalized.cumulative_released_qty_micros, 30_000_000);
-  assert.equal(normalized.last_partial_release_reason ?? normalized.partial_release_reason, "Khách giảm số lượng");
-  assert.equal(normalized.last_partial_released_by, "planner@example.test");
+  assert.equal(explicitReason.partial_release_reason, "Khách giảm số lượng");
 });
 
 test("client không được tự chuyển Đã dùng", async () => {
