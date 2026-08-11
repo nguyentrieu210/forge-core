@@ -8,6 +8,11 @@ export interface SalesTotalsInput {
   discount_amount?: string | number | undefined;
   /** Chỉ controller đã chạy applyUomConversion mới được bật trục giá server này. */
   use_priced_quantity?: boolean | undefined;
+  /**
+   * Only a controller that has rebuilt line money through the canonical commercial resolver
+   * may enable this. Raw REST payload discount/adjustment fields are otherwise ignored.
+   */
+  use_server_line_money?: boolean | undefined;
 }
 
 export interface SalesTotals {
@@ -30,9 +35,12 @@ export interface SalesTotals {
 }
 
 /**
- * Fixed-point implementation of the O2C tax subset captured by the pinned
- * ERPNext oracle: multiple percentage rows, included tax, previous-row total,
- * Actual, per-quantity, document discount and rounding adjustment.
+ * Fixed-point implementation of the O2C tax subset captured by the pinned ERPNext oracle.
+ *
+ * Legacy callers start from gross line amount and optional document discount. The canonical
+ * commercial Sales path additionally enables `use_server_line_money`, in which each line has
+ * already been rebuilt by the server as `gross - line discount + line adjustment`. That mode
+ * removes the old dependency on a client-computed header `discount_amount`.
  */
 export function calculateSalesTotals(
   items: SalesItem[],
@@ -42,14 +50,25 @@ export function calculateSalesTotals(
 ): SalesTotals {
   if (items.length === 0) throw errors.validation("At least one item is required");
   assertCurrencyScale(currencyScale);
+  const useServerLineMoney = options.use_server_line_money === true;
   const normalizedItems = items.map((item, index) => normalizeItem(
     item,
     index,
     currencyScale,
     options.use_priced_quantity === true,
+    useServerLineMoney,
   ));
   const grossMinor = addMinor(normalizedItems.map((item) => item.amount_minor ?? 0), "gross total");
   const quantityMicros = addMinor(normalizedItems.map((item) => item.qty_micros ?? 0), "quantity total");
+  const lineDiscountMinor = useServerLineMoney
+    ? addMinor(normalizedItems.map((item) => item.discount_amount_minor ?? 0), "line discount total")
+    : 0;
+  const lineAdjustmentMinor = useServerLineMoney
+    ? addMinor(normalizedItems.map((item) => item.adjustment_amount_minor ?? 0), "line adjustment total")
+    : 0;
+  const lineNetMinor = useServerLineMoney
+    ? addMinor(normalizedItems.map((item) => item.net_amount_minor ?? 0), "line net total")
+    : grossMinor;
 
   const discountBasis = options.apply_discount_on ?? "Net Total";
   if (discountBasis !== "Net Total" && discountBasis !== "Grand Total") throw errors.validation("Invalid apply_discount_on value");
@@ -69,9 +88,13 @@ export function calculateSalesTotals(
       throw errors.validation("Included tax currently supports additive On Net Total rows only");
     }
   }
-  // A normalized percentage-discount document legitimately contains both the
-  // percentage and its computed discount_amount. Percentage is authoritative
-  // when non-zero, which makes GET -> save/submit idempotent.
+  if (useServerLineMoney && includedRows.length > 0 && (lineDiscountMinor !== 0 || lineAdjustmentMinor !== 0)) {
+    throw errors.validation("Included tax with policy-derived line discount/adjustment is not supported in this O2C release");
+  }
+
+  // A normalized percentage-discount document legitimately contains both the percentage and
+  // its computed discount_amount. Percentage is authoritative when non-zero. In server-line
+  // mode the caller must never pass a computed line-discount total back as this header field.
   const fixedDiscount = percentage > 0 ? 0 : requestedFixedDiscount;
   if (includedRows.length > 0 && (percentage > 0 || fixedDiscount > 0)) {
     throw errors.validation("Included tax and document discount cannot be combined in this O2C release");
@@ -84,37 +107,37 @@ export function calculateSalesTotals(
   }), "included tax rates");
   const rateDenominator = 100_000_000; // 100 × 10^6
   let netMinor = includedRateMicros === 0
-    ? grossMinor
-    : divideRoundedSafe(BigInt(grossMinor) * BigInt(rateDenominator), BigInt(rateDenominator + includedRateMicros), "inclusive net total");
+    ? lineNetMinor
+    : divideRoundedSafe(BigInt(lineNetMinor) * BigInt(rateDenominator), BigInt(rateDenominator + includedRateMicros), "inclusive net total");
 
-  let discountMinor = 0;
+  let documentDiscountMinor = 0;
   let discountedGrandTarget: number | null = null;
   if (percentage > 0) {
     const netDiscount = percentOfMinor(netMinor, fromScaledInt(percentage, 6), 6, "additional_discount_percentage");
     if (discountBasis === "Grand Total") {
       const provisional = calculateTaxRows(netMinor, grossMinor, quantityMicros, taxes, currencyScale);
       const provisionalGrand = addMinor([netMinor, provisional.nonIncludedTaxMinor], "provisional grand total");
-      discountMinor = percentOfMinor(provisionalGrand, fromScaledInt(percentage, 6), 6, "additional_discount_percentage");
-      discountedGrandTarget = provisionalGrand - discountMinor;
+      documentDiscountMinor = percentOfMinor(provisionalGrand, fromScaledInt(percentage, 6), 6, "additional_discount_percentage");
+      discountedGrandTarget = provisionalGrand - documentDiscountMinor;
     } else {
-      discountMinor = netDiscount;
+      documentDiscountMinor = netDiscount;
     }
     netMinor -= netDiscount;
   } else if (fixedDiscount > 0) {
-    discountMinor = fixedDiscount;
+    documentDiscountMinor = fixedDiscount;
     if (discountBasis === "Grand Total") {
       const provisional = calculateTaxRows(netMinor, grossMinor, quantityMicros, taxes, currencyScale);
       const provisionalGrand = addMinor([netMinor, provisional.nonIncludedTaxMinor], "provisional grand total");
-      if (discountMinor > provisionalGrand) throw errors.validation("discount_amount cannot exceed Grand Total");
-      discountedGrandTarget = provisionalGrand - discountMinor;
+      if (documentDiscountMinor > provisionalGrand) throw errors.validation("discount_amount cannot exceed Grand Total");
+      discountedGrandTarget = provisionalGrand - documentDiscountMinor;
       netMinor = scaleByRatio(netMinor, discountedGrandTarget, provisionalGrand, "grand-total discount");
     } else {
-      if (discountMinor > netMinor) throw errors.validation("discount_amount cannot exceed Net Total");
-      netMinor -= discountMinor;
+      if (documentDiscountMinor > netMinor) throw errors.validation("discount_amount cannot exceed Net Total");
+      netMinor -= documentDiscountMinor;
     }
   }
 
-  const itemsWithNet = allocateNetAmounts(normalizedItems, netMinor, grossMinor, currencyScale);
+  const itemsWithNet = allocateNetAmounts(normalizedItems, netMinor, lineNetMinor, currencyScale);
   const taxResult = calculateTaxRows(netMinor, grossMinor, quantityMicros, taxes, currencyScale);
   const taxMinor = taxResult.totalTaxMinor;
   const computedGrand = addMinor([netMinor, taxMinor], "computed grand total");
@@ -122,6 +145,7 @@ export function calculateSalesTotals(
     ? addMinor([grossMinor, taxResult.nonIncludedTaxMinor], "inclusive rounded total")
     : (discountedGrandTarget ?? computedGrand);
   const roundingAdjustment = targetGrand - computedGrand;
+  const totalDiscountMinor = addMinor([lineDiscountMinor, documentDiscountMinor], "total discount");
 
   return {
     items: itemsWithNet,
@@ -138,8 +162,8 @@ export function calculateSalesTotals(
     rounding_adjustment_minor: roundingAdjustment,
     ...(options.apply_discount_on ? { apply_discount_on: options.apply_discount_on } : {}),
     ...(percentage > 0 ? { additional_discount_percentage: fromScaledInt(percentage, 6) } : {}),
-    discount_amount: fromScaledInt(discountMinor, currencyScale),
-    discount_amount_minor: discountMinor,
+    discount_amount: fromScaledInt(totalDiscountMinor, currencyScale),
+    discount_amount_minor: totalDiscountMinor,
   };
 }
 
@@ -148,15 +172,15 @@ function normalizeItem(
   index: number,
   currencyScale: number,
   usePricedQuantity: boolean,
+  useServerLineMoney: boolean,
 ): SalesItem {
   if (!item.item_code) throw errors.validation(`Item code is required at row ${index + 1}`);
   const qtyMicros = toScaledInt(item.qty, 6, `items[${index}].qty`);
   if (qtyMicros <= 0) throw errors.validation(`Quantity must be greater than zero at row ${index + 1}`);
   // Default callers may pass raw REST payloads, so hidden priced_qty_micros is untrusted.
-  // Only the sales controllers enable it after UOM core has rebuilt the snapshot from master.
+  // Only sales controllers enable it after UOM core has rebuilt the snapshot from master.
   const pricedQtyMicros = usePricedQuantity ? item.priced_qty_micros ?? qtyMicros : qtyMicros;
   if (pricedQtyMicros <= 0) throw errors.validation(`Priced quantity must be greater than zero at row ${index + 1}`);
-  // ERPNext rounds the rate at currency precision before multiplying quantity.
   const rateMinor = toScaledInt(item.rate, currencyScale, `items[${index}].rate`);
   if (rateMinor < 0) throw errors.validation(`Rate cannot be negative at row ${index + 1}`);
   const roundedRate = fromScaledInt(rateMinor, currencyScale);
@@ -168,6 +192,18 @@ function normalizeItem(
     currencyScale,
     `items[${index}].amount`,
   );
+
+  let netAmountMinor = amountMinor;
+  let lineDiscountMinor = 0;
+  let lineAdjustmentMinor = 0;
+  if (useServerLineMoney) {
+    lineDiscountMinor = trustedMinor(item.discount_amount_minor, `items[${index}].discount_amount_minor`);
+    lineAdjustmentMinor = trustedMinor(item.adjustment_amount_minor, `items[${index}].adjustment_amount_minor`);
+    if (lineDiscountMinor > amountMinor) throw errors.validation(`Line discount cannot exceed gross amount at row ${index + 1}`);
+    netAmountMinor = addMinor([amountMinor, -lineDiscountMinor, lineAdjustmentMinor], `items[${index}].net_amount`);
+    if (netAmountMinor < 0) throw errors.validation(`Line net amount cannot be negative at row ${index + 1}`);
+  }
+
   return {
     ...item,
     qty: fromScaledInt(qtyMicros, 6),
@@ -177,7 +213,21 @@ function normalizeItem(
     rate_minor: rateMinor,
     amount_minor: amountMinor,
     amount: fromScaledInt(amountMinor, currencyScale),
+    ...(useServerLineMoney ? {
+      discount_amount_minor: lineDiscountMinor,
+      discount_amount: fromScaledInt(lineDiscountMinor, currencyScale),
+      adjustment_amount_minor: lineAdjustmentMinor,
+      adjustment_amount: fromScaledInt(lineAdjustmentMinor, currencyScale),
+      net_amount_minor: netAmountMinor,
+      net_amount: fromScaledInt(netAmountMinor, currencyScale),
+    } : {}),
   };
+}
+
+function trustedMinor(value: number | undefined, field: string): number {
+  if (value === undefined) return 0;
+  if (!Number.isSafeInteger(value) || value < 0) throw errors.validation(`${field} must be a non-negative safe integer`);
+  return value;
 }
 
 function calculateTaxRows(
@@ -229,13 +279,13 @@ function calculateTaxRows(
   };
 }
 
-function allocateNetAmounts(items: SalesItem[], netMinor: number, grossMinor: number, scale: number): SalesItem[] {
+function allocateNetAmounts(items: SalesItem[], netMinor: number, sourceNetMinor: number, scale: number): SalesItem[] {
   let allocated = 0;
   return items.map((item, index) => {
-    const amountMinor = item.amount_minor ?? 0;
+    const sourceMinor = item.net_amount_minor ?? item.amount_minor ?? 0;
     const netAmount = index === items.length - 1
       ? netMinor - allocated
-      : (grossMinor === 0 ? 0 : scaleByRatio(amountMinor, netMinor, grossMinor, `items[${index}].net_amount`));
+      : (sourceNetMinor === 0 ? 0 : scaleByRatio(sourceMinor, netMinor, sourceNetMinor, `items[${index}].net_amount`));
     allocated += netAmount;
     return { ...item, net_amount_minor: netAmount, net_amount: fromScaledInt(netAmount, scale) };
   });
