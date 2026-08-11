@@ -19,7 +19,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Converge builder and source-safety gates
+      - name: Finalize canonical builder source only
         shell: bash
         run: |
           set -euo pipefail
@@ -28,6 +28,7 @@ jobs:
 
           builder = Path('server/scripts/build-alumdoor-v2-brief.mjs')
           s = builder.read_text(encoding='utf-8')
+
           old = '''// ── G1. Chủ xưởng chốt lại ngày 30/07: nhôm nhập và tồn theo KG ──
           // Số cây/lá, số bó và chiều dài là quy cách vật lý để tính barem và theo dõi nhà máy giao;
           // không thay thế số lượng giao dịch. `qty` của đơn mua là kg barem, `qty` của phiếu nhập là
@@ -96,27 +97,6 @@ jobs:
               s = s.replace(anchor, block + anchor, 1)
           s = s.replace('writeFileSync(OUT, JSON.stringify(brief, null, 1) + "\\n", "utf8");', 'writeFileSync(OUT, JSON.stringify(brief, null, 2) + "\\n", "utf8");', 1)
           builder.write_text(s, encoding='utf-8')
-
-          r6 = Path('.github/workflows/r6-pass-convergence.yml')
-          s = r6.read_text(encoding='utf-8')
-          old = '      - name: Diff hygiene\n        run: git diff --check\n'
-          new = "      - name: Source diff hygiene\n        shell: bash\n        run: |\n          set -euo pipefail\n          git diff --check -- . \\\n            ':(exclude)client/apps/*/dist/**' \\\n            ':(exclude)client/apps/*/dist-mobile/**'\n"
-          if old not in s:
-              raise SystemExit('R6 diff hygiene anchor not found')
-          s = s.replace(old, new, 1)
-          r6.write_text(s, encoding='utf-8')
-
-          gate = Path('.github/workflows/aluminum-inventory-closure.yml')
-          s = gate.read_text(encoding='utf-8')
-          path_anchor = '      - "server/scripts/apply-alumdoor-aluminum-metadata-overlay.mjs"\n'
-          if 'server/scripts/build-alumdoor-v2-brief.mjs' not in s:
-              s = s.replace(path_anchor, path_anchor + '      - "server/scripts/build-alumdoor-v2-brief.mjs"\n', 1)
-          step_old = '          node scripts/apply-alumdoor-aluminum-metadata-overlay.mjs briefs/alumdoor-v2.json --check\n'
-          step_new = '          node scripts/build-alumdoor-v2-brief.mjs\n          node scripts/apply-alumdoor-aluminum-metadata-overlay.mjs briefs/alumdoor-v2.json --check\n          git diff --exit-code -- briefs/alumdoor-v2.json\n'
-          if step_old not in s:
-              raise SystemExit('dedicated metadata step anchor not found')
-          s = s.replace(step_old, step_new, 1)
-          gate.write_text(s, encoding='utf-8')
           PY
 
           cd server
@@ -125,10 +105,9 @@ jobs:
           git diff --exit-code -- briefs/alumdoor-v2.json
           cd ..
 
-          rm .github/workflows/aluminum-finalize-source.yml
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add .github/workflows/r6-pass-convergence.yml .github/workflows/aluminum-inventory-closure.yml server/scripts/build-alumdoor-v2-brief.mjs server/briefs/alumdoor-v2.json .github/workflows/aluminum-finalize-source.yml
+          git add server/scripts/build-alumdoor-v2-brief.mjs
           git diff --cached --check
-          git commit -m "fix(alumdoor): converge aluminum builder and release hygiene"
+          git commit -m "fix(alumdoor): make aluminum V2 builder canonical"
           git push origin HEAD:feat/alumdoor-aluminum-inventory-closure
