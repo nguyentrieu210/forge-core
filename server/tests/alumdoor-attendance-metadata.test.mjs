@@ -48,8 +48,8 @@ test("AlumDoor attendance payroll metadata stays an isolated HRM-dependent packa
     "alumdoor-attendance:today",
     "alumdoor-attendance:month",
     "alumdoor-attendance:exceptions",
-    "alumdoor-payroll:run",
-    "alumdoor-payroll:my-slips",
+    "alumdoor-attendance:payroll-run",
+    "alumdoor-attendance:payroll-my-slips",
   ]) {
     assert.ok(manifest.nav.some((entry) => entry.kind === "experience" && entry.key === key), `missing experience ${key}`);
   }
