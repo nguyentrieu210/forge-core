@@ -4,6 +4,7 @@ import {
   handleTrackedPurchaseFifoRequest,
   validateAluminumPurchaseHook,
 } from "./aluminum-purchase-closure.js";
+import { buildResidualPurchaseValidationRequest } from "./aluminum-validation-bridge.js";
 import {
   handleAluminumSalesPlan,
   handleMaterialRequestFromAluminumShortage,
@@ -76,8 +77,26 @@ export default {
     }
 
     if (body?.doctype && PURCHASE_VALIDATION_DOCTYPES.has(body.doctype)) {
+      const baseResponse = await baseWorker.fetch(request.clone(), env, ctx);
+      if (baseResponse.ok) {
+        const aluminum = await validateAluminumPurchaseHook(request.clone(), env);
+        return aluminum ?? baseResponse;
+      }
+      if (baseResponse.status !== 422) return baseResponse;
+      const baseMessage = await responseMessage(baseResponse);
+      if (!/chưa có hệ số quy đổi/i.test(baseMessage)) return baseResponse;
+
+      // The legacy validator stopped on the obsolete Kg→piece factor of an aluminum line.
+      // Validate canonical aluminum semantics, then re-run the old validator on every ordinary
+      // row left in the same mixed document so no later error is hidden by the override.
       const aluminum = await validateAluminumPurchaseHook(request.clone(), env);
-      if (aluminum) return aluminum;
+      if (!aluminum || !aluminum.ok) return aluminum ?? baseResponse;
+      const residualRequest = await buildResidualPurchaseValidationRequest(request.clone(), env);
+      if (residualRequest) {
+        const residual = await baseWorker.fetch(residualRequest, env, ctx);
+        if (!residual.ok) return residual;
+      }
+      return aluminum;
     }
 
     return baseWorker.fetch(request, env, ctx);
