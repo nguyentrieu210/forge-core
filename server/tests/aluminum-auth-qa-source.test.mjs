@@ -16,6 +16,9 @@ test("local authenticated QA seed uses counted aluminum stock plus Kg catch weig
   assert.match(seed, /purchase_allocation_qty_field:\s*"qty_bar"/);
   assert.match(seed, /purchase_allocation_uom:\s*"Cây"/);
   assert.match(seed, /uom_conversions:\s*\[\]/);
+  assert.match(seed, /Material Specification", "AL71-QA-SPEC"/);
+  assert.match(seed, /theoretical_kg_per_m:\s*0\.389/);
+  assert.match(seed, /material_specification:\s*"AL71-QA-SPEC"/);
 });
 
 test("authenticated FIFO E2E asserts tracked Batch Bundle receipt rather than Kg stock", () => {
