@@ -13,17 +13,12 @@ import { toScaledInt } from "../../money/src/index.js";
 import { domainEvent } from "../../outbox/src/index.js";
 import type { StockReturnData } from "./types.js";
 import { StockReturnController } from "./controllers.js";
+import { assertStockPlanRespectsReservations } from "./outbound-reservation-guard.js";
 
 function text(value: unknown): string {
   return String(value ?? "").normalize("NFC").trim();
 }
 
-/**
- * Stock Return is a correction of an already-posted Delivery/Purchase Receipt.
- * Cancellation therefore reverses the exact submitted Stock/GL facts; it must never
- * recalculate valuation or reselect batch state from "now" because stock may have moved
- * since the return was submitted.
- */
 export class StockReturnIntegrityController extends StockReturnController {
   override async buildPlan(context: ControllerContext<StockReturnData>): Promise<MutationPlan<StockReturnData>> {
     if (context.command.action === "submit") {
@@ -36,11 +31,15 @@ export class StockReturnIntegrityController extends StockReturnController {
           company,
         );
       }
-      return super.buildPlan(context);
+      const plan = await super.buildPlan(context);
+      await assertStockPlanRespectsReservations(context, plan.stock_entries, [context.command.aggregate.name]);
+      return plan;
     }
 
     if (context.command.action !== "cancel") return super.buildPlan(context);
-    return buildExactCancelPlan(context);
+    const plan = await buildExactCancelPlan(context);
+    await assertStockPlanRespectsReservations(context, plan.stock_entries, [context.command.aggregate.name]);
+    return plan;
   }
 }
 
