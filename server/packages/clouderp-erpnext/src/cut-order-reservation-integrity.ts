@@ -1,26 +1,29 @@
+import type { JsonObject, MutationPlan } from "../../contracts/src/index.js";
+import type { ControllerContext, DocumentController } from "../../document-kernel/src/index.js";
 import { CutOrderController } from "./alumdoor-inventory.js";
 import { withReservationLifecycleReader } from "./reservation-lifecycle-reader.js";
-
-type CutOrderContext = Parameters<CutOrderController["buildPlan"]>[0];
 
 function text(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
 /**
- * Preserves the mature Cut Order calculation/ledger implementation while making its existing
- * reservation scan lifecycle-aware. Cancelled source documents cease to reserve ATP without
- * rewriting their immutable reservation audit records, while the Cut Order may consume the
- * promise owned by its own Production Order / Sales reference.
+ * Composition wrapper instead of subclassing because CutOrderController's internal data type
+ * is intentionally private to alumdoor-inventory.ts. This keeps the public controller registry
+ * on JsonObject while preserving the exact mature Cut Order mutation plan.
  */
-export class CutOrderReservationIntegrityController extends CutOrderController {
-  override buildPlan(context: CutOrderContext) {
+export class CutOrderReservationIntegrityController implements DocumentController<JsonObject> {
+  readonly doctype = "Cut Order";
+  private readonly delegate = new CutOrderController();
+
+  async buildPlan(context: ControllerContext<JsonObject>): Promise<MutationPlan<JsonObject>> {
     const document = context.command.action === "cancel" ? context.existing?.data : context.command.document;
     const ownSources = [
       context.command.aggregate.name,
       text(document?.production_order),
       text(document?.so_reference),
     ];
-    return super.buildPlan(withReservationLifecycleReader(context, ownSources));
+    const scoped = withReservationLifecycleReader(context, ownSources);
+    return this.delegate.buildPlan(scoped as never) as unknown as Promise<MutationPlan<JsonObject>>;
   }
 }
