@@ -62,6 +62,22 @@ function assertActiveReservationNotZombie(context: ReservationContext, previous:
   }
 }
 
+function assertConsumptionIsNotClientDeclared(current: ReservationData, previous: ReservationData, desiredState: string): void {
+  if (desiredState === "Đã dùng") {
+    throw errors.lifecycle(
+      "Trạng thái Đã dùng do chứng từ tiêu thụ/cắt xác nhận; không được chuyển tay trên phiếu giữ chỗ",
+    );
+  }
+  if (desiredState !== "Đang giữ") return;
+  const before = toScaledInt(previous.qty_reserved, 6, "qty_reserved");
+  const after = toScaledInt(current.qty_reserved, 6, "qty_reserved");
+  if (after < before) {
+    throw errors.lifecycle(
+      "Không được giảm số lượng giữ chỗ bằng tay; phần đã dùng phải được trừ từ bằng chứng cắt/xuất kho",
+    );
+  }
+}
+
 async function assertReservationWarehouseScope(context: ReservationContext, input: ReservationData): Promise<void> {
   if (!input.warehouse) return;
   const source = input.source_doctype && input.source_name
@@ -192,14 +208,29 @@ export class StockReservationIntegrityController extends StockReservationControl
         throw errors.lifecycle("Giữ chỗ mới phải bắt đầu ở trạng thái Đang giữ");
       }
       const normalized = await super.normalize(context);
-      await assertReservationFeasibleAcrossThresholds(context, normalized, context.command.aggregate.name);
-      return normalized;
+      const qtyMicros = toScaledInt(normalized.qty_reserved, 6, "qty_reserved");
+      const withSnapshot = {
+        ...normalized,
+        initial_qty_reserved: fromScaledInt(qtyMicros, 6),
+        initial_qty_reserved_micros: qtyMicros,
+      } as ReservationData;
+      await assertReservationFeasibleAcrossThresholds(context, withSnapshot, context.command.aggregate.name);
+      return withSnapshot;
     }
 
     assertReservationIdentityImmutable(input, previous);
     assertActiveReservationNotZombie(context, previous, desiredState);
+    assertConsumptionIsNotClientDeclared(input, previous, desiredState);
     const normalized = await super.normalize(context);
-    await assertReservationFeasibleAcrossThresholds(context, normalized, context.command.aggregate.name);
-    return normalized;
+    const initialMicros = typeof previous.initial_qty_reserved_micros === "number"
+      ? previous.initial_qty_reserved_micros
+      : toScaledInt(previous.initial_qty_reserved ?? previous.qty_reserved, 6, "initial_qty_reserved");
+    const withSnapshot = {
+      ...normalized,
+      initial_qty_reserved: fromScaledInt(initialMicros, 6),
+      initial_qty_reserved_micros: initialMicros,
+    } as ReservationData;
+    await assertReservationFeasibleAcrossThresholds(context, withSnapshot, context.command.aggregate.name);
+    return withSnapshot;
   }
 }
