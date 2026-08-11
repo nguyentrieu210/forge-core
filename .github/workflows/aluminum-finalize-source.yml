@@ -1,0 +1,132 @@
+name: Alumdoor Aluminum Source Finalizer
+
+on:
+  push:
+    branches:
+      - feat/alumdoor-aluminum-inventory-closure
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/alumdoor-aluminum-inventory-closure
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Converge builder and source-safety gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          builder = Path('server/scripts/build-alumdoor-v2-brief.mjs')
+          s = builder.read_text(encoding='utf-8')
+          old = '''// ── G1. Chủ xưởng chốt lại ngày 30/07: nhôm nhập và tồn theo KG ──
+          // Số cây/lá, số bó và chiều dài là quy cách vật lý để tính barem và theo dõi nhà máy giao;
+          // không thay thế số lượng giao dịch. `qty` của đơn mua là kg barem, `qty` của phiếu nhập là
+          // số lượng thực nhận theo ĐVT mua. Vì vậy profile nhôm phải giữ stock_uom = Kg.
+          fixture("Measurement Profile", "Nhôm cây/lá").data.stock_uom = "Kg";
+          note('G1 · Measurement Profile "Nhôm cây/lá": nhập/tồn Kg; cây/lá là số lượng phụ');
+          '''
+          new = '''// ── G1. Contract canonical 11/08: nhôm mua/định giá theo Kg, tồn vật lý theo Cây/Lá ──
+          // Kg là catch weight và priced quantity; số cây/lá là stock quantity. Hai trục cùng nằm trên
+          // Stock Ledger/Batch, tuyệt đối không dùng hệ số Kg↔Cây tĩnh và không tạo shadow balance.
+          fixture("Measurement Profile", "Nhôm cây/lá").data.stock_uom = "Cây";
+          note('G1 · Measurement Profile "Nhôm cây/lá": tồn Cây/Lá; Kg là catch weight và đơn vị mua/định giá');
+          '''
+          if old not in s:
+              raise SystemExit('expected legacy G1 block not found')
+          s = s.replace(old, new, 1)
+
+          marker = '// ── ALUMINUM INVENTORY AUTHORITY CONVERGENCE ──'
+          if marker not in s:
+              anchor = 'writeFileSync(OUT, JSON.stringify(brief, null, 1) + "\\n", "utf8");'
+              if anchor not in s:
+                  raise SystemExit('builder output anchor not found')
+              block = '''// ── ALUMINUM INVENTORY AUTHORITY CONVERGENCE ──
+          // Effective package must be born canonical: purchase/price in Kg, physical stock in Cây/Lá,
+          // Batch identity + catch weight, and qty_bar as exact purchase stock/allocation quantity.
+          const technicalItemFields = [
+            { fieldname: "purchase_stock_qty_field", fieldtype: "Data", label: "Trường SL tồn mua", hidden: true, read_only: true },
+            { fieldname: "purchase_allocation_qty_field", fieldtype: "Data", label: "Trường SL phân bổ mua", hidden: true, read_only: true },
+            { fieldname: "purchase_allocation_uom", fieldtype: "Link", options: "UOM", label: "ĐVT phân bổ mua", hidden: true, read_only: true },
+          ];
+          for (const field of technicalItemFields) {
+            if (!item.fields.some((existing) => typeof existing === "object" && existing?.fieldname === field.fieldname)) item.fields.push(field);
+          }
+          const canonicalAluminumProfile = fixture("Measurement Profile", "Nhôm cây/lá").data;
+          canonicalAluminumProfile.stock_uom = "Cây";
+          canonicalAluminumProfile.track_dimension_lot = true;
+          canonicalAluminumProfile.require_piece_qty = true;
+          canonicalAluminumProfile._desc = "Tồn nhôm theo số cây/lá có Batch và chiều dài; Kg là catch weight/đơn vị mua-định giá, không phải số lượng tồn.";
+          for (const f of brief.fixtures) {
+            if (f?.type !== "Item" || f?.data?.inventory_mode !== "Nhôm cây/lá") continue;
+            f.data.stock_uom = "Cây";
+            f.data.default_purchase_uom = "Kg";
+            f.data.has_batch_no = 1;
+            f.data.has_catch_weight = 1;
+            f.data.weight_uom = "Kg";
+            f.data.purchase_stock_qty_field = "qty_bar";
+            f.data.purchase_allocation_qty_field = "qty_bar";
+            f.data.purchase_allocation_uom = "Cây";
+            f.data.allow_negative_stock = 0;
+            f.data.uom_conversions = [];
+          }
+          note('AL-INV · package canonical: Kg priced/catch-weight + Cây/Lá stock + Batch + qty_bar descriptors');
+
+          '''
+              s = s.replace(anchor, block + anchor, 1)
+          builder.write_text(s, encoding='utf-8')
+
+          r6 = Path('.github/workflows/r6-pass-convergence.yml')
+          s = r6.read_text(encoding='utf-8')
+          old = '      - name: Diff hygiene\n        run: git diff --check\n'
+          new = '''      - name: Source diff hygiene
+                shell: bash
+                run: |
+                  set -euo pipefail
+                  git diff --check -- . \\
+                    ':(exclude)client/apps/*/dist/**' \\
+                    ':(exclude)client/apps/*/dist-mobile/**'
+          '''
+          if old not in s:
+              raise SystemExit('R6 diff hygiene anchor not found')
+          s = s.replace(old, new, 1)
+          r6.write_text(s, encoding='utf-8')
+
+          gate = Path('.github/workflows/aluminum-inventory-closure.yml')
+          s = gate.read_text(encoding='utf-8')
+          path_anchor = '      - "server/scripts/apply-alumdoor-aluminum-metadata-overlay.mjs"\n'
+          if 'server/scripts/build-alumdoor-v2-brief.mjs' not in s:
+              s = s.replace(path_anchor, path_anchor + '      - "server/scripts/build-alumdoor-v2-brief.mjs"\n', 1)
+          step_old = '          node scripts/apply-alumdoor-aluminum-metadata-overlay.mjs briefs/alumdoor-v2.json --check\n'
+          step_new = '''          node scripts/build-alumdoor-v2-brief.mjs
+                    node scripts/apply-alumdoor-aluminum-metadata-overlay.mjs briefs/alumdoor-v2.json --check
+                    git diff --exit-code -- briefs/alumdoor-v2.json
+          '''
+          if step_old not in s:
+              raise SystemExit('dedicated metadata step anchor not found')
+          s = s.replace(step_old, step_new, 1)
+          gate.write_text(s, encoding='utf-8')
+          PY
+
+          cd server
+          node scripts/build-alumdoor-v2-brief.mjs
+          node scripts/apply-alumdoor-aluminum-metadata-overlay.mjs briefs/alumdoor-v2.json --check
+          cd ..
+
+          rm .github/workflows/aluminum-finalize-source.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .github/workflows/r6-pass-convergence.yml .github/workflows/aluminum-inventory-closure.yml server/scripts/build-alumdoor-v2-brief.mjs server/briefs/alumdoor-v2.json .github/workflows/aluminum-finalize-source.yml
+          git diff --cached --check
+          git commit -m "fix(alumdoor): converge aluminum builder and release hygiene"
+          git push origin HEAD:feat/alumdoor-aluminum-inventory-closure
