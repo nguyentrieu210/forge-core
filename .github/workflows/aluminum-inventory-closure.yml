@@ -9,6 +9,7 @@ on:
       - "server/packages/clouderp-erpnext/**"
       - "server/apps-src/alumdoor-worker/**"
       - "server/tests/aluminum-*.test.mjs"
+      - "server/tests/alumdoor-item-validator.test.mjs"
       - "server/tests/alumdoor-v2-inventory.test.mjs"
       - "server/tests/purchase-*.test.mjs"
       - "server/tests/catch-weight-valuation.test.mjs"
@@ -64,11 +65,12 @@ jobs:
           test -f dist/packages/clouderp-core/src/uom.js
           test -f dist/apps-src/alumdoor-worker/src/aluminum-purchase-closure.js
           test -f dist/apps-src/alumdoor-worker/src/aluminum-supply-demand.js
+          test -f dist/apps-src/alumdoor-worker/src/aluminum-validation-bridge.js
           if [ "$status" -ne 0 ]; then
             echo "Repository TypeScript baseline is non-zero. Failing only if changed aluminum files have TS errors."
             grep "error TS" /tmp/aluminum-tsc.log > /tmp/aluminum-ts-errors.log || true
             cat /tmp/aluminum-ts-errors.log
-            if grep -E 'packages/clouderp-core/src/uom\.ts|apps-src/alumdoor-worker/src/(entry|item-catalog-invariants|aluminum-purchase-closure|aluminum-supply-demand)\.ts' /tmp/aluminum-ts-errors.log; then
+            if grep -E 'packages/clouderp-core/src/uom\.ts|apps-src/alumdoor-worker/src/(entry|item-catalog-invariants|aluminum-purchase-closure|aluminum-supply-demand|aluminum-validation-bridge)\.ts' /tmp/aluminum-ts-errors.log; then
               echo "Changed aluminum closure source has TypeScript errors"
               exit 1
             fi
@@ -84,6 +86,14 @@ jobs:
             tests/purchase-receipt-allocation-controller.test.mjs \
             tests/r5-03-purchase-allocation-measure.test.mjs \
             tests/catch-weight-valuation.test.mjs
+
+      - name: Validator and mixed-document boundary
+        working-directory: server
+        run: |
+          node --test \
+            tests/alumdoor-item-validator.test.mjs \
+            tests/aluminum-item-validator-boundary.test.mjs \
+            tests/aluminum-validation-bridge.test.mjs
 
       - name: Aluminum ATP reservation and cut closure
         working-directory: server
