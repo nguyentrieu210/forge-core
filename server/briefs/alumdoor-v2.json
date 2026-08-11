@@ -3085,6 +3085,13 @@
      "rate",
      "amount",
      "note"
+    ],
+    "previewMethod": "alumdoor.ui.preview_child_row",
+    "previewParentFields": [
+     "customer",
+     "customer_group",
+     "selling_price_list",
+     "currency"
     ]
    },
    "quickEntry": {
@@ -3101,6 +3108,13 @@
      "qty",
      "rate",
      "amount"
+    ],
+    "previewMethod": "alumdoor.ui.preview_child_row",
+    "previewParentFields": [
+     "customer",
+     "customer_group",
+     "selling_price_list",
+     "currency"
     ]
    }
   },
@@ -3648,6 +3662,13 @@
      "qty",
      "rate",
      "amount"
+    ],
+    "previewMethod": "alumdoor.ui.preview_child_row",
+    "previewParentFields": [
+     "customer",
+     "customer_group",
+     "selling_price_list",
+     "currency"
     ]
    },
    "quickEntry": {
@@ -3664,6 +3685,13 @@
      "qty",
      "rate",
      "amount"
+    ],
+    "previewMethod": "alumdoor.ui.preview_child_row",
+    "previewParentFields": [
+     "customer",
+     "customer_group",
+     "selling_price_list",
+     "currency"
     ]
    }
   },
@@ -4007,6 +4035,13 @@
      "rate",
      "valuation_rate",
      "amount"
+    ],
+    "previewMethod": "alumdoor.ui.preview_child_row",
+    "previewParentFields": [
+     "customer",
+     "customer_group",
+     "selling_price_list",
+     "currency"
     ]
    },
    "quickEntry": {
@@ -4016,6 +4051,13 @@
      "qty",
      "warehouse",
      "rate"
+    ],
+    "previewMethod": "alumdoor.ui.preview_child_row",
+    "previewParentFields": [
+     "customer",
+     "customer_group",
+     "selling_price_list",
+     "currency"
     ]
    }
   },
@@ -4466,6 +4508,13 @@
      "qty",
      "rate",
      "amount"
+    ],
+    "previewMethod": "alumdoor.ui.preview_child_row",
+    "previewParentFields": [
+     "customer",
+     "customer_group",
+     "selling_price_list",
+     "currency"
     ]
    },
    "quickEntry": {
@@ -4475,6 +4524,13 @@
      "qty",
      "rate",
      "amount"
+    ],
+    "previewMethod": "alumdoor.ui.preview_child_row",
+    "previewParentFields": [
+     "customer",
+     "customer_group",
+     "selling_price_list",
+     "currency"
     ]
    }
   },
@@ -5181,6 +5237,12 @@
      "amount",
      "lead_time_days",
      "note"
+    ],
+    "previewMethod": "alumdoor.ui.preview_child_row",
+    "previewParentFields": [
+     "company",
+     "currency",
+     "transaction_date"
     ]
    },
    "quickEntry": {
@@ -5191,6 +5253,12 @@
      "uom",
      "rate",
      "amount"
+    ],
+    "previewMethod": "alumdoor.ui.preview_child_row",
+    "previewParentFields": [
+     "company",
+     "currency",
+     "transaction_date"
     ]
    }
   },
@@ -5519,6 +5587,12 @@
      "so_no",
      "warehouse",
      "note"
+    ],
+    "previewMethod": "alumdoor.ui.preview_child_row",
+    "previewParentFields": [
+     "company",
+     "currency",
+     "transaction_date"
     ]
    },
    "quickEntry": {
@@ -5529,6 +5603,12 @@
      "rate",
      "amount",
      "is_stamped"
+    ],
+    "previewMethod": "alumdoor.ui.preview_child_row",
+    "previewParentFields": [
+     "company",
+     "currency",
+     "transaction_date"
     ]
    }
   },
@@ -5926,6 +6006,12 @@
      "warehouse",
      "purchase_order",
      "note"
+    ],
+    "previewMethod": "alumdoor.ui.preview_child_row",
+    "previewParentFields": [
+     "company",
+     "currency",
+     "transaction_date"
     ]
    },
    "quickEntry": {
@@ -5937,6 +6023,12 @@
      "amount",
      "is_stamped",
      "warehouse"
+    ],
+    "previewMethod": "alumdoor.ui.preview_child_row",
+    "previewParentFields": [
+     "company",
+     "currency",
+     "transaction_date"
     ]
    }
   },
@@ -6215,6 +6307,12 @@
      "rate",
      "amount",
      "warehouse"
+    ],
+    "previewMethod": "alumdoor.ui.preview_child_row",
+    "previewParentFields": [
+     "company",
+     "currency",
+     "transaction_date"
     ]
    },
    "quickEntry": {
@@ -6224,6 +6322,12 @@
      "uom",
      "rate",
      "amount"
+    ],
+    "previewMethod": "alumdoor.ui.preview_child_row",
+    "previewParentFields": [
+     "company",
+     "currency",
+     "transaction_date"
     ]
    }
   },
