@@ -24,3 +24,17 @@ test("metadata child grid preserves common row workflow", () => {
   assert.match(grid, /registry\.resolve/);
   assert.match(grid, /readOnly=\{Boolean\(readOnly \|\| resolved\.readOnly\)\}/);
 });
+
+test("metadata child grid delegates row derivation to declared server preview", () => {
+  assert.match(grid, /viewPreviewMethod/);
+  assert.match(grid, /services\.callPost<ChildRowPreviewResult>\(previewMethod/);
+  assert.match(grid, /changed_field: changedField/);
+  assert.match(grid, /child_fields: childFields/);
+  assert.match(grid, /previewParentFields/);
+});
+
+test("server preview cannot write unknown fields and stale responses are discarded", () => {
+  assert.match(grid, /previewVersion\.current\.get\(key\) !== version/);
+  assert.match(grid, /if \(childFields\.includes\(fieldname\)\) nextRow\[fieldname\] = undefined/);
+  assert.match(grid, /if \(childFields\.includes\(fieldname\)\) nextRow\[fieldname\] = value/);
+});
