@@ -27,6 +27,7 @@
   ],
   "permissions": [
     { "role": "AlumDoor QR System", "read": true, "write": true, "create": true },
+    { "role": "AlumDoor Attendance System", "read": true, "write": true },
     { "role": "AlumDoor Payroll System", "read": true, "write": true },
     { "role": "AlumDoor Attendance Viewer", "read": true, "report": true },
     { "role": "AlumDoor Attendance Manager", "read": true, "report": true, "export": true },
@@ -35,5 +36,5 @@
     { "role": "HR Manager", "read": true, "report": true, "export": true },
     { "role": "System Manager", "read": true, "report": true, "export": true }
   ],
-  "revision": 2
+  "revision": 3
 }
