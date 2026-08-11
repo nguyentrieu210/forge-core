@@ -12,7 +12,7 @@ function byId(matrix, id) {
   return row;
 }
 
-test("UI-REC-01 detects current Sales backend-to-metadata drift without duplicating domain authority", () => {
+test("UI-REC-01 tracks unresolved Sales authority drift while locking the converged Sales line projection", () => {
   const matrix = auditBackendUiSurfaces();
 
   const option = byId(matrix, "selling::Sales Option::master");
@@ -28,9 +28,10 @@ test("UI-REC-01 detects current Sales backend-to-metadata drift without duplicat
   assert.ok(salesPackage.classification.includes("NAV_MISSING"));
 
   const salesLine = byId(matrix, "alumdoor::Sales Order Item::child");
-  assert.ok(salesLine.classification.includes("SCHEMA_DRIFT"));
-  assert.ok(salesLine.classification.includes("GRID_INCOMPLETE"));
-  assert.equal(salesLine.projection.grid_present, false);
+  assert.deepEqual(salesLine.classification, ["OK"]);
+  assert.equal(salesLine.projection.metadata_present, true);
+  assert.equal(salesLine.projection.grid_present, true);
+  assert.ok(salesLine.schema.fields.some((field) => field?.fieldname === "sales_option" && field.fieldtype === "Link" && field.options === "Sales Option"));
 });
 
 test("UI-REC-01 keeps the repaired Sales Order server-preview summary projected", () => {
