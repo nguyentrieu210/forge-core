@@ -1,55 +1,47 @@
 import type { Doc } from "@metaforge/core";
 
+/** Compatibility names consumed by ChildGrid; semantics come only from Item.sales_qty_basis. */
 export type LinearSalesBasis = "RAY" | "TRUC";
 
-const normalized = (value: unknown) => String(value ?? "").normalize("NFC").trim().toLocaleLowerCase("vi");
+export type SalesQtyBasis =
+  | "DIRECT"
+  | "AREA"
+  | "HEIGHT_X_SETS"
+  | "WIDTH_X_SETS"
+  | "LENGTH_X_PIECES"
+  | "SET_COUNT"
+  | "PIECES";
 
-const DOOR_TYPES = new Set([
-  "cửa đức", "cửa úc", "cửa lưới", "cửa đài loan", "cửa siêu trường", "cửa tấm liền úc",
-]);
+export function salesQtyBasis(row: Doc | Record<string, unknown>): SalesQtyBasis {
+  const value = String(row.sales_qty_basis ?? "").trim().toUpperCase();
+  if (["AREA", "HEIGHT_X_SETS", "WIDTH_X_SETS", "LENGTH_X_PIECES", "SET_COUNT", "PIECES"].includes(value)) {
+    return value as SalesQtyBasis;
+  }
+  return "DIRECT";
+}
 
-const DOOR_ITEM_GROUPS = new Set([
-  "cửa cn đức", "cửa tấm liền úc", "cửa lưới", "cửa đài loan", "cửa đài loan inox",
-  "cửa kéo đài loan", "cửa siêu trường",
-]);
-
-/** Ray/trục là hàng bán theo mét, không phải mã cửa dù một số mã đang nằm trong nhóm cửa. */
+/** HEIGHT/WIDTH are generic measurement facts; names such as ray/trục never enter runtime policy. */
 export function deriveLinearSalesBasis(row: Doc | Record<string, unknown>): LinearSalesBasis | undefined {
-  const itemName = normalized(row.item_name);
-  const itemCode = normalized(row.item_code);
-  if (itemName.startsWith("ray") || itemCode.includes("ray")) return "RAY";
-  if (itemName.startsWith("trục") || itemName.startsWith("truc")
-    || itemCode.includes("trục") || itemCode.includes("truc")) return "TRUC";
+  const basis = salesQtyBasis(row);
+  if (basis === "HEIGHT_X_SETS") return "RAY";
+  if (basis === "WIDTH_X_SETS") return "TRUC";
   return undefined;
 }
 
-/**
- * Phụ kiện Bộ ba lá đáy và Lá đầu bán theo mét lấy chiều rộng làm cơ sở.
- * Đây là quy tắc thương mại riêng của hai mã, không phải quy tắc chung cho
- * toàn bộ nhóm Nhôm cây/lá.
- */
+/** Kept for old ChildGrid call-sites while they transition to salesQtyBasis. */
 export function isWidthQuantitySalesItem(row: Doc | Record<string, unknown>): boolean {
-  const itemName = normalized(row.item_name);
-  const itemCode = normalized(row.item_code).replace(/[ _-]+/g, "");
-  return itemName.includes("bộ ba lá đáy")
-    || itemName === "lá đầu"
-    || itemCode.includes("bo3laday")
-    || itemCode === "tpa282"
-    || itemCode.includes("ladau");
+  return salesQtyBasis(row) === "WIDTH_X_SETS";
 }
 
 export function isOrdinaryQuantitySalesItem(row: Doc | Record<string, unknown>): boolean {
-  return normalized(row.inventory_mode) === "hàng thường"
-    && !deriveLinearSalesBasis(row)
-    && !isWidthQuantitySalesItem(row);
+  const basis = salesQtyBasis(row);
+  return basis === "SET_COUNT" || basis === "PIECES";
 }
 
-/** Chỉ mã cửa được mặc định 15%; ray/trục và phụ kiện luôn bắt đầu từ 0%. */
-export function defaultSalesDiscountPercent(row: Doc | Record<string, unknown>): number {
-  if (deriveLinearSalesBasis(row)) return 0;
-  if (DOOR_TYPES.has(normalized(row.door_type))) return 15;
-  return normalized(row.inventory_mode) === "thành phẩm theo m2"
-    && DOOR_ITEM_GROUPS.has(normalized(row.item_group))
-    ? 15
-    : 0;
+/**
+ * Deprecated compatibility export. Monetary policy is server-authoritative Pricing Rule;
+ * the client never invents a percentage from item type/name/group.
+ */
+export function defaultSalesDiscountPercent(_row: Doc | Record<string, unknown>): number {
+  return 0;
 }
