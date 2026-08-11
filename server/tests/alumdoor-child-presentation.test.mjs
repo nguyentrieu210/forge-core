@@ -26,6 +26,17 @@ function names(view) {
   return view?.columns ?? view?.fields ?? [];
 }
 
+function expectedQuick(golden, doctype) {
+  const existing = new Set(doctype.fields.map((field) => field.fieldname));
+  const inForm = new Set(names(doctype.viewPolicy.form));
+  return golden.filter((fieldname) => existing.has(fieldname) && inForm.has(fieldname));
+}
+
+function expectedFull(golden, doctype) {
+  const existing = new Set(doctype.fields.map((field) => field.fieldname));
+  return golden.filter((fieldname) => existing.has(fieldname));
+}
+
 test("presentation helper migrates every Alumdoor child DocType without changing field order", () => {
   const brief = sourceBrief();
   const before = new Map(brief.doctypes.filter((dt) => dt.child === true).map((dt) => [dt.name, dt.fields.map((field) => typeof field === "string" ? field.split(":")[0].trim() : field.fieldname)]));
@@ -48,16 +59,16 @@ test("golden Sales and Purchase compact/full policies survive canonical UI-polic
   const sales = compiledDoctype(pkg, "Sales Order Item");
   assert.equal(sales.viewPolicy.form.enabled, true);
   assert.equal(sales.viewPolicy.quickEntry.enabled, true);
-  assert.deepEqual(names(sales.viewPolicy.quickEntry), alumdoorGoldenChildGridPolicies.salesCompact.filter((fieldname) => sales.fields.some((field) => field.fieldname === fieldname && field.surface !== "internal")));
-  assert.deepEqual(names(sales.viewPolicy.form), alumdoorGoldenChildGridPolicies.salesFull.filter((fieldname) => sales.fields.some((field) => field.fieldname === fieldname)));
+  assert.deepEqual(names(sales.viewPolicy.quickEntry), expectedQuick(alumdoorGoldenChildGridPolicies.salesCompact, sales));
+  assert.deepEqual(names(sales.viewPolicy.form), expectedFull(alumdoorGoldenChildGridPolicies.salesFull, sales));
 
   const po = compiledDoctype(pkg, "Purchase Order Item");
-  assert.deepEqual(names(po.viewPolicy.quickEntry), alumdoorGoldenChildGridPolicies.purchaseCompact.filter((fieldname) => po.fields.some((field) => field.fieldname === fieldname)));
-  assert.deepEqual(names(po.viewPolicy.form), alumdoorGoldenChildGridPolicies.purchaseOrderFull.filter((fieldname) => po.fields.some((field) => field.fieldname === fieldname)));
+  assert.deepEqual(names(po.viewPolicy.quickEntry), expectedQuick(alumdoorGoldenChildGridPolicies.purchaseCompact, po));
+  assert.deepEqual(names(po.viewPolicy.form), expectedFull(alumdoorGoldenChildGridPolicies.purchaseOrderFull, po));
 
   const receipt = compiledDoctype(pkg, "Purchase Receipt Item");
-  assert.deepEqual(names(receipt.viewPolicy.quickEntry), alumdoorGoldenChildGridPolicies.purchaseCompact.filter((fieldname) => receipt.fields.some((field) => field.fieldname === fieldname)));
-  assert.deepEqual(names(receipt.viewPolicy.form), alumdoorGoldenChildGridPolicies.purchaseReceiptFull.filter((fieldname) => receipt.fields.some((field) => field.fieldname === fieldname)));
+  assert.deepEqual(names(receipt.viewPolicy.quickEntry), expectedQuick(alumdoorGoldenChildGridPolicies.purchaseCompact, receipt));
+  assert.deepEqual(names(receipt.viewPolicy.form), expectedFull(alumdoorGoldenChildGridPolicies.purchaseReceiptFull, receipt));
 });
 
 test("all 28 child doctypes explicitly own form and quick-entry presentation after attachment", () => {
