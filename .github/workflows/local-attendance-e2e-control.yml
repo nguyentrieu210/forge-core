@@ -6,6 +6,12 @@ on:
     paths:
       - '.github/workflows/local-attendance-e2e-control.yml'
       - '.github/scripts/local-attendance-e2e.ps1'
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+    paths:
+      - '.github/workflows/local-attendance-e2e-control.yml'
+      - '.github/scripts/local-attendance-e2e.ps1'
 
 jobs:
   run-local-attendance-payroll:
@@ -16,7 +22,6 @@ jobs:
         shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
-          $script = 'C:\alumdoor\.github\scripts\local-attendance-e2e.ps1'
           git -C C:\alumdoor fetch origin main --prune
           git -C C:\alumdoor show origin/main:.github/scripts/local-attendance-e2e.ps1 | Set-Content -Path C:\actions-runner\_temp\local-attendance-e2e.ps1 -Encoding UTF8
           powershell -NoProfile -ExecutionPolicy Bypass -File C:\actions-runner\_temp\local-attendance-e2e.ps1
