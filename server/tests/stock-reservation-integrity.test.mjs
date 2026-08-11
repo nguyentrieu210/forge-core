@@ -67,6 +67,7 @@ test("reservation mới chụp số lượng ban đầu do server sở hữu", a
   assert.equal(normalized.qty_reserved, "51.000000");
   assert.equal(normalized.initial_qty_reserved, "51.000000");
   assert.equal(normalized.initial_qty_reserved_micros, 51_000_000);
+  assert.equal(normalized.cumulative_released_qty_micros, 0);
 });
 
 test("reservation key và source không được đổi trên cùng audit record", async () => {
@@ -77,13 +78,28 @@ test("reservation key và source không được đổi trên cùng audit record
   await assert.rejects(() => controller.normalize(context({ existing, document: reservation({ item_code: "AL71" }) })), /không được đổi item_code/);
 });
 
-test("không được giảm qty bằng tay vì sẽ giải phóng ATP không có bằng chứng tiêu thụ", async () => {
+test("nhả một phần phải có lý do và server chụp lượng nhả nhưng giữ trạng thái active", async () => {
   const controller = new StockReservationIntegrityController();
-  const existing = reservation({ initial_qty_reserved: "51.000000", initial_qty_reserved_micros: 51_000_000 });
+  const existing = reservation({
+    initial_qty_reserved: "51.000000",
+    initial_qty_reserved_micros: 51_000_000,
+    cumulative_released_qty: "0.000000",
+    cumulative_released_qty_micros: 0,
+  });
   await assert.rejects(
     () => controller.normalize(context({ existing, document: reservation({ qty_reserved: "21" }) })),
-    /Không được giảm số lượng giữ chỗ bằng tay/,
+    /Giảm một phần giữ chỗ phải nhập lý do/,
   );
+  const normalized = await controller.normalize(context({
+    existing,
+    document: reservation({ qty_reserved: "21", partial_release_reason: "Khách giảm số lượng" }),
+  }));
+  assert.equal(normalized.qty_reserved, "21.000000");
+  assert.equal(normalized.state, "Đang giữ");
+  assert.equal(normalized.last_partial_release_qty_micros, 30_000_000);
+  assert.equal(normalized.cumulative_released_qty_micros, 30_000_000);
+  assert.equal(normalized.last_partial_release_reason ?? normalized.partial_release_reason, "Khách giảm số lượng");
+  assert.equal(normalized.last_partial_released_by, "planner@example.test");
 });
 
 test("client không được tự chuyển Đã dùng", async () => {
