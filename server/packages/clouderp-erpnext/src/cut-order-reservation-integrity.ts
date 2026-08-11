@@ -1,6 +1,7 @@
 import type { MutationPlan } from "../../contracts/src/index.js";
 import type { ControllerContext } from "../../document-kernel/src/index.js";
-import { CutOrderController, type CutOrderData } from "./alumdoor-inventory.js";
+import { CutOrderController } from "./alumdoor-inventory.js";
+import type { CutOrderData } from "./types.js";
 import { withReservationLifecycleReader } from "./reservation-lifecycle-reader.js";
 
 /**
