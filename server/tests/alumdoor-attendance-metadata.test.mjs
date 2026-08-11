@@ -35,6 +35,7 @@ test("AlumDoor attendance payroll metadata stays an isolated HRM-dependent packa
       "AlumDoor Attendance Manager",
       "AlumDoor Attendance Viewer",
       "AlumDoor Payroll Approver",
+      "AlumDoor Payroll System",
       "AlumDoor Payroll User",
       "AlumDoor QR System",
     ],
@@ -55,7 +56,7 @@ test("AlumDoor attendance payroll metadata stays an isolated HRM-dependent packa
   }
 });
 
-test("AlumDoor attendance daily projection is system-written and manager read-only", async () => {
+test("AlumDoor attendance daily projection is system-written and payroll-lockable only internally", async () => {
   const manifest = parseAppManifest(await readAppSource(source));
   const day = manifest.doctypes.find((meta) => meta.name === "AlumDoor Attendance Day");
   assert.equal(day?.kind, "transaction");
@@ -63,11 +64,15 @@ test("AlumDoor attendance daily projection is system-written and manager read-on
   assert.equal(field(day, "segments")?.fieldtype, "Table");
   assert.equal(field(day, "segments")?.options, "AlumDoor Attendance Segment");
   assert.deepEqual(field(day, "state")?.options, "open\ncomplete\nexception\napproved\nlocked");
+  assert.equal(field(day, "locked_by_payroll")?.options, "Payroll Entry");
 
   const qrSystem = permission(day, "AlumDoor QR System");
   assert.equal(qrSystem?.create, true);
   assert.equal(qrSystem?.write, true);
-  for (const role of ["AlumDoor Attendance Viewer", "AlumDoor Attendance Manager", "HR Manager", "System Manager"]) {
+  const payrollSystem = permission(day, "AlumDoor Payroll System");
+  assert.equal(payrollSystem?.write, true);
+  assert.notEqual(payrollSystem?.create, true);
+  for (const role of ["AlumDoor Attendance Viewer", "AlumDoor Attendance Manager", "AlumDoor Payroll User", "AlumDoor Payroll Approver", "HR Manager", "System Manager"]) {
     assert.notEqual(permission(day, role)?.create, true, `${role} must not create a daily projection`);
     assert.notEqual(permission(day, role)?.write, true, `${role} must not modify a daily projection`);
   }
