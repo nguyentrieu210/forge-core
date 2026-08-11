@@ -13,7 +13,7 @@
 
 import type { Actor, CanonicalDocument, JsonObject, JsonValue, MutationAction, MutationCommand, MutationReceipt } from "../../contracts/src/index.js";
 import { errors, sha256Hex } from "../../core/src/index.js";
-import { resolveCommercialLine } from "../../clouderp-selling/src/index.js";
+import { resolveCommercialLine, resolveSalesPackage } from "../../clouderp-selling/src/index.js";
 import type { D1MutationStore, DocumentListService, ListFilter } from "../../document-kernel/src/index.js";
 import type {
   D1CollaborationService, DocTypeMeta, DocumentAccessStore, ExtendedPermissionAction,
@@ -4301,13 +4301,14 @@ async function previewSalesCommercialLine(args: FrappeArgs, context: FrappeRoute
     ...line,
     item_group: item.data.item_group,
   };
-  const resolved = await resolveCommercialLine({
+  const kernelContext = {
     command: fakeCommand,
     existing: null,
     now: context.now(),
     nextVersion: 1,
     reader: context.documents,
-  }, {
+  };
+  const resolved = await resolveCommercialLine(kernelContext, {
     itemCode,
     priceList,
     documentCurrency: currency,
@@ -4322,8 +4323,17 @@ async function previewSalesCommercialLine(args: FrappeArgs, context: FrappeRoute
     ...(Number.isFinite(Number(line.length_m)) ? { lengthM: Number(line.length_m) } : {}),
     ...(Number.isFinite(Number(line.set_count)) ? { setCount: Number(line.set_count) } : {}),
   });
+  const packageSnapshot = resolved.sales_package
+    ? await resolveSalesPackage(kernelContext, {
+      packageName: resolved.sales_package,
+      postingDate,
+      itemCode,
+      facts: { ...facts, ...resolved },
+    })
+    : undefined;
   return {
     ...resolved,
+    ...(packageSnapshot ? { sales_package_snapshot: packageSnapshot } : {}),
     rate: resolved.selling_rate,
     amount: resolved.net_before_tax,
     net_amount: resolved.net_before_tax,
