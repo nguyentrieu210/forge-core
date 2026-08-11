@@ -45,6 +45,17 @@ jobs:
               raise SystemExit('expected legacy G1 block not found')
           s = s.replace(old, new, 1)
 
+          old_print = '''    "@page{size:A4 portrait;margin:0}",
+              "*{box-sizing:border-box}html,body{margin:0;width:210mm;min-height:297mm}body{font-family:Arial,'Liberation Sans',sans-serif;font-size:9px;color:#111;padding:23.7mm 8mm 8mm;font-kerning:none;letter-spacing:0;word-spacing:0}",
+          '''
+          new_print = '''    "@page{size:A4 portrait;margin:12mm 8mm 8mm}@page :first{margin-top:23.7mm}",
+              "*{box-sizing:border-box}html,body{margin:0}body{width:194mm;font-family:Arial,'Liberation Sans',sans-serif;font-size:9px;color:#111;padding:0;font-kerning:none;letter-spacing:0;word-spacing:0}",
+              "@media screen{html{width:210mm}body{width:210mm;min-height:297mm;padding:23.7mm 8mm 8mm}}",
+          '''
+          if old_print not in s:
+              raise SystemExit('expected Purchase Order print CSS source block not found')
+          s = s.replace(old_print, new_print, 1)
+
           marker = '// ── ALUMINUM INVENTORY AUTHORITY CONVERGENCE ──'
           anchor = 'writeFileSync(OUT, JSON.stringify(brief, null, 1) + "\\n", "utf8");'
           if marker not in s:
