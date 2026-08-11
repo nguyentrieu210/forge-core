@@ -24,6 +24,12 @@ import {
   type AlumDoorAttendanceScanInput,
 } from "./attendance-scan-coordinator.js";
 import {
+  reviewAlumDoorAttendanceCorrection,
+  submitAlumDoorAttendanceCorrection,
+  type AlumDoorAttendanceCorrectionInput,
+  type AlumDoorAttendanceCorrectionSubmitInput,
+} from "./attendance-correction-coordinator.js";
+import {
   approveAlumDoorPayroll,
   type AlumDoorPayrollApprovalInput,
 } from "./payroll-coordinator.js";
@@ -35,6 +41,8 @@ interface AggregateStub extends DurableObjectStub {
   mutateInventory<T extends JsonObject>(command: MutationCommand<T>): Promise<MutationReceipt>;
   mutatePurchase<T extends JsonObject>(command: MutationCommand<T>): Promise<MutationReceipt>;
   commitAlumDoorAttendanceScan(input: AlumDoorAttendanceScanInput): Promise<JsonObject>;
+  submitAlumDoorAttendanceCorrection(input: AlumDoorAttendanceCorrectionSubmitInput): Promise<JsonObject>;
+  reviewAlumDoorAttendanceCorrection(input: AlumDoorAttendanceCorrectionInput): Promise<JsonObject>;
   approveAlumDoorPayroll(input: AlumDoorPayrollApprovalInput): Promise<JsonObject>;
 }
 
@@ -43,12 +51,10 @@ const INVENTORY_EXECUTORS = new WeakMap<object, MutationSerialExecutor>();
 const PURCHASE_EXECUTORS = new WeakMap<object, PurchaseCommandSerialExecutor>();
 const APP_FACTORY_APPROVAL_EXECUTORS = new WeakMap<object, MutationSerialExecutor>();
 const ATTENDANCE_EXECUTORS = new WeakMap<object, MutationSerialExecutor>();
+const ATTENDANCE_CORRECTION_EXECUTORS = new WeakMap<object, MutationSerialExecutor>();
 const PAYROLL_EXECUTORS = new WeakMap<object, MutationSerialExecutor>();
 
-/**
- * One class serves several logical coordinator roles inside the existing AGGREGATES namespace:
- * document, inventory, purchase, attendance, payroll and App Factory approval keys.
- */
+/** One Durable Object class serves the keyed business coordinators in the existing AGGREGATES namespace. */
 export class AggregateCoordinator extends DurableObject<TenantEnv> {
   constructor(ctx: DurableObjectState, env: TenantEnv) { super(ctx, env); }
 
@@ -58,29 +64,18 @@ export class AggregateCoordinator extends DurableObject<TenantEnv> {
       if (!executor) { executor = new MutationSerialExecutor(); APP_FACTORY_APPROVAL_EXECUTORS.set(this, executor); }
       return executor.execute(() => this.appFactoryApprovalRuntime().execute(command as MutationCommand<JsonObject>, new Date().toISOString()));
     }
-
     const { kernel, store } = this.commandServices();
     const inventoryKey = await resolveInventoryCoordinatorKey(command as MutationCommand<JsonObject>, store);
-    if (inventoryKey) {
-      const stub = this.env.AGGREGATES.getByName(inventoryKey) as AggregateStub;
-      return stub.mutateInventory(command);
-    }
-
-    if (!PURCHASE_ALLOCATION_DOCTYPES.has(command.aggregate.doctype) || !["submit", "cancel"].includes(command.action)) {
-      return kernel.execute(command);
-    }
-
+    if (inventoryKey) return (this.env.AGGREGATES.getByName(inventoryKey) as AggregateStub).mutateInventory(command);
+    if (!PURCHASE_ALLOCATION_DOCTYPES.has(command.aggregate.doctype) || !["submit", "cancel"].includes(command.action)) return kernel.execute(command);
     let company = textField(command.document, "company");
     let supplier = textField(command.document, "supplier");
     if (!company || !supplier) {
       const existing = await store.getDocument<JsonObject>(command.tenant_id, command.aggregate.doctype, command.aggregate.name);
-      company ||= textField(existing?.data, "company");
-      supplier ||= textField(existing?.data, "supplier");
+      company ||= textField(existing?.data, "company"); supplier ||= textField(existing?.data, "supplier");
     }
     if (!company || !supplier) throw errors.validation("Purchase allocation commands require company and supplier");
-    const key = `purchase:${command.tenant_id}:${encodeURIComponent(company)}:${encodeURIComponent(supplier)}`;
-    const stub = this.env.AGGREGATES.getByName(key) as AggregateStub;
-    return stub.mutatePurchase(command);
+    return (this.env.AGGREGATES.getByName(`purchase:${command.tenant_id}:${encodeURIComponent(company)}:${encodeURIComponent(supplier)}`) as AggregateStub).mutatePurchase(command);
   }
 
   async mutateInventory<T extends JsonObject>(command: MutationCommand<T>): Promise<MutationReceipt> {
@@ -91,24 +86,33 @@ export class AggregateCoordinator extends DurableObject<TenantEnv> {
   }
 
   async mutatePurchase<T extends JsonObject>(command: MutationCommand<T>): Promise<MutationReceipt> {
-    if (!PURCHASE_ALLOCATION_DOCTYPES.has(command.aggregate.doctype) || !["submit", "cancel"].includes(command.action)) {
-      throw errors.validation("mutatePurchase accepts only submitted purchase allocation commands");
-    }
+    if (!PURCHASE_ALLOCATION_DOCTYPES.has(command.aggregate.doctype) || !["submit", "cancel"].includes(command.action)) throw errors.validation("mutatePurchase accepts only submitted purchase allocation commands");
     let executor = PURCHASE_EXECUTORS.get(this);
     if (!executor) { executor = new PurchaseCommandSerialExecutor(); PURCHASE_EXECUTORS.set(this, executor); }
     return executor.execute(() => this.commandServices().kernel.execute(command));
   }
 
   async commitAlumDoorAttendanceScan(input: AlumDoorAttendanceScanInput): Promise<JsonObject> {
-    let executor = ATTENDANCE_EXECUTORS.get(this);
-    if (!executor) { executor = new MutationSerialExecutor(); ATTENDANCE_EXECUTORS.set(this, executor); }
-    return executor.execute(() => {
+    return this.withAttendanceExecutor(() => {
       const { kernel, store } = this.commandServices();
       return commitAlumDoorAttendanceScan(input, { kernel, store });
     });
   }
 
-  /** One payroll period is serialized as a unit so two approvers cannot race. */
+  async submitAlumDoorAttendanceCorrection(input: AlumDoorAttendanceCorrectionSubmitInput): Promise<JsonObject> {
+    return this.withCorrectionExecutor(() => {
+      const { kernel, store } = this.commandServices();
+      return submitAlumDoorAttendanceCorrection(input, { kernel, store });
+    });
+  }
+
+  async reviewAlumDoorAttendanceCorrection(input: AlumDoorAttendanceCorrectionInput): Promise<JsonObject> {
+    return this.withCorrectionExecutor(() => {
+      const { kernel, store } = this.commandServices();
+      return reviewAlumDoorAttendanceCorrection(input, { kernel, store });
+    });
+  }
+
   async approveAlumDoorPayroll(input: AlumDoorPayrollApprovalInput): Promise<JsonObject> {
     let executor = PAYROLL_EXECUTORS.get(this);
     if (!executor) { executor = new MutationSerialExecutor(); PAYROLL_EXECUTORS.set(this, executor); }
@@ -118,30 +122,29 @@ export class AggregateCoordinator extends DurableObject<TenantEnv> {
     });
   }
 
+  private withAttendanceExecutor<T>(operation: () => Promise<T>): Promise<T> {
+    let executor = ATTENDANCE_EXECUTORS.get(this);
+    if (!executor) { executor = new MutationSerialExecutor(); ATTENDANCE_EXECUTORS.set(this, executor); }
+    return executor.execute(operation);
+  }
+
+  private withCorrectionExecutor<T>(operation: () => Promise<T>): Promise<T> {
+    let executor = ATTENDANCE_CORRECTION_EXECUTORS.get(this);
+    if (!executor) { executor = new MutationSerialExecutor(); ATTENDANCE_CORRECTION_EXECUTORS.set(this, executor); }
+    return executor.execute(operation);
+  }
+
   private commandServices(): { kernel: DocumentKernel; store: D1RolloutPurchaseAllocationDomainStore } {
     const metadata = new D1MetadataStore(this.env.DB);
-    const registry = registerIntegrationHubControllers(
-      registerAppFactoryControllers(
-        registerErpNextCoreControllers(registerStockControllers(registerErpCoreControllers(createO2CControllerRegistry()))),
-        metadata,
-      ),
-    ).setFallback(new GenericMetadataController(metadata));
+    const registry = registerIntegrationHubControllers(registerAppFactoryControllers(registerErpNextCoreControllers(registerStockControllers(registerErpCoreControllers(createO2CControllerRegistry()))), metadata)).setFallback(new GenericMetadataController(metadata));
     const store = new D1RolloutPurchaseAllocationDomainStore(this.env.DB);
-    return {
-      store,
-      kernel: new DocumentKernel(registry, store, new MetadataPermissionService(metadata, undefined, new D1DocumentAccessStore(this.env.DB))),
-    };
+    return { store, kernel: new DocumentKernel(registry, store, new MetadataPermissionService(metadata, undefined, new D1DocumentAccessStore(this.env.DB))) };
   }
 
   private appFactoryApprovalRuntime(): AppFactoryApprovalRuntime {
-    const metadata = new D1MetadataStore(this.env.DB);
-    const access = new D1DocumentAccessStore(this.env.DB);
-    const reader = new D1RolloutPurchaseAllocationDomainStore(this.env.DB);
+    const metadata = new D1MetadataStore(this.env.DB); const access = new D1DocumentAccessStore(this.env.DB); const reader = new D1RolloutPurchaseAllocationDomainStore(this.env.DB);
     return new AppFactoryApprovalRuntime(this.env.DB, reader, new MetadataPermissionService(metadata, undefined, access), new D1OrganizationSecurityGuard(this.env.DB, metadata));
   }
 }
 
-function textField(value: JsonObject | undefined, field: string): string {
-  const candidate = value?.[field];
-  return typeof candidate === "string" ? candidate.trim() : "";
-}
+function textField(value: JsonObject | undefined, field: string): string { const candidate = value?.[field]; return typeof candidate === "string" ? candidate.trim() : ""; }
