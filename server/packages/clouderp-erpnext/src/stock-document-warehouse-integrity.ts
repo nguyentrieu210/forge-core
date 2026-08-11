@@ -1,5 +1,7 @@
 import type { JsonObject, MutationPlan } from "../../contracts/src/index.js";
+import { errors } from "../../core/src/index.js";
 import type { ControllerContext, DocumentController } from "../../document-kernel/src/index.js";
+import { reverseGl, reverseStock } from "../../ledger/src/index.js";
 import {
   RolloutPurchaseReceiptController,
   type PurchaseReceiptData,
@@ -69,11 +71,52 @@ extends WarehouseScopedController<DeliveryNoteData> {
 /**
  * Wraps the rollout-aware Purchase Receipt controller rather than bypassing it, so the
  * purchase-allocation rollout switch remains intact while warehouse posting is hardened.
+ *
+ * Cancellation lets the delegate build procurement/allocation reversal facts, then replaces
+ * reconstructed Stock/GL rows with the exact rows from the submitted revision. That keeps
+ * allocation v1 behavior while making quantity/value/account reversal audit-exact.
  */
 export class WarehouseScopedPurchaseReceiptController
 extends WarehouseScopedController<PurchaseReceiptData> {
   readonly doctype = "Purchase Receipt";
   protected readonly delegate = new RolloutPurchaseReceiptController();
+
+  override async buildPlan(context: ControllerContext<PurchaseReceiptData>): Promise<MutationPlan<PurchaseReceiptData>> {
+    if (context.command.action === "submit") {
+      await assertPostingWarehouses(
+        context as unknown as ControllerContext<JsonObject>,
+        context.command.document,
+      );
+      return this.delegate.buildPlan(context);
+    }
+    if (context.command.action !== "cancel") return this.delegate.buildPlan(context);
+    if (!context.existing) throw errors.notFound();
+
+    const plan = await this.delegate.buildPlan(context);
+    const revision = context.existing.version;
+    const [stock, gl] = await Promise.all([
+      context.reader.getVoucherStockEntries(
+        context.command.tenant_id,
+        this.doctype,
+        context.command.aggregate.name,
+        revision,
+      ),
+      context.reader.getVoucherGlEntries(
+        context.command.tenant_id,
+        this.doctype,
+        context.command.aggregate.name,
+        revision,
+      ),
+    ]);
+    if (stock.length === 0) {
+      throw errors.reference(`Original stock posting for ${this.doctype} ${context.command.aggregate.name} was not found`);
+    }
+    return {
+      ...plan,
+      stock_entries: reverseStock(stock),
+      gl_entries: reverseGl(gl),
+    };
+  }
 }
 
 function text(value: unknown): string {
