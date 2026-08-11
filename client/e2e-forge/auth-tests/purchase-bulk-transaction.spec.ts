@@ -58,17 +58,17 @@ async function requireDoc(response: BrowserResponse): Promise<FrappeDoc> {
 
 async function createResource(page: Page, csrf: string, doctype: string, document: JsonRecord) {
   return requireDoc(await browserRequest(page, `/api/resource/${encodeURIComponent(doctype)}`, {
-    method: "POST",
-    csrf,
-    body: { doctype, ...document },
+    method: "POST", csrf, body: { doctype, ...document },
   }));
+}
+
+async function getResource(page: Page, doctype: string, name: string) {
+  return requireDoc(await browserRequest(page, `/api/resource/${encodeURIComponent(doctype)}/${encodeURIComponent(name)}`));
 }
 
 async function submit(page: Page, csrf: string, doc: FrappeDoc) {
   return requireDoc(await browserRequest(page, "/api/method/frappe.client.submit", {
-    method: "POST",
-    csrf,
-    body: { doc: JSON.stringify(doc) },
+    method: "POST", csrf, body: { doc: JSON.stringify(doc) },
   }));
 }
 
@@ -92,12 +92,11 @@ function aluminiumLine(lengthM: number, bars: number): JsonRecord {
     item_name: "Nhôm AL71 QA",
     inventory_mode: "Nhôm cây/lá",
     measurement_profile: "Nhôm cây/lá",
-    material_specification: "AL71",
-    stock_uom: "Kg",
+    material_specification: "AL71-QA-SPEC",
+    stock_uom: "Cây",
     uom: "Kg",
     qty: baremKg,
-    conversion_factor: 1,
-    stock_qty: baremKg,
+    stock_qty: bars,
     rate: 100_000,
     amount: round(baremKg * 100_000),
     warehouse: "K36",
@@ -166,7 +165,7 @@ async function draftReceiptsForInvoice(page: Page, invoice: string): Promise<Jso
   return (unwrap(response.body) as JsonRecord[]) ?? [];
 }
 
-test("authenticated bulk transaction grid pastes rows, previews and creates one idempotent draft", async ({ page }) => {
+test("authenticated bulk transaction creates one idempotent tracked aluminum draft", async ({ page }) => {
   const csrf = await login(page);
   const project = test.info().project.name;
   const suffix = `${project}-${Date.now()}`;
@@ -218,6 +217,13 @@ test("authenticated bulk transaction grid pastes rows, previews and creates one 
   expect(Number(drafts[0]?.docstatus)).toBe(0);
   const receiptName = String(drafts[0]?.name ?? "");
   expect(receiptName).toMatch(/^PNM-/);
+
+  const draft = await getResource(page, "Purchase Receipt", receiptName);
+  expect(draft.docstatus).toBe(0);
+  expect(draft.items).toHaveLength(2);
+  expect((draft.items ?? []).every((row) => row.stock_uom === "Cây")).toBe(true);
+  expect((draft.items ?? []).map((row) => Number(row.stock_qty))).toEqual([10, 10]);
+  expect((draft.items ?? []).every((row) => String(row.serial_and_batch_bundle ?? "").startsWith("SABB-"))).toBe(true);
 
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "Tạo phiếu nhập hàng loạt", exact: true }).click();
