@@ -13,8 +13,7 @@ const ALUMDOOR_COMPANY = "ALUMDOOR";
 
 /**
  * Canonical Sales Order pricing path for AlumDoor while preserving the shared legacy
- * controller for other installed apps. No door type, rail name, percentage or surcharge
- * amount lives here: those decisions are master data / Pricing Rule records.
+ * controller for other installed apps. Product-specific values live in master/config data.
  */
 export class CommercialSalesOrderController extends SalesOrderController {
   override async normalize(context: ControllerContext<SalesOrderData>): Promise<SalesOrderData> {
@@ -102,6 +101,13 @@ export class CommercialSalesOrderController extends SalesOrderController {
 
       pricedItems.push({
         ...item,
+        ...(resolved.sales_option ? { sales_option: resolved.sales_option } : {}),
+        ...(resolved.sales_option_code ? { sales_option_code: resolved.sales_option_code } : {}),
+        ...(resolved.sales_option_label ? { sales_option_label: resolved.sales_option_label } : {}),
+        ...(resolved.sales_option_version ? { sales_option_version: resolved.sales_option_version } : {}),
+        ...(resolved.sales_mode ? { sales_mode: resolved.sales_mode } : {}),
+        ...(resolved.sales_package ? { sales_package: resolved.sales_package } : {}),
+        price_variant: resolved.price_variant,
         rate: resolved.selling_rate,
         rate_minor: resolved.selling_rate_minor,
         standard_rate: fromScaledInt(canonicalRateMinor, currency.transactionScale),
@@ -110,6 +116,8 @@ export class CommercialSalesOrderController extends SalesOrderController {
         rate_requires_approval: rateChanged,
         item_price: resolved.item_price,
         discount_percentage: resolved.discount_percentage,
+        discount_basis_item_price: resolved.discount_basis_item_price,
+        discount_basis_variant: resolved.discount_basis_variant,
         discount_basis_rate: resolved.discount_basis_rate,
         discount_basis_rate_minor: resolved.discount_basis_rate_minor,
         discount_basis_amount: resolved.discount_basis_amount,
@@ -135,8 +143,6 @@ export class CommercialSalesOrderController extends SalesOrderController {
       throw errors.permission("Đơn hàng có giá/chiết khấu/bảng giá khác chính sách; Sales Manager phải duyệt trước khi bán.");
     }
 
-    // Policy-derived line discount/adjustment money is already authoritative. Do not pass
-    // client `discount_amount` back into totals; it is a projection only.
     const totals = calculateSalesTotals(pricedItems, input.taxes ?? [], currency.transactionScale, {
       use_priced_quantity: true,
       use_server_line_money: true,
@@ -144,7 +150,10 @@ export class CommercialSalesOrderController extends SalesOrderController {
       additional_discount_percentage: orderDiscount,
     });
 
-    const lineAdjustmentMinor = totals.items.reduce((sum, row) => safeAdd(sum, row.adjustment_amount_minor ?? 0, "surcharge total"), 0);
+    const lineAdjustmentMinor = totals.items.reduce(
+      (sum, row) => safeAdd(sum, row.adjustment_amount_minor ?? 0, "surcharge total"),
+      0,
+    );
     const { extraMinor, ...vatProjection } = alumdoorOrderTotals({
       netTotalMinor: totals.net_total_minor,
       discountAmountMinor: totals.discount_amount_minor,
@@ -236,8 +245,6 @@ function trustedCommercialFacts(
   customerGroup: string,
   priceList: string,
 ): Record<string, unknown> {
-  // Master classification wins over similarly named payload fields. Only genuine line facts
-  // such as selected finish/sales mode/dimensions are allowed to participate as conditions.
   return {
     item_code: line.item_code,
     item_group: itemMaster.item_group,
@@ -310,11 +317,20 @@ function hasCommercialSnapshot(source: SalesItem): boolean {
 function rebuildFrozenQuotationLine(source: SalesItem, target: SalesItem, scale: number, qtyMicros: number): Partial<SalesItem> {
   const rateMinor = toScaledInt(source.rate, scale, `${source.item_code}.quotation_rate`);
   const amountMinor = multiplyMinorByQty(rateMinor, qtyMicros, `${source.item_code}.quotation_amount`);
+  const basisRateMinor = source.discount_basis_rate_minor ?? rateMinor;
+  const basisAmountMinor = multiplyMinorByQty(basisRateMinor, qtyMicros, `${source.item_code}.quotation_discount_basis`);
   const pctMicros = toScaledInt(source.discount_percentage ?? "0", 6, `${source.item_code}.quotation_discount`);
-  const discountMinor = percentMinor(amountMinor, pctMicros);
+  const discountMinor = percentMinor(basisAmountMinor, pctMicros);
   const adjustmentMinor = frozenAdjustmentTotal(source, target, qtyMicros);
   const netMinor = safeAdd(safeAdd(amountMinor, -discountMinor, "frozen net"), adjustmentMinor, "frozen net");
   return {
+    ...(source.sales_option ? { sales_option: source.sales_option } : {}),
+    ...(source.sales_option_code ? { sales_option_code: source.sales_option_code } : {}),
+    ...(source.sales_option_label ? { sales_option_label: source.sales_option_label } : {}),
+    ...(source.sales_option_version ? { sales_option_version: source.sales_option_version } : {}),
+    ...(source.sales_mode ? { sales_mode: source.sales_mode } : {}),
+    ...(source.sales_package ? { sales_package: source.sales_package } : {}),
+    ...(source.price_variant ? { price_variant: source.price_variant } : {}),
     rate: fromScaledInt(rateMinor, scale),
     rate_minor: rateMinor,
     amount: fromScaledInt(amountMinor, scale),
@@ -324,10 +340,12 @@ function rebuildFrozenQuotationLine(source: SalesItem, target: SalesItem, scale:
     base_rate_minor: source.base_rate_minor,
     standard_rate: source.standard_rate ?? source.rate,
     discount_percentage: fromScaledInt(pctMicros, 6),
-    discount_basis_rate: source.discount_basis_rate ?? source.rate,
-    discount_basis_rate_minor: source.discount_basis_rate_minor ?? rateMinor,
-    discount_basis_amount: fromScaledInt(amountMinor, scale),
-    discount_basis_amount_minor: amountMinor,
+    ...(source.discount_basis_item_price ? { discount_basis_item_price: source.discount_basis_item_price } : {}),
+    ...(source.discount_basis_variant ? { discount_basis_variant: source.discount_basis_variant } : {}),
+    discount_basis_rate: fromScaledInt(basisRateMinor, scale),
+    discount_basis_rate_minor: basisRateMinor,
+    discount_basis_amount: fromScaledInt(basisAmountMinor, scale),
+    discount_basis_amount_minor: basisAmountMinor,
     discount_amount: fromScaledInt(discountMinor, scale),
     discount_amount_minor: discountMinor,
     adjustment_amount: fromScaledInt(adjustmentMinor, scale),
@@ -355,7 +373,6 @@ function frozenAdjustmentTotal(source: SalesItem, target: SalesItem, qtyMicros: 
     if (basisMicros <= 0) continue;
     total = safeAdd(total, multiplyMinorByQty(row.rate_minor, basisMicros, `${row.rule_name}.frozen_adjustment`), "frozen adjustments");
   }
-  // Legacy quote snapshots may have only the final amount. Preserve it when no typed rule exists.
   if (total === 0 && typeof source.adjustment_amount_minor === "number") return source.adjustment_amount_minor;
   return total;
 }
@@ -363,15 +380,14 @@ function frozenAdjustmentTotal(source: SalesItem, target: SalesItem, qtyMicros: 
 function recomputeManualFrozenRate(frozen: Partial<SalesItem>, rate: number, scale: number, qtyMicros: number): Partial<SalesItem> {
   const rateMinor = toScaledInt(rate, scale, "manual quotation-derived rate");
   const amountMinor = multiplyMinorByQty(rateMinor, qtyMicros, "manual quotation-derived amount");
+  const basisAmountMinor = frozen.discount_basis_amount_minor ?? amountMinor;
   const pctMicros = toScaledInt(frozen.discount_percentage ?? "0", 6);
-  const discountMinor = percentMinor(amountMinor, pctMicros);
+  const discountMinor = percentMinor(basisAmountMinor, pctMicros);
   const adjustmentMinor = frozen.adjustment_amount_minor ?? 0;
   const netMinor = safeAdd(safeAdd(amountMinor, -discountMinor, "manual frozen net"), adjustmentMinor, "manual frozen net");
   return {
     rate: fromScaledInt(rateMinor, scale), rate_minor: rateMinor,
     amount: fromScaledInt(amountMinor, scale), amount_minor: amountMinor,
-    discount_basis_rate: fromScaledInt(rateMinor, scale), discount_basis_rate_minor: rateMinor,
-    discount_basis_amount: fromScaledInt(amountMinor, scale), discount_basis_amount_minor: amountMinor,
     discount_amount: fromScaledInt(discountMinor, scale), discount_amount_minor: discountMinor,
     net_amount: fromScaledInt(netMinor, scale), net_amount_minor: netMinor,
   };
@@ -380,8 +396,9 @@ function recomputeManualFrozenRate(frozen: Partial<SalesItem>, rate: number, sca
 function recomputeManualFrozenDiscount(frozen: Partial<SalesItem>, discount: number, scale: number): Partial<SalesItem> {
   const pctMicros = toScaledInt(discount, 6, "manual quotation-derived discount");
   if (pctMicros < 0 || pctMicros > 100_000_000) throw errors.validation("Discount percentage must be from 0 to 100");
+  const basisAmountMinor = frozen.discount_basis_amount_minor ?? frozen.amount_minor ?? 0;
+  const discountMinor = percentMinor(basisAmountMinor, pctMicros);
   const amountMinor = frozen.amount_minor ?? 0;
-  const discountMinor = percentMinor(amountMinor, pctMicros);
   const adjustmentMinor = frozen.adjustment_amount_minor ?? 0;
   const netMinor = safeAdd(safeAdd(amountMinor, -discountMinor, "manual frozen discount net"), adjustmentMinor, "manual frozen discount net");
   return {
