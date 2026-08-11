@@ -23,6 +23,10 @@ import {
   commitAlumDoorAttendanceScan,
   type AlumDoorAttendanceScanInput,
 } from "./attendance-scan-coordinator.js";
+import {
+  approveAlumDoorPayroll,
+  type AlumDoorPayrollApprovalInput,
+} from "./payroll-coordinator.js";
 import { isInventoryCoordinatedCommand, resolveInventoryCoordinatorKey } from "./inventory-coordinator.js";
 import { PurchaseCommandSerialExecutor } from "./purchase-command-retry.js";
 
@@ -31,6 +35,7 @@ interface AggregateStub extends DurableObjectStub {
   mutateInventory<T extends JsonObject>(command: MutationCommand<T>): Promise<MutationReceipt>;
   mutatePurchase<T extends JsonObject>(command: MutationCommand<T>): Promise<MutationReceipt>;
   commitAlumDoorAttendanceScan(input: AlumDoorAttendanceScanInput): Promise<JsonObject>;
+  approveAlumDoorPayroll(input: AlumDoorPayrollApprovalInput): Promise<JsonObject>;
 }
 
 const PURCHASE_ALLOCATION_DOCTYPES = new Set(["Purchase Order", "Purchase Receipt"]);
@@ -38,155 +43,93 @@ const INVENTORY_EXECUTORS = new WeakMap<object, MutationSerialExecutor>();
 const PURCHASE_EXECUTORS = new WeakMap<object, PurchaseCommandSerialExecutor>();
 const APP_FACTORY_APPROVAL_EXECUTORS = new WeakMap<object, MutationSerialExecutor>();
 const ATTENDANCE_EXECUTORS = new WeakMap<object, MutationSerialExecutor>();
+const PAYROLL_EXECUTORS = new WeakMap<object, MutationSerialExecutor>();
 
 /**
- * One class serves several logical coordinator roles inside the existing AGGREGATES
- * namespace:
- *
- * - document key: tenant:doctype:name for ordinary aggregates;
- * - inventory key: inventory:tenant:company for stock posting, cutting,
- *   reconciliation and reservation read-check-write mutations;
- * - purchase key: purchase:tenant:company:supplier for PO/Receipt allocation;
- * - attendance key: attendance:tenant:user for one employee's QR scan sequence;
- * - App Factory approval key: tenant:App Factory Approval Process:process-id for persisted
- *   process-control facts. It never writes the target business document or a ledger.
- *
- * Company-wide inventory serialization is deliberately broader than batch-level locking:
- * one multi-row voucher has exactly one lock, so there is no lock-order deadlock and no
- * race between differently named documents consuming or reserving the same physical stock.
+ * One class serves several logical coordinator roles inside the existing AGGREGATES namespace:
+ * document, inventory, purchase, attendance, payroll and App Factory approval keys.
  */
 export class AggregateCoordinator extends DurableObject<TenantEnv> {
-  constructor(ctx: DurableObjectState, env: TenantEnv) {
-    super(ctx, env);
-  }
+  constructor(ctx: DurableObjectState, env: TenantEnv) { super(ctx, env); }
 
   async mutate<T extends JsonObject>(command: MutationCommand<T>): Promise<MutationReceipt> {
     if (command.aggregate.doctype === APP_FACTORY_APPROVAL_PROCESS_DOCTYPE) {
       let executor = APP_FACTORY_APPROVAL_EXECUTORS.get(this);
-      if (!executor) {
-        executor = new MutationSerialExecutor();
-        APP_FACTORY_APPROVAL_EXECUTORS.set(this, executor);
-      }
-      // Construct request-scoped D1/security services only when this process command reaches
-      // the front of its Durable Object queue. That prevents two approvers from satisfying
-      // one expected process revision concurrently while keeping unrelated processes parallel.
-      return executor.execute(() => this.appFactoryApprovalRuntime().execute(
-        command as MutationCommand<JsonObject>,
-        new Date().toISOString(),
-      ));
+      if (!executor) { executor = new MutationSerialExecutor(); APP_FACTORY_APPROVAL_EXECUTORS.set(this, executor); }
+      return executor.execute(() => this.appFactoryApprovalRuntime().execute(command as MutationCommand<JsonObject>, new Date().toISOString()));
     }
 
     const { kernel, store } = this.commandServices();
-    const inventoryKey = await resolveInventoryCoordinatorKey(
-      command as MutationCommand<JsonObject>,
-      store,
-    );
+    const inventoryKey = await resolveInventoryCoordinatorKey(command as MutationCommand<JsonObject>, store);
     if (inventoryKey) {
       const stub = this.env.AGGREGATES.getByName(inventoryKey) as AggregateStub;
       return stub.mutateInventory(command);
     }
 
-    if (!PURCHASE_ALLOCATION_DOCTYPES.has(command.aggregate.doctype)
-      || !["submit", "cancel"].includes(command.action)) {
+    if (!PURCHASE_ALLOCATION_DOCTYPES.has(command.aggregate.doctype) || !["submit", "cancel"].includes(command.action)) {
       return kernel.execute(command);
     }
 
     let company = textField(command.document, "company");
     let supplier = textField(command.document, "supplier");
     if (!company || !supplier) {
-      const existing = await store.getDocument<JsonObject>(
-        command.tenant_id,
-        command.aggregate.doctype,
-        command.aggregate.name,
-      );
+      const existing = await store.getDocument<JsonObject>(command.tenant_id, command.aggregate.doctype, command.aggregate.name);
       company ||= textField(existing?.data, "company");
       supplier ||= textField(existing?.data, "supplier");
     }
-    if (!company || !supplier) {
-      throw errors.validation("Purchase allocation commands require company and supplier");
-    }
-
+    if (!company || !supplier) throw errors.validation("Purchase allocation commands require company and supplier");
     const key = `purchase:${command.tenant_id}:${encodeURIComponent(company)}:${encodeURIComponent(supplier)}`;
     const stub = this.env.AGGREGATES.getByName(key) as AggregateStub;
     return stub.mutatePurchase(command);
   }
 
-  /** Called only by another instance in this Worker's AGGREGATES namespace. */
   async mutateInventory<T extends JsonObject>(command: MutationCommand<T>): Promise<MutationReceipt> {
-    if (!isInventoryCoordinatedCommand(command as MutationCommand<JsonObject>)) {
-      throw errors.validation("mutateInventory accepts only coordinated inventory commands");
-    }
-
-    // Routing to one Durable Object is not sufficient serialization: RPC methods
-    // can interleave while awaiting D1. Queue the entire kernel invocation so two
-    // differently named vouchers cannot both validate against the same stock state.
+    if (!isInventoryCoordinatedCommand(command as MutationCommand<JsonObject>)) throw errors.validation("mutateInventory accepts only coordinated inventory commands");
     let executor = INVENTORY_EXECUTORS.get(this);
-    if (!executor) {
-      executor = new MutationSerialExecutor();
-      INVENTORY_EXECUTORS.set(this, executor);
-    }
+    if (!executor) { executor = new MutationSerialExecutor(); INVENTORY_EXECUTORS.set(this, executor); }
     return executor.execute(() => this.commandServices().kernel.execute(command));
   }
 
-  /** Called only by another instance in this Worker's AGGREGATES namespace. */
   async mutatePurchase<T extends JsonObject>(command: MutationCommand<T>): Promise<MutationReceipt> {
-    if (!PURCHASE_ALLOCATION_DOCTYPES.has(command.aggregate.doctype)
-      || !["submit", "cancel"].includes(command.action)) {
+    if (!PURCHASE_ALLOCATION_DOCTYPES.has(command.aggregate.doctype) || !["submit", "cancel"].includes(command.action)) {
       throw errors.validation("mutatePurchase accepts only submitted purchase allocation commands");
     }
     let executor = PURCHASE_EXECUTORS.get(this);
-    if (!executor) {
-      executor = new PurchaseCommandSerialExecutor();
-      PURCHASE_EXECUTORS.set(this, executor);
-    }
-    // Construct request-scoped D1 services only after this mutation reaches the
-    // front of the supplier queue. The retry wrapper invokes this callback again,
-    // so a revision retry also gets a fresh first-primary session and rereads the
-    // authoritative queue state instead of reusing a service created while waiting.
+    if (!executor) { executor = new PurchaseCommandSerialExecutor(); PURCHASE_EXECUTORS.set(this, executor); }
     return executor.execute(() => this.commandServices().kernel.execute(command));
   }
 
-  /**
-   * The only write path for an AlumDoor QR scan.  The entry Worker has already
-   * authenticated the app callback and token; this Durable Object serializes the
-   * authenticated employee's scan stream while the kernel bundle commits both facts.
-   */
   async commitAlumDoorAttendanceScan(input: AlumDoorAttendanceScanInput): Promise<JsonObject> {
     let executor = ATTENDANCE_EXECUTORS.get(this);
-    if (!executor) {
-      executor = new MutationSerialExecutor();
-      ATTENDANCE_EXECUTORS.set(this, executor);
-    }
+    if (!executor) { executor = new MutationSerialExecutor(); ATTENDANCE_EXECUTORS.set(this, executor); }
     return executor.execute(() => {
       const { kernel, store } = this.commandServices();
       return commitAlumDoorAttendanceScan(input, { kernel, store });
     });
   }
 
-  /**
-   * D1 sessions are request-scoped. Initializing command services in the Durable
-   * Object constructor happens outside an RPC request and makes Workerd reject every
-   * write before the method body runs. Construct them per invocation so each session
-   * is created inside the request that owns it.
-   */
+  /** One payroll period is serialized as a unit so two approvers cannot race. */
+  async approveAlumDoorPayroll(input: AlumDoorPayrollApprovalInput): Promise<JsonObject> {
+    let executor = PAYROLL_EXECUTORS.get(this);
+    if (!executor) { executor = new MutationSerialExecutor(); PAYROLL_EXECUTORS.set(this, executor); }
+    return executor.execute(() => {
+      const { kernel, store } = this.commandServices();
+      return approveAlumDoorPayroll(input, { kernel, store });
+    });
+  }
+
   private commandServices(): { kernel: DocumentKernel; store: D1RolloutPurchaseAllocationDomainStore } {
     const metadata = new D1MetadataStore(this.env.DB);
     const registry = registerIntegrationHubControllers(
       registerAppFactoryControllers(
-        registerErpNextCoreControllers(
-          registerStockControllers(registerErpCoreControllers(createO2CControllerRegistry())),
-        ),
+        registerErpNextCoreControllers(registerStockControllers(registerErpCoreControllers(createO2CControllerRegistry()))),
         metadata,
       ),
     ).setFallback(new GenericMetadataController(metadata));
     const store = new D1RolloutPurchaseAllocationDomainStore(this.env.DB);
     return {
       store,
-      kernel: new DocumentKernel(
-        registry,
-        store,
-        new MetadataPermissionService(metadata, undefined, new D1DocumentAccessStore(this.env.DB)),
-      ),
+      kernel: new DocumentKernel(registry, store, new MetadataPermissionService(metadata, undefined, new D1DocumentAccessStore(this.env.DB))),
     };
   }
 
@@ -194,12 +137,7 @@ export class AggregateCoordinator extends DurableObject<TenantEnv> {
     const metadata = new D1MetadataStore(this.env.DB);
     const access = new D1DocumentAccessStore(this.env.DB);
     const reader = new D1RolloutPurchaseAllocationDomainStore(this.env.DB);
-    return new AppFactoryApprovalRuntime(
-      this.env.DB,
-      reader,
-      new MetadataPermissionService(metadata, undefined, access),
-      new D1OrganizationSecurityGuard(this.env.DB, metadata),
-    );
+    return new AppFactoryApprovalRuntime(this.env.DB, reader, new MetadataPermissionService(metadata, undefined, access), new D1OrganizationSecurityGuard(this.env.DB, metadata));
   }
 }
 
