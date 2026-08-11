@@ -27,10 +27,6 @@ async function responseMessage(response: Response): Promise<string> {
   return String(payload.message ?? payload.error ?? "");
 }
 
-/**
- * Entrypoint triển khai của Alumdoor.
- * Canonical controllers still own document, Stock, Manufacturing and Finance posting.
- */
 export default {
   async fetch(request: Request, env: WorkerEnv, ctx: WorkerContext): Promise<Response> {
     const url = new URL(request.url);
@@ -52,9 +48,6 @@ export default {
       const event = await request.clone().json().catch(() => null) as { event_type?: string } | null;
       const type = String(event?.event_type ?? "");
       if (type.startsWith("purchase_receipt.")) {
-        // P0 convergence boundary: the historical post-commit lot hook maintained a second
-        // quantity balance. Batch support documents are now created before Receipt submit and
-        // the canonical Stock Ledger is the only active quantity/weight/value authority.
         return Response.json({
           ok: true,
           skipped_legacy_aluminium_lot_sync: true,
@@ -69,19 +62,17 @@ export default {
 
     const body = await request.clone().json().catch(() => null) as { doctype?: string } | null;
     if (body?.doctype === "Item") {
+      const baseResponse = await baseWorker.fetch(request.clone(), env, ctx);
+      if (!baseResponse.ok) {
+        if (baseResponse.status !== 422) return baseResponse;
+        const message = await responseMessage(baseResponse);
+        // Only the historical static transaction-UOM factor rule is superseded. Earlier legacy
+        // checks (Item Group, Measurement Profile, colors, enums...) remain authoritative.
+        if (!/chưa có hệ số quy đổi/i.test(message)) return baseResponse;
+      }
       const invariantResponse = await validateItemCatalogInvariants(request.clone(), env);
       if (!invariantResponse.ok) return invariantResponse;
-      const marker = await invariantResponse.clone().json().catch(() => ({})) as { aluminum_contract?: boolean };
-      const baseResponse = await baseWorker.fetch(request.clone(), env, ctx);
-      if (!marker.aluminum_contract) return baseResponse;
-      if (baseResponse.ok) return invariantResponse;
-      if (baseResponse.status !== 422) return baseResponse;
-      const message = await responseMessage(baseResponse);
-      // Historical validator has already checked Item Group, Measurement Profile and colors
-      // before reaching this obsolete static-conversion rule. Only this one rejection is
-      // superseded for exact catch-weight aluminum; every other legacy validation still wins.
-      if (/chưa có hệ số quy đổi/i.test(message)) return invariantResponse;
-      return baseResponse;
+      return invariantResponse;
     }
 
     if (body?.doctype && PURCHASE_VALIDATION_DOCTYPES.has(body.doctype)) {
