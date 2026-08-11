@@ -70,18 +70,36 @@ function assertActiveReservationNotZombie(context: ReservationContext, previous:
   }
 }
 
-function assertConsumptionIsNotClientDeclared(current: ReservationData, previous: ReservationData, desiredState: string): void {
+interface PartialReleaseSnapshot {
+  releasedMicros: number;
+  releasedReason: string;
+}
+
+/**
+ * Reducing an ACTIVE reservation is a release of a promise, not proof of stock consumption.
+ * It is allowed only as an explicit audited business action with a reason. The document stays
+ * active for its remaining quantity. Client-declared `Đã dùng` remains forbidden separately.
+ */
+function partialReleaseSnapshot(
+  current: ReservationData,
+  previous: ReservationData,
+  desiredState: string,
+): PartialReleaseSnapshot | null {
+  if (desiredState !== "Đang giữ") return null;
+  const before = toScaledInt(previous.qty_reserved, 6, "qty_reserved");
+  const after = toScaledInt(current.qty_reserved, 6, "qty_reserved");
+  if (after >= before) return null;
+  const reason = text(current.partial_release_reason ?? current.released_reason);
+  if (!reason) {
+    throw errors.validation("Giảm một phần giữ chỗ phải nhập lý do nhả phần giữ");
+  }
+  return { releasedMicros: before - after, releasedReason: reason };
+}
+
+function assertConsumptionIsNotClientDeclared(desiredState: string): void {
   if (desiredState === "Đã dùng") {
     throw errors.lifecycle(
       "Trạng thái Đã dùng do chứng từ tiêu thụ/cắt xác nhận; không được chuyển tay trên phiếu giữ chỗ",
-    );
-  }
-  if (desiredState !== "Đang giữ") return;
-  const before = toScaledInt(previous.qty_reserved, 6, "qty_reserved");
-  const after = toScaledInt(current.qty_reserved, 6, "qty_reserved");
-  if (after < before) {
-    throw errors.lifecycle(
-      "Không được giảm số lượng giữ chỗ bằng tay; phần đã dùng phải được trừ từ bằng chứng cắt/xuất kho",
     );
   }
 }
@@ -207,6 +225,8 @@ export class StockReservationIntegrityController extends StockReservationControl
         ...normalized,
         initial_qty_reserved: fromScaledInt(qtyMicros, 6),
         initial_qty_reserved_micros: qtyMicros,
+        cumulative_released_qty: "0.000000",
+        cumulative_released_qty_micros: 0,
       } as ReservationData;
       await assertReservationFeasibleAcrossThresholds(context, withSnapshot, context.command.aggregate.name);
       return withSnapshot;
@@ -215,7 +235,8 @@ export class StockReservationIntegrityController extends StockReservationControl
     assertReservationOpen(previous);
     assertReservationIdentityImmutable(input, previous);
     assertActiveReservationNotZombie(context, previous, desiredState);
-    assertConsumptionIsNotClientDeclared(input, previous, desiredState);
+    assertConsumptionIsNotClientDeclared(desiredState);
+    const partialRelease = partialReleaseSnapshot(input, previous, desiredState);
     const normalized = await super.normalize(context);
     const initialMicros = typeof previous.initial_qty_reserved_micros === "number"
       ? previous.initial_qty_reserved_micros
@@ -224,10 +245,23 @@ export class StockReservationIntegrityController extends StockReservationControl
           6,
           "initial_qty_reserved",
         );
+    const priorReleasedMicros = typeof previous.cumulative_released_qty_micros === "number"
+      ? previous.cumulative_released_qty_micros
+      : 0;
+    const cumulativeReleasedMicros = priorReleasedMicros + (partialRelease?.releasedMicros ?? 0);
     const withSnapshot = {
       ...normalized,
       initial_qty_reserved: fromScaledInt(initialMicros, 6),
       initial_qty_reserved_micros: initialMicros,
+      cumulative_released_qty: fromScaledInt(cumulativeReleasedMicros, 6),
+      cumulative_released_qty_micros: cumulativeReleasedMicros,
+      ...(partialRelease ? {
+        partial_release_reason: partialRelease.releasedReason,
+        last_partial_release_qty: fromScaledInt(partialRelease.releasedMicros, 6),
+        last_partial_release_qty_micros: partialRelease.releasedMicros,
+        last_partial_released_at: context.now,
+        last_partial_released_by: context.command.actor.user_id,
+      } : {}),
     } as ReservationData;
     await assertReservationFeasibleAcrossThresholds(context, withSnapshot, context.command.aggregate.name);
     return withSnapshot;
