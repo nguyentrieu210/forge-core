@@ -1,15 +1,20 @@
 name: Sales Commercial Complete Validation
 
 on:
+  push:
+    branches:
+      - feat/sales-commercial-complete-20260811
   pull_request:
     branches:
       - exp/alumdoor-pricing-policy
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: sales-commercial-complete-${{ github.event.pull_request.number }}
+  group: sales-commercial-complete-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -19,7 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: feat/sales-commercial-complete-20260811
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: pnpm/action-setup@v4
         with:
           version: 9.15.0
@@ -35,7 +40,13 @@ jobs:
       - name: Commercial targeted tests
         working-directory: server
         run: |
-          node --test tests/commercial-line-resolver.test.mjs tests/commercial-line-price-variant.test.mjs tests/sales-option-resolver.test.mjs tests/sales-order-pricing-authority.test.mjs
+          node --test \
+            tests/commercial-line-authority.test.mjs \
+            tests/commercial-line-price-variant.test.mjs \
+            tests/commercial-pricing-policy.test.mjs \
+            tests/sales-option-resolver.test.mjs \
+            tests/sales-price-variant.test.mjs \
+            tests/o2c.test.mjs
       - name: SQL migration replay
         working-directory: server
         run: pnpm run test:sql
