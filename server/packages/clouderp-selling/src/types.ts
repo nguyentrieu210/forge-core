@@ -22,7 +22,17 @@ export interface SalesItem extends UomLine {
   serial_and_batch_bundle?: string;
   batch_no?: string;
   serial_nos?: string[];
+
+  /** Operator-facing commercial choice; server resolves all technical dimensions from it. */
+  sales_option?: string;
+  sales_option_code?: string;
+  sales_option_label?: string;
+  sales_option_version?: number;
+  sales_mode?: string;
+  sales_package?: string;
+
   item_price?: string | undefined;
+  price_variant?: string;
   /** Raw Item Price before Pricing Rule effects. */
   base_rate?: DecimalInput | undefined;
   base_rate_minor?: number | undefined;
@@ -33,6 +43,8 @@ export interface SalesItem extends UomLine {
   pricing_rule?: string;
   /** Policy percentage is retained for audit even when UI displays only money. */
   discount_percentage?: string;
+  discount_basis_item_price?: string;
+  discount_basis_variant?: string;
   discount_basis_rate?: DecimalInput;
   discount_basis_rate_minor?: number;
   discount_basis_amount?: string;
@@ -88,10 +100,7 @@ interface SalesTotalsData extends JsonObject {
   /** Sum of line policy adjustments. Kept for compatibility/reporting, not client authority. */
   surcharge_amount?: DecimalInput | undefined;
   surcharge_amount_minor?: number;
-  /**
-   * Alumdoor compatibility tax projection. Canonical commercial line money is already
-   * server-derived before these fields are calculated.
-   */
+  /** Alumdoor compatibility tax projection. Canonical line money is already server-derived. */
   total_amount?: DecimalInput | undefined;
   vat_rate?: DecimalInput | undefined;
   vat_amount?: DecimalInput | undefined;
