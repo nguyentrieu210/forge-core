@@ -16,7 +16,7 @@ import { DeliveryTripController, ProofOfDeliveryController } from "./logistics-c
 import { LoadingPlanController } from "./loading-plan-controller.js";
 import { FreightEstimateController, TransportContractController } from "./freight-controllers.js";
 import {
-  BankReconciliationController, BankTransactionController, EInvoiceSubmissionController, PayrollEntryController,
+  BankReconciliationController, BankTransactionController, EInvoiceSubmissionController,
   SubscriptionController,
 } from "./enterprise-controllers.js";
 import {
@@ -69,6 +69,7 @@ import { HrmSalarySlipController } from "./hrm-salary-slip.js";
 import { CutOrderController } from "./alumdoor-inventory.js";
 import { AlumDoorAttendanceDayController } from "./alumdoor-attendance.js";
 import { AlumDoorPayProfileController } from "./alumdoor-payroll.js";
+import { AlumDoorAwarePayrollEntryController } from "./alumdoor-payroll-entry.js";
 import { StockReservationIntegrityController } from "./stock-reservation-integrity.js";
 import { StockReconciliationIntegrityController } from "./stock-reconciliation-integrity.js";
 import { StockReturnIntegrityController } from "./stock-return-integrity.js";
@@ -182,7 +183,7 @@ export function registerErpNextCoreControllers(registry: ControllerRegistry): Co
     .register(new FinanceBudgetRevisionController())
     .register(new FinanceBudgetCommitmentController())
     .register(new HrmSalarySlipController())
-    .register(new PayrollEntryController())
+    .register(new AlumDoorAwarePayrollEntryController())
     .register(new SalaryBankBatchController())
     .register(new SubscriptionController())
     .register(new EInvoiceSubmissionController())
