@@ -13,63 +13,76 @@ No partial rounding. A gate is either `PASS = 1.0` or `OPEN = 0.0`. A 9/10 resul
 | # | Gate | Score | Current evidence / blocker |
 |---|---|---:|---|
 | 1 | Visual consistency | 0.0 | Golden Sales Order exists; remaining Alumdoor screens not yet certified against one UI contract. |
-| 2 | Metadata purity | 0.0 | `FormView.tsx`, `ChildGrid.tsx`, `ChildGridWithExtensions.tsx` still contain Sales/doctype-specific presentation/business branches. |
+| 2 | Metadata purity | 0.0 | Metadata-first child-grid presentation contract is verified 4/4, but `FormView.tsx`, `ChildGrid.tsx`, `ChildGridWithExtensions.tsx` still contain doctype/business branches. |
 | 3 | UX completeness | 0.0 | Needs create/edit/save/submit/cancel/link/grid/filter validation per operational screen with real runtime evidence. |
-| 4 | Sales closure | 0.0 | Strong O2C unit evidence exists, but final real-data end-to-end certification is still open. |
-| 5 | Purchase closure | 0.0 | Strong P2P unit evidence exists, but final real-data end-to-end certification and exact Purchase Receipt cancel review remain open. |
-| 6 | Inventory integrity | 0.0 | P0 slice verified 2020/2020; active-reservation scan bound, consumption evidence and remaining lifecycle guards are open. |
+| 4 | Sales closure | 0.0 | Strong O2C unit evidence exists; final real-data end-to-end certification remains open. |
+| 5 | Purchase closure | 0.0 | Purchase Receipt warehouse boundary and exact Stock/GL cancel are verified; full real-data P2P chain remains open. |
+| 6 | Inventory integrity | 0.0 | P0/exact-reversal/reservation-threshold slice verified; consumption evidence, source lifecycle and generic outbound reservation guard remain open. |
 | 7 | Manufacturing closure | 0.0 | Strong Work Order/Cut/manufacture evidence exists; final golden real-data chain not yet certified. |
 | 8 | Accounting reconciliation | 0.0 | Stock/GL/AR/AP controls exist; final Alumdoor golden-chain reconciliation is open. |
 | 9 | Real-data certification | 0.0 | Pricing lab real data exists; full vertical transaction chain on disposable Alumdoor data clone remains open. |
-| 10 | Regression / print / performance | 0.0 | Server full unit is green; full UI visual/E2E/performance certification is open. |
+| 10 | Regression / print / performance | 0.0 | Build + 2025/2025 server unit + metadata UI contract are green; visual/E2E/print/performance certification remains open. |
 
 **Current certified score: 0/10.** This intentionally does not reward partial gates. Evidence can be strong without the gate being complete.
 
-## Verified inventory slice — 2026-08-11
+## Latest verified checkpoint — 2026-08-11
 
 Self-hosted runner `alumdoor-runner` on `DESKTOP-JTFCUTT` tested experiment commit:
 
-`5839a04122beee9f17cd2f7c0a83c329a7d53f61`
+`3193acc42c9af588cd64f1238ecb876a09126f0f`
 
-Workflow: `Test local runner` run #48, run id `31444195885`, job id `93634832300`.
+Workflow: `Test local runner` run #56, run id `31446707358`, job id `93642385301`.
 
-Result:
+Verified results:
 
-- tests: 2020
-- pass: 2020
-- fail: 0
-- skipped: 0
-- marker: `PRICING_EXPERIMENT_FULL_SERVER_UNIT_PASS`
+- server TypeScript build: PASS
+- MetaForge views TypeScript build: PASS
+- metadata child-grid presentation contract: 4/4 PASS
+- focused inventory integrity slice: 28/28 PASS
+- full server suite: 2025/2025 PASS
+- full-suite fail: 0
+- marker: `ALUMDOOR_INVENTORY_FULL_SERVER_UNIT_PASS`
 
-Verified changes in this slice:
+### Inventory controls verified at this checkpoint
 
 1. Delivery Note rejects cross-company, disabled and group posting warehouses before stock planning.
-2. Purchase Receipt keeps rollout behavior but shares the same leaf/company warehouse boundary.
-3. Stock Reservation checks all nested length breakpoints; one physical bar cannot satisfy two incompatible promises.
-4. Stock Return cancellation reverses exact submitted Stock/GL rows instead of replaying current valuation.
-5. Delivery Note, Purchase Receipt and Stock Return now share the company-wide inventory coordinator with Stock Entry, Cut Order, Work Order and Stock Reconciliation.
+2. Purchase Receipt keeps rollout/allocation behavior and shares the same leaf/company warehouse boundary.
+3. Purchase Receipt cancel preserves procurement/allocation reversal facts but replaces reconstructed Stock/GL with exact submitted-revision reversals.
+4. Stock Reservation checks all nested length breakpoints; one physical bar cannot satisfy incompatible promises at multiple thresholds.
+5. Partial reservation release stays `Đang giữ` and records actor, time, delta, cumulative released quantity and canonical/custom reason.
+6. Client cannot declare reservation `Đã dùng`; consumption state remains server-evidence-only.
+7. Stock Return cancel reverses exact submitted Stock/GL rows without replaying current valuation.
+8. Delivery Note, Purchase Receipt and Stock Return share the company-wide inventory coordinator with Stock Entry, Cut Order, Work Order and Stock Reconciliation.
 
 ## Inventory remaining blockers
 
-### INV-P1-01 — bounded document scan must never silently undercount reservations
+### INV-P2-01 — bounded reservation scan scalability
 
-`D1MutationStore.listDocumentsByDoctype()` currently selects at most 5,000 rows. Reservation availability must either use a narrow active-reservation query or fail closed when the bounded scan cannot prove completeness.
+Production D1 does **not** silently truncate at 5,000. `D1RolloutPurchaseAllocationDomainStore` counts rows and `assertControllerDocumentScanCount()` fails closed when the controller scan bound is exceeded. Correctness is therefore protected; a targeted active-reservation reader is still required for scale and is now P2, not P1 correctness.
 
-### INV-P1-02 — `Đã dùng` requires consumption evidence
+### INV-P1-01 — `Đã dùng` requires canonical consumption evidence
 
-A reservation must not be allowed to become consumed merely because a client writes a state value. Terminal consumed state needs canonical evidence from a stock-consuming voucher/cut lineage.
+Direct client mutation is now blocked. The remaining work is positive evidence: submitted Cut/Delivery/Stock Entry lineage must derive consumed quantity and the terminal `Đã dùng` state when the promise is fully consumed.
 
-### INV-P1-03 — source lifecycle releases promises
+### INV-P1-02 — source lifecycle releases promises
 
-Cancellation/closure of the source Sales/Production document must deterministically release or terminate its active reservations with audit evidence.
+Cancellation/closure of the source Sales/Production/Cut document must deterministically release or terminate its active reservations with audit evidence.
 
-### INV-P1-04 — Purchase Receipt cancellation exactness
+### INV-P1-03 — generic outbound reservation guard
 
-Review and, where necessary, replace reconstructed cancellation with exact reversal of original Stock/GL/procurement facts.
+All stock-consuming paths must respect active promises using one server guard under the company inventory coordinator. Cut Order already has a specialized reservation protection; Delivery/Material Issue/Transfer/Purchase Return must converge on the same invariant.
 
-### INV-P1-05 — outbound reservation guard
+## Golden UI metadata work verified
 
-All stock-consuming paths must respect active promises using one generic server guard under the company inventory coordinator. Physical non-negative stock alone is insufficient because it does not protect promised stock.
+`client/packages/views/src/form/child-grid-presentation.ts` now defines a business-neutral presentation contract:
+
+- `viewPolicy.form.columns/fields` controls full detail order;
+- `viewPolicy.quickEntry.columns/fields` controls compact parent-form order;
+- `surface=quick|expanded|internal` provides a generic fallback policy;
+- `surface=internal` never becomes a business column;
+- legacy metadata returns `null`, explicitly preserving the current UI until a DocType is migrated.
+
+The contract is verified by `client/packages/views/tests/child-grid-presentation.test.mjs` and does not know Sales Order, Purchase Order or Alumdoor.
 
 ## Golden UI contract
 
@@ -91,7 +104,7 @@ Implementation constraint:
 - do **not** create `PurchaseOrderPage`, `StockEntryPage`, etc. by copying Sales Order React code;
 - presentation belongs in DocType/view metadata;
 - business calculation belongs in server policy/controllers;
-- `FormView` and `ChildGrid` must remain business-neutral.
+- `FormView` and `ChildGrid` must become business-neutral.
 
 ## Required final real-data chain
 
