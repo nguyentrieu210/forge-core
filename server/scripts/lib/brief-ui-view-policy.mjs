@@ -1,10 +1,10 @@
 import { BriefError } from "./compile-brief.mjs";
 
-const UI_POLICY_KEYS = ["bulk", "matrix"];
+const UI_POLICY_KEYS = ["form", "quickEntry", "bulk", "matrix"];
 
 /**
  * Keep the legacy brief schema strict for every pre-existing property while allowing
- * UI01-owned view policy blocks to be validated by the canonical server parser after
+ * renderer-owned view policy blocks to be validated by the canonical server parser after
  * compilation. The clone is schema-only; the original brief remains untouched.
  */
 export function withoutUiViewPolicies(brief) {
@@ -42,9 +42,10 @@ export function validateBriefUiViewPolicies(brief) {
 }
 
 /**
- * Add UI01-owned policies after the mature base compiler has derived the rest of a package.
- * This avoids duplicating list/form/workflow compilation while still making Matrix/Bulk
- * first-class package data. parseAppManifest immediately validates the result in forge-app.
+ * Add renderer-owned policies after the mature base compiler has derived the rest of a package.
+ * This avoids duplicating list/form/workflow compilation while making authored Form, Quick Entry,
+ * Matrix and Bulk presentation first-class package data. parseAppManifest immediately validates
+ * the result in forge-app, including every referenced field name.
  */
 export function attachBriefUiViewPolicies(brief, pkg) {
   if (!brief || typeof brief !== "object" || !Array.isArray(brief.doctypes)) return pkg;
