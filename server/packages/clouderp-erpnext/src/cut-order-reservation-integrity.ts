@@ -1,8 +1,7 @@
-import type { MutationPlan } from "../../contracts/src/index.js";
-import type { ControllerContext } from "../../document-kernel/src/index.js";
 import { CutOrderController } from "./alumdoor-inventory.js";
-import type { CutOrderData } from "./types.js";
 import { withReservationLifecycleReader } from "./reservation-lifecycle-reader.js";
+
+type CutOrderContext = Parameters<CutOrderController["buildPlan"]>[0];
 
 /**
  * Preserves the mature Cut Order calculation/ledger implementation while making its existing
@@ -10,7 +9,7 @@ import { withReservationLifecycleReader } from "./reservation-lifecycle-reader.j
  * rewriting their immutable reservation audit records.
  */
 export class CutOrderReservationIntegrityController extends CutOrderController {
-  override async buildPlan(context: ControllerContext<CutOrderData>): Promise<MutationPlan<CutOrderData>> {
+  override buildPlan(context: CutOrderContext) {
     return super.buildPlan(withReservationLifecycleReader(context));
   }
 }
