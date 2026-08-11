@@ -12,7 +12,7 @@ on:
       - "server/packages/clouderp-selling/**"
       - "server/migrations/tenant/0117_sales_pricing_authority.sql"
       - "server/scripts/test-sales-pricing-authority-migration.py"
-      - "server/tests/commercial-*.test.mjs"
+      - "server/tests/**"
       - ".github/workflows/sales-pricing-authority-validation.yml"
 
 permissions:
@@ -25,7 +25,7 @@ concurrency:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - name: Checkout exact head
         uses: actions/checkout@v4
@@ -54,3 +54,7 @@ jobs:
       - name: Pricing Rule migration replay
         working-directory: server
         run: python3 scripts/test-sales-pricing-authority-migration.py
+
+      - name: Full server unit suite
+        working-directory: server
+        run: pnpm run test:unit
