@@ -269,6 +269,13 @@ function parseViewPolicy(value: unknown, fields: DocFieldMeta[]): DocTypeViewPol
       ? undefined
       : array(entry.reasonRequiredOn, `viewPolicy.${key}.reasonRequiredOn`).map((item, index) =>
           text(item, `viewPolicy.${key}.reasonRequiredOn[${index}]`, 80));
+    const previewMethod = entry.previewMethod === undefined
+      ? undefined
+      : text(entry.previewMethod, `viewPolicy.${key}.previewMethod`, 240);
+    const previewParentFields = entry.previewParentFields === undefined
+      ? undefined
+      : array(entry.previewParentFields, `viewPolicy.${key}.previewParentFields`).map((item, index) =>
+          text(item, `viewPolicy.${key}.previewParentFields[${index}]`, 160));
     return {
       enabled: bool(entry.enabled, false),
       ...(fieldsValue ? { fields: fieldsValue } : {}),
@@ -277,6 +284,8 @@ function parseViewPolicy(value: unknown, fields: DocFieldMeta[]): DocTypeViewPol
       ...(startField ? { startField } : {}),
       ...(endField ? { endField } : {}),
       ...(reasonRequiredOn ? { reasonRequiredOn } : {}),
+      ...(previewMethod ? { previewMethod } : {}),
+      ...(previewParentFields ? { previewParentFields } : {}),
     };
   };
   const quickEntry = parseView("quickEntry");

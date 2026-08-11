@@ -32,6 +32,8 @@ import {
   type SalesMode,
 } from "./door-formulas.js";
 import { salesItemContext } from "./sales-item-context.js";
+import { previewChildRow } from "./ui-child-preview.js";
+import { previewDocument } from "./ui-document-preview.js";
 import {
   confirmSupplierOffset,
   planCapacity,
@@ -49,6 +51,14 @@ import {
   validateProductionRequest,
 } from "./sales-production.js";
 import { attendanceChallenge, attendanceScan } from "./attendance-routes.js";
+import {
+  attendanceExceptions, attendanceMonth, attendanceReviewCorrection,
+  attendanceSubmitCorrection, attendanceToday,
+} from "./attendance-operational-routes.js";
+import {
+  payrollApprovePeriod, payrollCalculatePeriod, payrollCreatePeriod, payrollMarkPaid,
+  payrollMySlips, payrollPeriodList, payrollPeriodSlips, payrollSubmitPeriod,
+} from "./payroll-routes.js";
 
 interface Env {
   INTERNAL_AUTH_SECRET?: string;
@@ -1468,48 +1478,15 @@ async function applyCutV2(call: PlatformCall, args: Record<string, unknown>): Pr
   if (cut.cut_state !== "Đã cắt") {
     await submitV2Doc(call, "Cut Order", name, cut as V2CutOrder & Record<string, unknown>);
   }
-  const reservations = await consumeReservationsForCut(call, name, cut.so_reference);
   const paint = await syncPaintJobsFromCut(call, name, 1);
   return answer({
     cut_order: name,
     submitted: true,
     idempotent: cut.cut_state === "Đã cắt",
-    reservations,
+    reservation_consumption: "derived-from-cut-order-stock-ledger",
     paint,
-    message: `Đã cắt và trừ tồn theo phiếu ${name}; ${reservations.used} phiếu giữ chỗ đã chuyển sang Đã dùng.`
-      + (reservations.failed.length ? ` Cần kiểm tra lại: ${reservations.failed.join(", ")}.` : ""),
+    message: `Đã cắt và trừ tồn theo phiếu ${name}; lượng giữ chỗ đã dùng được suy từ Stock Ledger của phiếu cắt.`,
   });
-}
-
-async function consumeReservationsForCut(
-  call: PlatformCall,
-  cutOrder: string,
-  sourceReference?: string,
-): Promise<{ used: number; failed: string[] }> {
-  const sourceNames = new Set([cutOrder, String(sourceReference ?? "").trim()].filter(Boolean));
-  const query = new URLSearchParams({
-    fields: JSON.stringify(["name", "source_name", "state", "modified"]),
-    filters: JSON.stringify([["state", "=", "Đang giữ"]]),
-    limit_page_length: "5000",
-  });
-  const response = await call(`resource/Stock%20Reservation?${query}`);
-  if (!response.ok) return { used: 0, failed: ["không đọc được danh sách giữ chỗ"] };
-  const rows = ((await response.json()) as {
-    data?: Array<{ name?: string; source_name?: string; state?: string; modified?: string }>;
-  }).data ?? [];
-  let used = 0;
-  const failed: string[] = [];
-  for (const row of rows) {
-    const reservation = String(row.name ?? "");
-    if (!reservation || !sourceNames.has(String(row.source_name ?? ""))) continue;
-    const saved = await call(`resource/Stock%20Reservation/${encodeURIComponent(reservation)}`, {
-      method: "PUT",
-      body: JSON.stringify({ state: "Đã dùng", modified: row.modified }),
-    });
-    if (saved.ok) used += 1;
-    else failed.push(reservation);
-  }
-  return { used, failed };
 }
 
 async function reverseCutV2(call: PlatformCall, args: Record<string, unknown>): Promise<Response> {
@@ -3187,7 +3164,22 @@ export default {
         const call = platformCaller(request, env);
         if (method === "alumdoor.attendance.challenge") return await attendanceChallenge({ request, call, env, args });
         if (method === "alumdoor.attendance.scan") return await attendanceScan({ request, call, env, args });
+        if (method === "alumdoor.attendance.today") return await attendanceToday({ call, args });
+        if (method === "alumdoor.attendance.month") return await attendanceMonth({ call, args });
+        if (method === "alumdoor.attendance.exceptions") return await attendanceExceptions({ call, args });
+        if (method === "alumdoor.attendance.submit_correction") return await attendanceSubmitCorrection({ call, args });
+        if (method === "alumdoor.attendance.review_correction") return await attendanceReviewCorrection({ call, args });
+        if (method === "alumdoor.payroll.period_list") return await payrollPeriodList({ call, args });
+        if (method === "alumdoor.payroll.create_period") return await payrollCreatePeriod({ call, args });
+        if (method === "alumdoor.payroll.calculate_period") return await payrollCalculatePeriod({ call, args });
+        if (method === "alumdoor.payroll.submit_period") return await payrollSubmitPeriod({ call, args });
+        if (method === "alumdoor.payroll.approve_period") return await payrollApprovePeriod({ call, args });
+        if (method === "alumdoor.payroll.mark_paid") return await payrollMarkPaid({ call, args });
+        if (method === "alumdoor.payroll.period_slips") return await payrollPeriodSlips({ call, args });
+        if (method === "alumdoor.payroll.my_slips") return await payrollMySlips({ call, args, actorUser: platformActorUser(request) });
         if (method === "alumdoor.sales.item_context") return await salesItemContext(call, args);
+    if (method === "alumdoor.ui.preview_child_row") return await previewChildRow(call, args);
+        if (method === "alumdoor.ui.preview_document") return await previewDocument(call, args);
         if (method === "alumdoor.sales.production_line_context") return await calculateSalesProductionLine(call, args);
         if (method === "alumdoor.sales.preview_production") return await previewSalesProduction(call, args);
         if (method === "alumdoor.sales.create_production") return await createSalesProduction(call, args);

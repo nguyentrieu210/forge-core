@@ -13,6 +13,7 @@
 
 import type { Actor, CanonicalDocument, JsonObject, JsonValue, MutationAction, MutationCommand, MutationReceipt } from "../../contracts/src/index.js";
 import { errors, sha256Hex } from "../../core/src/index.js";
+import { resolveCommercialLine, resolveSalesPackage } from "../../clouderp-selling/src/index.js";
 import type { D1MutationStore, DocumentListService, ListFilter } from "../../document-kernel/src/index.js";
 import type {
   D1CollaborationService, DocTypeMeta, DocumentAccessStore, ExtendedPermissionAction,
@@ -87,6 +88,14 @@ export interface FrappeRouterContext {
     nonceHash: string;
     deviceFingerprintHash?: string;
   }) => Promise<JsonObject>;
+  submitAlumdoorAttendanceCorrection?: (input: {
+    workDate: string; segmentCode: string; requestedIn?: string; requestedOut?: string;
+    reason: string; attachment?: string;
+  }) => Promise<JsonObject>;
+  reviewAlumdoorAttendanceCorrection?: (input: {
+    request: string; action: "approve" | "reject"; note?: string;
+  }) => Promise<JsonObject>;
+  approveAlumdoorPayroll?: (input: { payrollEntry: string }) => Promise<JsonObject>;
   now(): string;
   /** Overlay store for Custom Field / Property Setter. */
   customizations: CustomizationStore;
@@ -940,6 +949,9 @@ async function dispatchMethod(
     case "frappe.client.get_value":
       return methodResponse(await getValue(args, context));
 
+    case "metaforge.api.preview_sales_commercial_line":
+      return methodResponse(await previewSalesCommercialLine(args, context));
+
     case "frappe.client.submit":
       return methodResponse(await transition("submit", args, context));
 
@@ -971,6 +983,15 @@ async function dispatchMethod(
     // verified callback; a browser cannot manufacture the callback attribution.
     case "metaforge.api.commit_alumdoor_attendance_scan":
       return methodResponse(await commitAlumdoorAttendanceScan(args, context));
+
+    case "metaforge.api.submit_alumdoor_attendance_correction":
+      return methodResponse(await submitAlumdoorAttendanceCorrection(args, context));
+
+    case "metaforge.api.review_alumdoor_attendance_correction":
+      return methodResponse(await reviewAlumdoorAttendanceCorrection(args, context));
+
+    case "metaforge.api.approve_alumdoor_payroll":
+      return methodResponse(await approveAlumdoorPayroll(args, context));
 
     // The QR page needs a tiny, non-sensitive station/policy snapshot before it can
     // verify a short HMAC challenge.  Keep that read here rather than granting every
@@ -1262,6 +1283,43 @@ async function commitAlumdoorAttendanceScan(args: FrappeArgs, context: FrappeRou
   });
 }
 
+async function submitAlumdoorAttendanceCorrection(args: FrappeArgs, context: FrappeRouterContext): Promise<JsonObject> {
+  if (context.appCallbackAppId !== "alumdoor" || !context.submitAlumdoorAttendanceCorrection) {
+    throw errors.permission("AlumDoor attendance correction accepts only the verified AlumDoor app callback.");
+  }
+  const requestedIn = args.text("requested_in");
+  const requestedOut = args.text("requested_out");
+  const attachment = args.text("attachment");
+  return context.submitAlumdoorAttendanceCorrection({
+    workDate: args.requireText("work_date", 10),
+    segmentCode: args.requireText("segment_code", 16),
+    ...(requestedIn ? { requestedIn } : {}),
+    ...(requestedOut ? { requestedOut } : {}),
+    reason: args.requireText("reason", 1000),
+    ...(attachment ? { attachment } : {}),
+  });
+}
+
+async function reviewAlumdoorAttendanceCorrection(args: FrappeArgs, context: FrappeRouterContext): Promise<JsonObject> {
+  if (context.appCallbackAppId !== "alumdoor" || !context.reviewAlumdoorAttendanceCorrection) {
+    throw errors.permission("AlumDoor attendance correction review accepts only the verified AlumDoor app callback.");
+  }
+  const action = args.requireText("action", 16);
+  if (action !== "approve" && action !== "reject") throw errors.validation("action must be approve or reject");
+  const note = args.text("note");
+  return context.reviewAlumdoorAttendanceCorrection({
+    request: args.requireText("request", 320),
+    action,
+    ...(note ? { note } : {}),
+  });
+}
+
+async function approveAlumdoorPayroll(args: FrappeArgs, context: FrappeRouterContext): Promise<JsonObject> {
+  if (context.appCallbackAppId !== "alumdoor" || !context.approveAlumdoorPayroll) {
+    throw errors.permission("AlumDoor payroll approval accepts only the verified AlumDoor app callback.");
+  }
+  return context.approveAlumdoorPayroll({ payrollEntry: args.requireText("payroll_entry", 320) });
+}
 async function alumdoorAttendanceQrConfig(args: FrappeArgs, context: FrappeRouterContext): Promise<JsonObject> {
   if (context.appCallbackAppId !== "alumdoor") {
     throw errors.permission("AlumDoor attendance QR configuration accepts only the verified AlumDoor app callback.");
@@ -4264,4 +4322,74 @@ function dedupe(values: string[]): string[] {
 function clampPageLength(value: number): number {
   if (!Number.isSafeInteger(value) || value < 1) return 20;
   return Math.min(value, 100);
+}
+
+
+/** Read-only preview using the exact same selling resolver used by Quotation/Sales Order. */
+async function previewSalesCommercialLine(args: FrappeArgs, context: FrappeRouterContext): Promise<JsonObject> {
+  const line = args.object("line") ?? args.object("row") ?? {};
+  const itemCode = String(line.item_code ?? args.text("item_code") ?? "").trim();
+  const priceList = String(args.text("price_list") ?? line.price_list ?? "").trim();
+  const currency = String(args.text("currency") ?? line.currency ?? "VND").trim() || "VND";
+  const postingDate = String(args.text("posting_date") ?? args.text("transaction_date") ?? line.posting_date ?? context.now().slice(0, 10)).slice(0, 10);
+  if (!itemCode) throw errors.validation("item_code is required");
+  if (!priceList) throw errors.validation("price_list is required");
+
+  // Permission is evaluated on the actual Item before any pricing master is read.
+  const item = await loadReadable("Item", itemCode, context);
+  const qty = Number(line.qty ?? line.priced_qty ?? 0);
+  if (!Number.isFinite(qty) || qty <= 0) throw errors.validation("qty must be greater than zero");
+
+  const fakeCommand: MutationCommand<JsonObject> = {
+    schema_version: 1,
+    command_id: `preview-sales-${context.traceId}`,
+    tenant_id: context.tenantId,
+    aggregate: { doctype: "Sales Order", name: "__commercial_preview__" },
+    action: "save",
+    expected_version: null,
+    payload_hash: "preview",
+    document: {},
+    actor: context.actor,
+  };
+  const facts: Record<string, unknown> = {
+    ...line,
+    item_group: item.data.item_group,
+  };
+  const kernelContext = {
+    command: fakeCommand,
+    existing: null,
+    now: context.now(),
+    nextVersion: 1,
+    reader: context.documents,
+  };
+  const resolved = await resolveCommercialLine(kernelContext, {
+    itemCode,
+    priceList,
+    documentCurrency: currency,
+    postingDate,
+    ...(typeof line.uom === "string" && line.uom.trim() ? { uom: line.uom.trim() } : {}),
+    pricedQty: qty,
+    partyType: "Customer",
+    ...(args.text("customer") ? { party: args.text("customer")! } : {}),
+    ...(args.text("customer_group") ? { customerGroup: args.text("customer_group")! } : {}),
+    facts,
+    ...(Number.isFinite(Number(line.billable_area_sqm)) ? { areaSqm: Number(line.billable_area_sqm) } : {}),
+    ...(Number.isFinite(Number(line.length_m)) ? { lengthM: Number(line.length_m) } : {}),
+    ...(Number.isFinite(Number(line.set_count)) ? { setCount: Number(line.set_count) } : {}),
+  });
+  const packageSnapshot = resolved.sales_package
+    ? await resolveSalesPackage(kernelContext, {
+      packageName: resolved.sales_package,
+      postingDate,
+      itemCode,
+      facts: { ...facts, ...resolved },
+    })
+    : undefined;
+  return {
+    ...resolved,
+    ...(packageSnapshot ? { sales_package_snapshot: packageSnapshot } : {}),
+    rate: resolved.selling_rate,
+    amount: resolved.net_before_tax,
+    net_amount: resolved.net_before_tax,
+  };
 }

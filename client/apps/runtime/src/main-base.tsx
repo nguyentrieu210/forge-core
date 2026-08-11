@@ -33,6 +33,7 @@ const SocialCommerce = lazy(() => import("./experiences/SocialCommerce.js").then
 const DailyDetailedLedger = lazy(() => import("./experiences/DailyDetailedLedger.js").then((module) => ({ default: module.DailyDetailedLedger })));
 const AlumdoorOperationsCenter = lazy(() => import("./experiences/AlumdoorOperationsCenter.js").then((module) => ({ default: module.AlumdoorOperationsCenter })));
 const AlumdoorAttendanceKiosk = lazy(() => import("./experiences/AlumdoorAttendanceKiosk.js").then((module) => ({ default: module.AlumdoorAttendanceKiosk })));
+const AlumdoorAttendanceOperations = lazy(() => import("./experiences/AlumdoorAttendanceOperations.js").then((module) => ({ default: module.AlumdoorAttendanceOperations })));
 
 /**
  * The GENERIC runtime — one bundle that serves every app on the platform.
@@ -635,11 +636,31 @@ function ExperienceScreen({ manifest, boot, logout, nav }: ScreenProps) {
     );
   }
   if (kind === "alumdoor-attendance") {
-    return (
-      <Shell manifest={manifest} boot={boot} logout={logout} nav={nav} active={experienceKey} breadcrumbs={[{ label: "Chấm công QR" }]}>
-        <AlumdoorAttendanceKiosk />
-      </Shell>
-    );
+    const mode = experienceKey.slice("alumdoor-attendance:".length);
+    const label = manifest.nav.find((item) => item.key === experienceKey)?.label ?? "Attendance & Payroll";
+    if (mode === "kiosk" || mode === "mobile") {
+      return (
+        <Shell manifest={manifest} boot={boot} logout={logout} nav={nav} active={experienceKey} breadcrumbs={[{ label }]}>
+          <AlumdoorAttendanceKiosk />
+        </Shell>
+      );
+    }
+    const operationsMode = mode === "today" ? "today"
+      : mode === "month" ? "month"
+      : mode === "exceptions" ? "exceptions"
+      : mode === "payroll-run" ? "payroll-run"
+      : mode === "payroll-my-slips" ? "payroll-my-slips"
+      : null;
+    if (operationsMode) {
+      return (
+        <Shell manifest={manifest} boot={boot} logout={logout} nav={nav} active={experienceKey} breadcrumbs={[{ label }]}>
+          <AlumdoorAttendanceOperations
+            mode={operationsMode}
+            onExit={() => navigate(`/overview/${encodeURIComponent(manifest.domain ?? manifest.id)}`)}
+          />
+        </Shell>
+      );
+    }
   }
   return <>{renderExperience(experienceKey, manifest, navigate)}</>;
 }

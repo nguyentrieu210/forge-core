@@ -1,64 +1,117 @@
 import baseWorker from "./index.js";
-import { validateItemCatalogInvariants } from "./item-catalog-invariants.js";
-import { handlePurchaseFifoRequest } from "./purchase-fifo-receipt.js";
-import { handleBulkPurchaseFifoRequest } from "./bulk-purchase-fifo-receipt.js";
+import {
+  validateCanonicalAluminumItem,
+  validateItemCatalogInvariants,
+} from "./item-catalog-invariants.js";
+import {
+  handleTrackedPurchaseFifoRequest,
+  validateAluminumPurchaseHook,
+} from "./aluminum-purchase-closure.js";
+import { buildResidualPurchaseValidationRequest } from "./aluminum-validation-bridge.js";
+import {
+  handleAluminumSalesPlan,
+  handleMaterialRequestFromAluminumShortage,
+  handleReserveAluminumForSales,
+} from "./aluminum-supply-demand.js";
 import { handlePurchaseSupplierDashboard } from "./purchase-supplier-dashboard.js";
 import { handlePurchaseSupplierSettlement } from "./purchase-supplier-settlement.js";
 
 type WorkerEnv = Parameters<typeof baseWorker.fetch>[1];
 type WorkerContext = Parameters<typeof baseWorker.fetch>[2];
 
-/**
- * Entrypoint triển khai của Alumdoor.
- *
- * Item đi qua cả validator lịch sử và các invariant catalog mới. Nhập nhôm FIFO có hai
- * controller: một dòng tương thích cũ và Bulk Transaction nhiều mã tạo một chứng từ nháp.
- * Dashboard giao hàng NCC đọc allocation timeline authoritative; đối soát chỉ compose
- * Purchase Settlement canonical, không tạo ledger cạnh tranh. Mọi route khác delegate nguyên vẹn.
- */
+const PURCHASE_VALIDATION_DOCTYPES = new Set([
+  "Supplier Quotation",
+  "Purchase Order",
+  "Purchase Receipt",
+  "Purchase Invoice",
+]);
+
+async function responseMessage(response: Response): Promise<string> {
+  const payload = await response.clone().json().catch(() => ({})) as { message?: unknown; error?: unknown };
+  return String(payload.message ?? payload.error ?? "");
+}
+
 export default {
   async fetch(request: Request, env: WorkerEnv, ctx: WorkerContext): Promise<Response> {
     const url = new URL(request.url);
+
     if (url.pathname.startsWith("/api/method/")) {
       const method = decodeURIComponent(url.pathname.slice("/api/method/".length));
-      if (method === "alumdoor.purchase.supplier_delivery_dashboard") {
-        return handlePurchaseSupplierDashboard(request, env);
-      }
-      if (method === "alumdoor.purchase.supplier_delivery_settlement") {
-        return handlePurchaseSupplierSettlement(request, env);
-      }
-      if (method === "alumdoor.purchase.preview_fifo_receipt") {
-        return handlePurchaseFifoRequest(request, env, false);
-      }
-      if (method === "alumdoor.purchase.fifo_receipt") {
-        return handlePurchaseFifoRequest(request, env, true);
-      }
-      if (method === "alumdoor.purchase.preview_bulk_fifo_receipt") {
-        return handleBulkPurchaseFifoRequest(request, env, false);
-      }
-      if (method === "alumdoor.purchase.bulk_fifo_receipt") {
-        return handleBulkPurchaseFifoRequest(request, env, true);
-      }
+      if (method === "alumdoor.purchase.supplier_delivery_dashboard") return handlePurchaseSupplierDashboard(request, env);
+      if (method === "alumdoor.purchase.supplier_delivery_settlement") return handlePurchaseSupplierSettlement(request, env);
+      if (method === "alumdoor.purchase.preview_fifo_receipt") return handleTrackedPurchaseFifoRequest(request, env, false, false);
+      if (method === "alumdoor.purchase.fifo_receipt") return handleTrackedPurchaseFifoRequest(request, env, true, false);
+      if (method === "alumdoor.purchase.preview_bulk_fifo_receipt") return handleTrackedPurchaseFifoRequest(request, env, false, true);
+      if (method === "alumdoor.purchase.bulk_fifo_receipt") return handleTrackedPurchaseFifoRequest(request, env, true, true);
+      if (method === "alumdoor.inventory.plan_sales_order") return handleAluminumSalesPlan(request, env);
+      if (method === "alumdoor.inventory.reserve_sales_order") return handleReserveAluminumForSales(request, env);
+      if (method === "alumdoor.inventory.material_request_from_shortage") return handleMaterialRequestFromAluminumShortage(request, env);
     }
 
-    if (url.pathname !== "/hooks/validate" || request.method !== "POST") {
+    if (url.pathname === "/hooks/event" && request.method === "POST") {
+      const event = await request.clone().json().catch(() => null) as { event_type?: string } | null;
+      const type = String(event?.event_type ?? "");
+      if (type.startsWith("purchase_receipt.")) {
+        return Response.json({
+          ok: true,
+          skipped_legacy_aluminium_lot_sync: true,
+          authority: "Batch + Stock Ledger",
+          event_type: type,
+        });
+      }
       return baseWorker.fetch(request, env, ctx);
     }
 
-    const invariantRequest = request.clone();
-    const body = await invariantRequest.clone().json().catch(() => null) as { doctype?: string } | null;
-    if (body?.doctype !== "Item") return baseWorker.fetch(request, env, ctx);
+    if (url.pathname !== "/hooks/validate" || request.method !== "POST") return baseWorker.fetch(request, env, ctx);
 
-    const [baseResponse, invariantResponse] = await Promise.all([
-      baseWorker.fetch(request, env, ctx),
-      validateItemCatalogInvariants(invariantRequest, env),
-    ]);
+    const body = await request.clone().json().catch(() => null) as { doctype?: string } | null;
+    if (body?.doctype === "Item") {
+      // 1) Preserve business-facing catalog invariant priority from main.
+      const invariantResponse = await validateItemCatalogInvariants(request.clone(), env);
+      if (!invariantResponse.ok) return invariantResponse;
 
-    // Preserve infrastructure/auth failures from the established validator. When both
-    // validators return a business validation response, the stricter catalog invariant
-    // is authoritative so its field-level reason is not hidden by a broader legacy error.
-    if (!baseResponse.ok && baseResponse.status !== 422) return baseResponse;
-    if (!invariantResponse.ok) return invariantResponse;
-    return baseResponse;
+      // 2) Preserve historical Item Group / Measurement Profile / color / UOM validation.
+      const baseResponse = await baseWorker.fetch(request.clone(), env, ctx);
+      if (!baseResponse.ok) {
+        if (baseResponse.status !== 422) return baseResponse;
+        const message = await responseMessage(baseResponse);
+        if (!/chưa có hệ số quy đổi/i.test(message)) return baseResponse;
+
+        // 3) Only canonical aluminum is allowed to supersede the obsolete static Kg→piece
+        // conversion rule. Ordinary Items still receive the historical 422 unchanged.
+        const strict = await validateCanonicalAluminumItem(request.clone(), env);
+        return strict ?? baseResponse;
+      }
+
+      // Base validation passed. A dimensional aluminum Item must still satisfy the stricter
+      // one-ledger/catch-weight contract and may not keep a static Kg↔piece conversion table.
+      const strict = await validateCanonicalAluminumItem(request.clone(), env);
+      return strict ?? invariantResponse;
+    }
+
+    if (body?.doctype && PURCHASE_VALIDATION_DOCTYPES.has(body.doctype)) {
+      const baseResponse = await baseWorker.fetch(request.clone(), env, ctx);
+      if (baseResponse.ok) {
+        const aluminum = await validateAluminumPurchaseHook(request.clone(), env);
+        return aluminum ?? baseResponse;
+      }
+      if (baseResponse.status !== 422) return baseResponse;
+      const baseMessage = await responseMessage(baseResponse);
+      if (!/chưa có hệ số quy đổi/i.test(baseMessage)) return baseResponse;
+
+      // The legacy validator stopped on the obsolete Kg→piece factor of an aluminum line.
+      // Validate canonical aluminum semantics, then re-run the old validator on every ordinary
+      // row left in the same mixed document so no later error is hidden by the override.
+      const aluminum = await validateAluminumPurchaseHook(request.clone(), env);
+      if (!aluminum || !aluminum.ok) return aluminum ?? baseResponse;
+      const residualRequest = await buildResidualPurchaseValidationRequest(request.clone(), env);
+      if (residualRequest) {
+        const residual = await baseWorker.fetch(residualRequest, env, ctx);
+        if (!residual.ok) return residual;
+      }
+      return aluminum;
+    }
+
+    return baseWorker.fetch(request, env, ctx);
   },
 };

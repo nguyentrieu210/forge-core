@@ -1,0 +1,94 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import { compileBrief } from "../scripts/lib/compile-brief.mjs";
+import { attachBriefUiViewPolicies } from "../scripts/lib/brief-ui-view-policy.mjs";
+import {
+  applyAlumdoorChildPresentation,
+  alumdoorGoldenChildGridPolicies,
+} from "../scripts/lib/alumdoor-child-presentation.mjs";
+
+function sourceBrief() {
+  return JSON.parse(fs.readFileSync(new URL("../briefs/alumdoor-v2.json", import.meta.url), "utf8"));
+}
+
+function compileWithUiPolicies(brief) {
+  return attachBriefUiViewPolicies(brief, compileBrief(brief));
+}
+
+function compiledDoctype(pkg, name) {
+  const value = pkg.doctypes.find((doctype) => doctype.name === name);
+  assert.ok(value, `missing compiled ${name}`);
+  return value;
+}
+
+function names(view) {
+  return view?.columns ?? view?.fields ?? [];
+}
+
+function expectedQuick(golden, doctype) {
+  const inForm = names(doctype.viewPolicy.form);
+  const preferred = new Set(golden);
+  for (const field of doctype.fields) {
+    if (field.required && !field.read_only && !field.hidden) preferred.add(field.fieldname);
+  }
+  return inForm.filter((fieldname) => preferred.has(fieldname));
+}
+
+function expectedFull(golden, doctype) {
+  const existing = new Set(doctype.fields.map((field) => field.fieldname));
+  return golden.filter((fieldname) => existing.has(fieldname));
+}
+
+test("presentation helper migrates every Alumdoor child DocType without changing field order", () => {
+  const brief = sourceBrief();
+  const before = new Map(brief.doctypes.filter((dt) => dt.child === true).map((dt) => [dt.name, dt.fields.map((field) => typeof field === "string" ? field.split(":")[0].trim() : field.fieldname)]));
+  const result = applyAlumdoorChildPresentation(brief);
+  assert.equal(result.migrated, 28);
+  assert.equal(result.doctypes.length, 28);
+  for (const dt of brief.doctypes.filter((value) => value.child === true)) {
+    assert.deepEqual(dt.fields.map((field) => field.fieldname), before.get(dt.name), `${dt.name} field order changed`);
+    assert.ok(dt.fields.every((field) => ["quick", "expanded", "internal"].includes(field.surface)), `${dt.name} has missing surface`);
+    assert.ok(Array.isArray(dt.form?.fields) && dt.form.fields.length > 0, `${dt.name} missing authored form fields`);
+    assert.ok(Array.isArray(dt.quickEntry?.fields) && dt.quickEntry.fields.length > 0, `${dt.name} missing authored quick-entry fields`);
+  }
+});
+
+test("golden Sales and Purchase compact/full policies survive canonical UI-policy attachment", () => {
+  const brief = sourceBrief();
+  applyAlumdoorChildPresentation(brief);
+  const pkg = compileWithUiPolicies(brief);
+
+  const sales = compiledDoctype(pkg, "Sales Order Item");
+  assert.equal(sales.viewPolicy.form.enabled, true);
+  assert.equal(sales.viewPolicy.quickEntry.enabled, true);
+  assert.deepEqual(names(sales.viewPolicy.quickEntry), expectedQuick(alumdoorGoldenChildGridPolicies.salesCompact, sales));
+  assert.deepEqual(names(sales.viewPolicy.form), expectedFull(alumdoorGoldenChildGridPolicies.salesFull, sales));
+
+  const po = compiledDoctype(pkg, "Purchase Order Item");
+  assert.deepEqual(names(po.viewPolicy.quickEntry), expectedQuick(alumdoorGoldenChildGridPolicies.purchaseCompact, po));
+  assert.deepEqual(names(po.viewPolicy.form), expectedFull(alumdoorGoldenChildGridPolicies.purchaseOrderFull, po));
+
+  const receipt = compiledDoctype(pkg, "Purchase Receipt Item");
+  assert.deepEqual(names(receipt.viewPolicy.quickEntry), expectedQuick(alumdoorGoldenChildGridPolicies.purchaseCompact, receipt));
+  assert.deepEqual(names(receipt.viewPolicy.form), expectedFull(alumdoorGoldenChildGridPolicies.purchaseReceiptFull, receipt));
+});
+
+test("all 28 child doctypes explicitly own form and quick-entry presentation after attachment", () => {
+  const brief = sourceBrief();
+  applyAlumdoorChildPresentation(brief);
+  const pkg = compileWithUiPolicies(brief);
+  const children = pkg.doctypes.filter((doctype) => doctype.is_child === true);
+  assert.equal(children.length, 28);
+  const missing = children
+    .filter((doctype) => !doctype.viewPolicy?.form?.enabled || !doctype.viewPolicy?.quickEntry?.enabled)
+    .map((doctype) => doctype.name);
+  assert.deepEqual(missing, [], `children without explicit presentation ownership: ${missing.join(", ")}`);
+  const hiddenRequired = children.flatMap((doctype) => {
+    const quick = new Set(names(doctype.viewPolicy.quickEntry));
+    return doctype.fields
+      .filter((field) => field.required && !field.read_only && !field.hidden && !quick.has(field.fieldname))
+      .map((field) => `${doctype.name}.${field.fieldname}`);
+  });
+  assert.deepEqual(hiddenRequired, [], `required editable fields missing from quick entry: ${hiddenRequired.join(", ")}`);
+});

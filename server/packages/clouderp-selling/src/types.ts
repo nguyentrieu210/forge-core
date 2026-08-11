@@ -1,6 +1,7 @@
 import type { JsonObject } from "../../contracts/src/index.js";
 import type { DecimalInput } from "../../money/src/index.js";
 import type { UomLine } from "../../clouderp-core/src/types.js";
+import type { PricingRuleSnapshot } from "../../clouderp-pricing/src/commercial-policy.js";
 
 export interface SalesItem extends UomLine {
   row_id: string;
@@ -21,13 +22,49 @@ export interface SalesItem extends UomLine {
   serial_and_batch_bundle?: string;
   batch_no?: string;
   serial_nos?: string[];
-  item_price?: string;
+
+  /** Operator-facing commercial choice; server resolves all technical dimensions from it. */
+  sales_option?: string;
+  sales_option_code?: string;
+  sales_option_label?: string;
+  sales_option_version?: number;
+  sales_mode?: string;
+  sales_package?: string;
+  /** Frozen package authority; downstream fulfillment never re-resolves mutable package master data. */
+  sales_package_version?: number;
+  sales_package_checksum?: string;
+  sales_package_snapshot?: JsonObject;
+  /** Exact Sales Order child-row identity used by Delivery/Billing progress. */
+  sales_order_row_id?: string;
+  /** Exact component within a frozen package when the physical line fulfills a package parent. */
+  sales_package_component_key?: string;
+
+  item_price?: string | undefined;
+  price_variant?: string;
+  /** Raw Item Price before Pricing Rule effects. */
+  base_rate?: DecimalInput | undefined;
+  base_rate_minor?: number | undefined;
   /** Price-list baseline retained when a salesperson overrides the line rate. */
   standard_rate?: DecimalInput;
-  /** Server-derived flag: submitted rate differs from the active price list. */
+  /** Server-derived flag: submitted rate differs from the active commercial policy. */
   rate_requires_approval?: boolean;
   pricing_rule?: string;
+  /** Policy percentage is retained for audit even when UI displays only money. */
   discount_percentage?: string;
+  discount_basis_item_price?: string;
+  discount_basis_variant?: string;
+  discount_basis_rate?: DecimalInput;
+  discount_basis_rate_minor?: number;
+  discount_basis_amount?: string;
+  discount_basis_amount_minor?: number;
+  discount_amount?: string;
+  discount_amount_minor?: number;
+  adjustment_amount?: string;
+  adjustment_amount_minor?: number;
+  taxable_adjustment_amount?: string;
+  taxable_adjustment_amount_minor?: number;
+  pricing_as_of?: string | undefined;
+  pricing_rule_snapshots?: PricingRuleSnapshot[];
   /** Source Quotation child row. Required when a Sales Order declares against_quotation. */
   quotation_item?: string;
 }
@@ -68,19 +105,14 @@ interface SalesTotalsData extends JsonObject {
   additional_discount_percentage?: DecimalInput | undefined;
   discount_amount?: DecimalInput | undefined;
   discount_amount_minor?: number;
-  /** Optional commercial surcharge, used by Alumdoor sales orders. */
+  /** Sum of line policy adjustments. Kept for compatibility/reporting, not client authority. */
   surcharge_amount?: DecimalInput | undefined;
   surcharge_amount_minor?: number;
-  /**
-   * Alumdoor khai VAT bằng một tỷ lệ ở đầu đơn thay vì bảng `taxes` của ERPNext, và in
-   * "Tổng tiền hàng" là số TRƯỚC chiết khấu. Ba trường này để controller chốt được cả ba
-   * con số đó thay vì tin vào giá trị client gửi lên.
-   */
+  /** Alumdoor compatibility tax projection. Canonical line money is already server-derived. */
   total_amount?: DecimalInput | undefined;
   vat_rate?: DecimalInput | undefined;
   vat_amount?: DecimalInput | undefined;
   vat_amount_minor?: number;
-  /** Gốc tính thuế: tiền hàng − chiết khấu + phụ thu (phụ thu không chịu CK nhưng chịu VAT). */
   vat_base_amount?: DecimalInput | undefined;
 }
 
@@ -112,7 +144,7 @@ export interface SalesOrderData extends SalesTotalsData, CurrencyContextData {
   /** Server-owned amendment generation; starts at 1 and increments from amended_from. */
   revision_no?: number;
   items: SalesItem[];
-  /** Server-derived: a line price/discount differs from Alumdoor's standard policy and needs approval. */
+  /** Server-derived: manual rate/discount differs from commercial policy and needs approval. */
   discount_requires_approval?: boolean;
   taxes?: TaxRow[];
   delivered_percentage?: string;

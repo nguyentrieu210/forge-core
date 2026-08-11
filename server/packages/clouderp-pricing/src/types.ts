@@ -7,6 +7,10 @@ export interface PricingContext {
   priceList: string;
   documentCurrency: string;
   uom?: string;
+  /** Missing/blank remains STANDARD for backward compatibility. */
+  priceVariant?: string;
+  /** Existing callers keep legacy behavior unless commercial composition asks for raw price. */
+  applyPricingRules?: boolean;
   partyType?: "Customer" | "Supplier";
   party?: string;
   customerGroup?: string;
@@ -19,6 +23,7 @@ export interface ResolvedPrice extends JsonObject {
   currency: string;
   currency_scale: number;
   item_price: string;
+  price_variant: string;
   pricing_rule?: string;
   discount_percentage?: string;
 }

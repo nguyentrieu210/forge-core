@@ -2,21 +2,17 @@ import type { CanonicalDocument, JsonObject } from "../../contracts/src/index.js
 import { errors } from "../../core/src/index.js";
 import type { ControllerContext } from "../../document-kernel/src/index.js";
 import { toScaledInt } from "../../money/src/index.js";
-import { SalesOrderController } from "./controllers.js";
+import { CommercialSalesOrderController } from "./commercial-sales-order-controller.js";
 import type { QuotationData } from "./quotation-types.js";
 import type { SalesItem, SalesOrderData } from "./types.js";
 
 /**
  * Transaction-closure hardening for Sales Order source traceability.
  *
- * The canonical SalesOrderController remains the pricing/UOM/fulfilment authority.
- * This subclass only closes two Sales-owned gaps:
- * - Quotation -> Sales Order source-line integrity and cumulative quoted quantity;
- * - domain revision numbering on top of the framework-owned amended_from chain.
- *
- * It deliberately does not own credit, stock valuation, GL or settlement authority.
+ * The commercial controller owns pricing/UOM. This subclass closes Sales-owned source
+ * integrity and amendment revision semantics without creating another pricing authority.
  */
-export class SalesOrderClosureController extends SalesOrderController {
+export class SalesOrderClosureController extends CommercialSalesOrderController {
   override async normalize(context: ControllerContext<SalesOrderData>): Promise<SalesOrderData> {
     const data = await super.normalize(context);
     const existing = context.existing?.data;
@@ -31,10 +27,6 @@ export class SalesOrderClosureController extends SalesOrderController {
 
     let revisionNo = existing ? revision(existing) : 1;
     if (!existing && context.command.amended_from) {
-      // Amend validity is a DocumentKernel/storage invariant. Read the source only to add
-      // Sales-specific revision/provenance when it is a valid cancelled source; otherwise
-      // deliberately defer failure to the canonical amend-chain guard so D1 and in-memory
-      // adapters keep one error contract (AMEND_SOURCE_NOT_CANCELLED / ALREADY_AMENDED).
       const source = await context.reader.getDocument<SalesOrderData>(
         context.command.tenant_id,
         "Sales Order",

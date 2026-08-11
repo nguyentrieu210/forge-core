@@ -123,6 +123,10 @@ export interface DocTypeView {
   rowSource?: BulkRowSource;
   /** Workflow transitions that require an operator reason, e.g. backward/cancel. */
   reasonRequiredOn?: string[];
+  /** Dotted app method used for server-owned child-row preview. */
+  previewMethod?: string;
+  /** Parent fields whose changes trigger row preview refresh. */
+  previewParentFields?: string[];
   [k: string]: unknown;
 }
 

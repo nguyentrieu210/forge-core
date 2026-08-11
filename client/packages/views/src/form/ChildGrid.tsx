@@ -28,15 +28,15 @@ const EMPTY_LAYOUT: GridLayout = { w: {}, order: [], hidden: [], pinned: [], lab
 
 const PURCHASE_COMPACT_FIELDS = ["item_code", "qty", "uom", "rate", "amount"];
 const SALES_COMPACT_FIELDS = [
-  "item_code", "color", "sales_mode", "height_m", "width_m", "set_count", "has_butterfly_bracket",
-  "length_m", "qty_bar", "uom", "qty", "rate", "discount_percentage", "amount",
+  "item_code", "sales_option", "color", "height_m", "width_m", "set_count", "has_butterfly_bracket",
+  "length_m", "qty_bar", "uom", "qty", "rate", "discount_amount", "adjustment_amount", "net_amount",
 ];
 const SALES_ORDER_ITEM_FULL_FIELDS = [
-  "item_code", "door_type", "color", "sales_mode", "height_m", "width_m", "mesh_height_m", "set_count",
+  "item_code", "door_type", "sales_option", "color", "sales_mode", "height_m", "width_m", "mesh_height_m", "set_count",
   "has_butterfly_bracket", "leaf_variant", "leaf_height_deduction_m", "leaf_divisor_m", "leaf_rounding",
   "leaf_count", "single_layer_leaf_count", "double_layer_leaf_count", "cut_width_m", "billable_area_sqm",
   "estimated_weight_kg", "estimated_minutes", "formula_policy", "formula_version", "formula_explanation",
-  "length_m", "qty_bar", "uom", "qty", "rate", "discount_percentage", "amount", "motor_model", "accessories", "install_note", "warehouse",
+  "length_m", "qty_bar", "uom", "qty", "rate", "discount_amount", "adjustment_amount", "net_amount", "motor_model", "accessories", "install_note", "warehouse",
   "availability_status", "note",
 ];
 // Các cột kỹ thuật/sản xuất vẫn được giữ trong dữ liệu để tính toán và in nội bộ,
@@ -45,7 +45,8 @@ const SALES_ORDER_HIDDEN_FIELDS = new Set([
   "door_type", "has_butterfly_bracket", "mesh_height_m", "leaf_height_deduction_m", "leaf_divisor_m", "leaf_rounding",
   "leaf_count", "estimated_weight_kg", "estimated_minutes", "formula_explanation", "motor_model",
   "accessories", "warehouse", "stock_qty", "available_qty", "available_stock_qty", "available_stock_uom",
-  "availability_status", "install_note",
+  "availability_status", "install_note", "sales_mode", "discount_percentage", "sales_qty_basis",
+  "price_variant", "discount_basis_variant", "sales_package", "sales_package_snapshot",
 ]);
 const PURCHASE_ORDER_ITEM_FULL_FIELDS = [
   "item_code",
@@ -847,11 +848,12 @@ export function ChildGrid(props: ChildGridProps) {
       if (field.fieldname === "rate") {
         return { ...field, label: "Đơn giá\n(VNĐ)" };
       }
-      if (field.fieldname === "discount_percentage") {
-        return { ...field, label: "Chiết khấu\n(%)" };
-      }
-      if (field.fieldname === "amount") {
-        return { ...field, label: "Thành tiền\n(VNĐ)" };
+      if (field.fieldname === "sales_option") return { ...field, label: "Phương án bán" };
+      if (field.fieldname === "discount_percentage") return { ...field, hidden: 1, read_only: 1 };
+      if (field.fieldname === "discount_amount") return { ...field, label: "Tiền CK\n(VNĐ)", read_only: 1 };
+      if (field.fieldname === "adjustment_amount") return { ...field, label: "Phụ thu\n(VNĐ)", read_only: 1 };
+      if (field.fieldname === "net_amount" || field.fieldname === "amount") {
+        return { ...field, label: "Thành tiền\n(VNĐ)", read_only: 1 };
       }
       if (field.fieldname === "length_m" && quantity.policy === "LENGTH_X_PIECES") {
         return { ...field, reqd: 1, label: "Dài một cây/đoạn (m)" };
@@ -975,11 +977,11 @@ export function ChildGrid(props: ChildGridProps) {
       const rate = Number(next.rate);
       if (Number.isFinite(qty) && qty > 0 && Number.isFinite(rate) && rate >= 0) {
         const standardAmount = Math.round(qty * rate);
-        const percent = Math.min(100, Math.max(0, Number(next.discount_percentage) || 0));
-        const discountAmount = Math.round(standardAmount * percent / 100);
         next.standard_amount = standardAmount;
-        next.discount_amount = discountAmount;
+        // Client may show gross immediately, but never derives policy money. Server response owns
+        // discount_amount, adjustment_amount and net_amount.
         next.amount = standardAmount;
+        if (next.net_amount == null) next.net_amount = standardAmount;
       }
       else next.amount = undefined;
     }
@@ -1069,11 +1071,9 @@ export function ChildGrid(props: ChildGridProps) {
         const rate = Number(adjusted.rate);
         if ("amount" in adjusted && Number.isFinite(rate)) {
           const standardAmount = Math.round(billable * rate);
-          const percent = Math.min(100, Math.max(0, Number(adjusted.discount_percentage) || 0));
-          const discountAmount = Math.round(standardAmount * percent / 100);
           adjusted.standard_amount = standardAmount;
-          adjusted.discount_amount = discountAmount;
           adjusted.amount = standardAmount;
+          if (adjusted.net_amount == null) adjusted.net_amount = standardAmount;
         }
         return adjusted;
       });
@@ -1278,6 +1278,7 @@ export function ChildGrid(props: ChildGridProps) {
     // nguồn trên Item → các ô đích trên dòng bảng con
     const plan: Array<[string, string[]]> = [
       ["stock_uom", ["stock_uom"]],
+      ["sales_qty_basis", ["sales_qty_basis"]],
       ["inventory_mode", ["inventory_mode"]],
       ["measurement_profile", ["measurement_profile"]],
       ["material_specification", ["material_specification"]],
@@ -1422,18 +1423,7 @@ export function ChildGrid(props: ChildGridProps) {
         for (const fieldname of ["door_type", "purchase_kg_per_m2", "leaf_divisor_m"]) {
           if (has(fieldname) && salesContext[fieldname] !== undefined && salesContext[fieldname] !== null) patch[fieldname] = salesContext[fieldname];
         }
-        // Chính sách bán chuẩn: Cửa Đức giảm 15%, mọi mặt hàng khác không giảm.
-        // Chỉ mồi khi đổi mặt hàng (ô cũ đã được reset phía trên), không ghi đè mức giảm
-        // mà người dùng chủ động sửa để đơn đó đi vào luồng cần duyệt.
-        if (childMeta.name === "Sales Order Item" && has("discount_percentage")) {
-          patch.discount_percentage = defaultSalesDiscountPercent({
-            ...base[rowIdx],
-            item_code: itemCode,
-            item_group: salesContext.item_group,
-            inventory_mode: salesContext.inventory_mode,
-            door_type: salesContext.door_type,
-          });
-        }
+        // Monetary discount/adjustment is resolved only by the canonical server Pricing Rule engine.
         if (parentDoc?.selling_price_list && has("rate")) {
           const baseline = salesContext.price_missing ? undefined : salesContext.rate;
           const entered = Number(base[rowIdx]?.rate);
@@ -1500,7 +1490,7 @@ export function ChildGrid(props: ChildGridProps) {
     // Master Item tải bất đồng bộ. Trong lúc chờ, người dùng có thể đã nhập SL/Đơn giá; chỉ tự điền
     // vào ô còn trống, còn các field phân loại thuộc chính Item luôn phải đồng bộ theo mã vừa chọn.
     const authoritativeItemFields = new Set([
-      "stock_uom", "inventory_mode", "measurement_profile", "material_specification",
+      "stock_uom", "inventory_mode", "sales_qty_basis", "measurement_profile", "material_specification",
       "item_name", "description", "min_area_sqm", "theoretical_kg_per_m",
       "available_qty", "available_stock_qty", "available_stock_uom", "availability_status",
     ]);

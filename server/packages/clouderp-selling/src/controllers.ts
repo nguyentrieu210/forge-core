@@ -20,6 +20,7 @@ import { resolveServerPrice } from "../../clouderp-pricing/src/index.js";
 import { applyUomConversion, pricedQtyMicros, stockQtyMicros } from "../../clouderp-core/src/uom.js";
 import { assertCurrencyScale, calculateSalesTotals } from "./totals.js";
 import type { DeliveryIssuePurpose, DeliveryNoteData, PaymentEntryData, SalesInvoiceData, SalesItem, SalesOrderData } from "./types.js";
+import { assertSalesOrderDeliveryLines, freezeSalesOrderBillingLines, salesOrderFulfillmentEntries } from "./sales-order-downstream.js";
 
 const DELIVERY_ISSUE_PURPOSES = new Set<DeliveryIssuePurpose>([
   "Bán hàng",
@@ -372,15 +373,11 @@ export class DeliveryNoteController extends BaseController<DeliveryNoteData> {
           "Delivery Note",
           "Sales Order",
         );
-        await assertRemainingQuantity(context, {
-          source: salesOrder,
+        await assertSalesOrderDeliveryLines(
+          context as unknown as ControllerContext<JsonObject>,
+          salesOrder,
           items,
-          targetParentDoctype: "Delivery Note",
-          referenceField: "against_sales_order",
-          referenceName: input.against_sales_order,
-          label: "delivered",
-          quantityKind: "stock",
-        });
+        );
       }
       if (!allowNegativeStock) {
         for (const item of items) {
@@ -437,14 +434,7 @@ export class DeliveryNoteController extends BaseController<DeliveryNoteData> {
         throw errors.reference(`Original stock posting for ${this.doctype} ${context.command.aggregate.name} was not found`);
       }
       const fulfillment = data.against_sales_order
-        ? data.items.map((item, index): FulfillmentEntry => ({
-          line_key: `REV-DELIVERY-${item.row_id || index + 1}`,
-          sales_order: data.against_sales_order!,
-          kind: "Delivery",
-          item_code: item.item_code,
-          qty_micros: -(item.qty_micros ?? toScaledInt(item.qty, 6)),
-          posting_at: data.posting_at,
-        }))
+        ? salesOrderFulfillmentEntries(data.against_sales_order, "Delivery", data.items, data.posting_at, true)
         : [];
       const stockBundleUsages = data.items.flatMap((item, index): StockBundleUsageEntry[] => (
         item.serial_and_batch_bundle
@@ -486,7 +476,7 @@ export class DeliveryNoteController extends BaseController<DeliveryNoteData> {
       if(stockAccount&&cogsAccount){gl.push({line_key:`COGS-${item.row_id||index+1}`,account:cogsAccount,debit_minor:postedValue,credit_minor:0,currency:data.currency,currency_scale:currencyScale,posting_at:data.posting_at},{line_key:`STOCK-${item.row_id||index+1}`,account:stockAccount,debit_minor:0,credit_minor:postedValue,currency:data.currency,currency_scale:currencyScale,posting_at:data.posting_at});}
     }
     const fulfillment = data.against_sales_order
-      ? data.items.map((item, index): FulfillmentEntry => ({ line_key:`DELIVERY-${item.row_id||index+1}`,sales_order:data.against_sales_order!,kind:"Delivery",item_code:item.item_code,qty_micros:item.qty_micros??toScaledInt(item.qty,6),posting_at:data.posting_at }))
+      ? salesOrderFulfillmentEntries(data.against_sales_order, "Delivery", data.items, data.posting_at)
       : [];
     return { gl,stock:normal,fulfillment,stockBundleUsages:usages };
   }
@@ -510,12 +500,35 @@ export class SalesInvoiceController extends BaseController<SalesInvoiceData> {
     const currency = await resolveCurrencyContext(context, input.company, input.currency, input.posting_at);
     const currencyScale = currency.transactionScale;
     const itemSnapshots = await applyUomConversion(context as unknown as ControllerContext<JsonObject>, input.items, { transactionKind: "sales" });
-    const pricedItems = await applySellingPricing(context, itemSnapshots, input.selling_price_list, input.currency, input.posting_at, input.customer, input.customer_group);
+    let sourceSalesOrder: CanonicalDocument<SalesOrderData> | null = null;
+    let pricedItems: SalesItem[];
+    if (input.against_sales_order) {
+      if (context.command.action === "submit") {
+        sourceSalesOrder = await requireSubmittedDocument<SalesOrderData>(context, "Sales Order", input.against_sales_order);
+      } else {
+        sourceSalesOrder = await context.reader.getDocument<SalesOrderData>(context.command.tenant_id, "Sales Order", input.against_sales_order);
+        if (!sourceSalesOrder || sourceSalesOrder.docstatus === 2) {
+          throw errors.reference(`Sales Order ${input.against_sales_order} is required`);
+        }
+      }
+      assertSameCommercialContext(input, sourceSalesOrder.data, "Sales Invoice", "Sales Order");
+      pricedItems = await freezeSalesOrderBillingLines(
+        context as unknown as ControllerContext<JsonObject>,
+        sourceSalesOrder,
+        itemSnapshots,
+        currencyScale,
+        { enforceRemaining: context.command.action === "submit" },
+      );
+    } else {
+      pricedItems = await applySellingPricing(context, itemSnapshots, input.selling_price_list, input.currency, input.posting_at, input.customer, input.customer_group);
+    }
+    const frozenHeaderDiscount = sourceSalesOrder?.data.additional_discount_percentage ?? input.additional_discount_percentage;
     const totals = calculateSalesTotals(pricedItems, input.taxes ?? [], currencyScale, {
       use_priced_quantity: true,
-      apply_discount_on: input.apply_discount_on,
-      additional_discount_percentage: input.additional_discount_percentage,
-      discount_amount: input.discount_amount,
+      use_server_line_money: Boolean(sourceSalesOrder),
+      apply_discount_on: sourceSalesOrder?.data.apply_discount_on ?? input.apply_discount_on,
+      additional_discount_percentage: frozenHeaderDiscount,
+      ...(sourceSalesOrder ? {} : { discount_amount: input.discount_amount }),
     });
     if (totals.rounding_adjustment_minor !== 0 && !input.round_off_account) {
       throw errors.validation("round_off_account is required when rounding adjustment is non-zero");
@@ -533,21 +546,14 @@ export class SalesInvoiceController extends BaseController<SalesInvoiceData> {
       ]);
       await assertPostingUnlocked(context, input.company, input.posting_at);
     }
-    if (context.command.action === "submit" && input.against_sales_order) {
-      const salesOrder = await requireSubmittedDocument<SalesOrderData>(context, "Sales Order", input.against_sales_order);
-      assertSameCommercialContext(input, salesOrder.data, "Sales Invoice", "Sales Order");
-      await assertRemainingQuantity(context, {
-        source: salesOrder,
-        items: totals.items,
-        targetParentDoctype: "Sales Invoice",
-        referenceField: "against_sales_order",
-        referenceName: input.against_sales_order,
-        label: "billed",
-        quantityKind: "transaction",
-      });
-    }
+    // SO-derived billing was validated by exact source row before totals. Item-code
+    // aggregation is intentionally not used here because configured rows may share an item.
     return {
       ...input,
+      ...(sourceSalesOrder?.data.selling_price_list ? { selling_price_list: sourceSalesOrder.data.selling_price_list } : {}),
+      ...(sourceSalesOrder?.data.customer_group ? { customer_group: sourceSalesOrder.data.customer_group } : {}),
+      ...(sourceSalesOrder?.data.apply_discount_on ? { apply_discount_on: sourceSalesOrder.data.apply_discount_on } : {}),
+      ...(frozenHeaderDiscount !== undefined ? { additional_discount_percentage: frozenHeaderDiscount } : {}),
       currency_scale: currencyScale,
       ...totals,
       ...baseTotals(totals, currency, currencyScale),
@@ -627,14 +633,7 @@ export class SalesInvoiceController extends BaseController<SalesInvoiceData> {
       posting_at: data.posting_at,
     }];
     const fulfillment: FulfillmentEntry[] = data.against_sales_order
-      ? data.items.map((item, index) => ({
-        line_key: `BILLING-${item.row_id || index + 1}`,
-        sales_order: data.against_sales_order!,
-        kind: "Billing",
-        item_code: item.item_code,
-        qty_micros: item.qty_micros ?? toScaledInt(item.qty, 6),
-        posting_at: data.posting_at,
-      }))
+      ? salesOrderFulfillmentEntries(data.against_sales_order, "Billing", data.items, data.posting_at)
       : [];
     return context.command.action === "cancel"
       ? {

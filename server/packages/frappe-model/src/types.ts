@@ -150,6 +150,10 @@ export interface DocTypeView extends JsonObject {
   /** Declarative parent × UOM source for create-or-update bulk grids. */
   rowSource?: BulkRowSource;
   reasonRequiredOn?: string[];
+  /** Optional app method that derives a child-row UX preview; save/submit remain authoritative. */
+  previewMethod?: string;
+  /** Parent fields whose changes invalidate the row preview. */
+  previewParentFields?: string[];
 }
 
 export interface DocTypeViewPolicy extends JsonObject {

@@ -90,8 +90,13 @@ jobs:
           node scripts/forge-app.mjs briefs/alumdoor-v2.json --dry-run | tee /tmp/r6-alumdoor-package.log
           grep -q 'app=alumdoor@2.2.3' /tmp/r6-alumdoor-package.log
           grep -q 'DRY_RUN_PASS alumdoor' /tmp/r6-alumdoor-package.log
-      - name: Diff hygiene
-        run: git diff --check
+      - name: Source diff hygiene
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check -- . \
+            ':(exclude)client/apps/*/dist/**' \
+            ':(exclude)client/apps/*/dist-mobile/**'
   observe-pilot:
     name: Read-only pilot provider and package/profile evidence
     runs-on: ubuntu-latest

@@ -13,7 +13,10 @@ function setup() {
 }
 
 test("Alumdoor Sales Order requires a server-managed price list", async () => {
-  const { kernel } = setup();
+  const { store, kernel } = setup();
+  // Customer-group authority is now validated before price-list authority. Seed the
+  // customer basis explicitly so this regression continues to test its original contract.
+  store.seedMaster("Customer", "CUST-0001", "demo", { price_group: "Đại lý" });
   const base = { ...orderDocument(), company: "ALUMDOOR" };
   await assert.rejects(
     mutate(kernel, {

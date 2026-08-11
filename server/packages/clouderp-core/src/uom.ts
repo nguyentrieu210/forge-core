@@ -65,6 +65,15 @@ function allowedUoms(master: JsonObject | null): Set<string> {
   return result;
 }
 
+function assertAllowedUom(line: UomLine, master: JsonObject | null, uom: string, index: number): void {
+  if (master && uom && !allowedUoms(master).has(uom)) {
+    throw errors.validation(
+      `Mặt hàng ${line.item_code} (dòng ${index + 1}) không cho phép giao dịch theo ĐVT "${uom}". `
+      + "Khai ĐVT đó làm ĐVT mua/bán mặc định hoặc trong bảng quy đổi trước khi dùng.",
+    );
+  }
+}
+
 function normalizedUom(value: string | undefined): string {
   return String(value ?? "").normalize("NFC").trim().toLocaleLowerCase("vi");
 }
@@ -107,19 +116,27 @@ function lineQuantityMicros(line: UomLine, field: string, index: number, label: 
   return qty;
 }
 
-function resolveFactorMicros(line: UomLine, master: JsonObject | null, uom: string, index: number): number {
-  if (master && uom && !allowedUoms(master).has(uom)) {
-    throw errors.validation(
-      `Mặt hàng ${line.item_code} (dòng ${index + 1}) không cho phép giao dịch theo ĐVT "${uom}". `
-      + "Hãy khai ĐVT đó trong Hàng hoá → Đơn vị quy đổi khác trước khi dùng.",
-    );
-  }
+function ratioFactorMicros(stockQtyMicros: number, transactionQtyMicros: number, index: number): number {
+  if (transactionQtyMicros <= 0) throw errors.validation(`Số lượng giao dịch phải lớn hơn 0 (dòng ${index + 1})`);
+  return toScaledInt(
+    Number(fromScaledInt(stockQtyMicros, 6)) / Number(fromScaledInt(transactionQtyMicros, 6)),
+    6,
+    `items[${index}].conversion_factor`,
+  );
+}
+
+function declaredFactorMicros(line: UomLine, index: number): number | undefined {
   const declared = line.conversion_factor;
-  if (declared !== undefined && declared !== null && declared !== "") {
-    const factor = toScaledInt(declared, 6, `items[${index}].conversion_factor`);
-    if (factor <= 0) throw errors.validation(`Hệ số quy đổi phải lớn hơn 0 (dòng ${index + 1})`);
-    return factor;
-  }
+  if (declared === undefined || declared === null || declared === "") return undefined;
+  const factor = toScaledInt(declared, 6, `items[${index}].conversion_factor`);
+  if (factor <= 0) throw errors.validation(`Hệ số quy đổi phải lớn hơn 0 (dòng ${index + 1})`);
+  return factor;
+}
+
+function resolveFactorMicros(line: UomLine, master: JsonObject | null, uom: string, index: number): number {
+  assertAllowedUom(line, master, uom, index);
+  const declared = declaredFactorMicros(line, index);
+  if (declared !== undefined) return declared;
   const stockUom = stockUomOf(master);
   if (!uom || !stockUom || uom === stockUom) return ONE;
   const factor = factorFromMaster(master, uom);
@@ -207,25 +224,28 @@ export async function applyUomConversion<T extends UomLine>(
     if (exactPurchaseStockQty !== undefined && dynamicStockQty !== undefined) {
       throw errors.validation(`Mặt hàng ${item.item_code}: có hai nguồn số lượng tồn mua cùng lúc`);
     }
-    const factorMicros = exactPurchaseStockQty === undefined && dynamicStockQty !== undefined
-      ? toScaledInt(
-          Number(fromScaledInt(dynamicStockQty, 6)) / Number(fromScaledInt(qtyMicros, 6)),
-          6,
-          `items[${index}].conversion_factor`,
-        )
-      : resolveFactorMicros(item, master, uom, index);
+
+    let factorMicros: number;
     if (exactPurchaseStockQty !== undefined) {
-      const expectedFactor = toScaledInt(
-        Number(fromScaledInt(exactPurchaseStockQty, 6)) / Number(fromScaledInt(qtyMicros, 6)),
-        6,
-        `items[${index}].conversion_factor`,
-      );
-      if (Math.abs(factorMicros - expectedFactor) > 1) {
+      // Exact observed stock quantity is the authority. This is the dual-measure/catch-weight
+      // path: 568.7 kg can be 200 counted bars, so there is no truthful static kg->bar factor
+      // to keep on Item master. Derive the per-line factor from the two observations. If an old
+      // client still sends a factor, accept it only when it agrees with the derived value.
+      assertAllowedUom(item, master, uom, index);
+      const expectedFactor = ratioFactorMicros(exactPurchaseStockQty, qtyMicros, index);
+      const declared = declaredFactorMicros(item, index);
+      if (declared !== undefined && Math.abs(declared - expectedFactor) > 1) {
         throw errors.validation(
           `Mặt hàng ${item.item_code} (dòng ${index + 1}): hệ số quy đổi không khớp ${purchaseStockQtyField}`,
         );
       }
+      factorMicros = expectedFactor;
+    } else if (dynamicStockQty !== undefined) {
+      factorMicros = ratioFactorMicros(dynamicStockQty, qtyMicros, index);
+    } else {
+      factorMicros = resolveFactorMicros(item, master, uom, index);
     }
+
     const stockQty = exactPurchaseStockQty ?? dynamicStockQty ?? (factorMicros === ONE
       ? qtyMicros
       : multiplyScaled(

@@ -1,0 +1,20 @@
+{
+  "name": "Duyet ho so luong AlumDoor",
+  "document_type": "AlumDoor Pay Profile",
+  "state_field": "status",
+  "is_active": true,
+  "states": [
+    { "state": "draft", "docstatus": 0, "allow_edit": "AlumDoor Payroll User" },
+    { "state": "approved", "docstatus": 1, "allow_edit": "AlumDoor Payroll Approver" },
+    { "state": "retired", "docstatus": 2, "allow_edit": "AlumDoor Payroll Approver" }
+  ],
+  "transitions": [
+    { "state": "draft", "action": "Duyet ho so luong", "next_state": "approved", "allowed_role": "AlumDoor Payroll Approver", "allow_self_approval": false },
+    { "state": "draft", "action": "Duyet ho so luong", "next_state": "approved", "allowed_role": "HR Manager", "allow_self_approval": false },
+    { "state": "draft", "action": "Duyet ho so luong", "next_state": "approved", "allowed_role": "System Manager", "allow_self_approval": false },
+    { "state": "approved", "action": "Ngung ap dung", "next_state": "retired", "allowed_role": "AlumDoor Payroll Approver" },
+    { "state": "approved", "action": "Ngung ap dung", "next_state": "retired", "allowed_role": "HR Manager" },
+    { "state": "approved", "action": "Ngung ap dung", "next_state": "retired", "allowed_role": "System Manager" }
+  ],
+  "revision": 1
+}
