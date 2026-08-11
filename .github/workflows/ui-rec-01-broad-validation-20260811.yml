@@ -42,6 +42,9 @@ jobs:
             echo '$ pnpm run verify:first-party-meta'
             pnpm run verify:first-party-meta
             echo
+            echo '$ node scripts/verify-backend-ui-contracts.mjs'
+            node scripts/verify-backend-ui-contracts.mjs
+            echo
             echo '$ pnpm run brief:check'
             pnpm run brief:check
             echo
