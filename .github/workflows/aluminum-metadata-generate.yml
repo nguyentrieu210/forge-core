@@ -1,0 +1,36 @@
+name: Alumdoor Aluminum Metadata Generate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "server/briefs/alumdoor-v2.json"
+      - "server/scripts/apply-alumdoor-aluminum-metadata-overlay.mjs"
+      - ".github/workflows/aluminum-metadata-generate.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    if: github.head_ref == 'feat/alumdoor-aluminum-inventory-closure'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Apply effective V2 metadata overlay
+        working-directory: server
+        run: node scripts/apply-alumdoor-aluminum-metadata-overlay.mjs briefs/alumdoor-v2.json --out="$RUNNER_TEMP/alumdoor-v2.json"
+      - name: Validate generated package
+        working-directory: server
+        run: |
+          cp "$RUNNER_TEMP/alumdoor-v2.json" "$RUNNER_TEMP/effective-alumdoor-v2.json"
+          node scripts/forge-app.mjs "$RUNNER_TEMP/effective-alumdoor-v2.json" --dry-run
+      - uses: actions/upload-artifact@v4
+        with:
+          name: effective-alumdoor-v2-${{ github.run_id }}
+          path: ${{ runner.temp }}/alumdoor-v2.json
+          retention-days: 7
