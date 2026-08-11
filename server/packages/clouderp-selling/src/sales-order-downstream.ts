@@ -2,14 +2,17 @@ import type { CanonicalDocument, FulfillmentEntry, JsonObject } from "../../cont
 import { errors } from "../../core/src/index.js";
 import type { ControllerContext } from "../../document-kernel/src/index.js";
 import { fromScaledInt, toScaledInt } from "../../money/src/index.js";
-import { pricedQtyMicros, stockQtyMicros } from "../../clouderp-core/src/uom.js";
+import { pricedQtyMicros } from "../../clouderp-core/src/uom.js";
 import { packageComponent, parseSalesPackageSnapshot } from "./sales-package-resolver.js";
 import type { SalesItem, SalesOrderData } from "./types.js";
 
 /**
- * Validate physical Delivery rows against the exact Sales Order source line/component.
- * Legacy callers without row identity are supported only when the item maps to exactly one
- * source line. Ambiguous duplicate-item orders always require sales_order_row_id.
+ * Validate Delivery rows against the exact Sales Order source line/component.
+ *
+ * Direct sales progress stays in the Sales Order UOM; stock conversion remains the stock
+ * ledger's authority. Package components use their frozen component UOM. This keeps billable,
+ * physical and stock quantities separate while preventing duplicate item rows from sharing
+ * fulfillment progress.
  */
 export async function assertSalesOrderDeliveryLines(
   context: ControllerContext<JsonObject>,
@@ -52,8 +55,11 @@ export async function assertSalesOrderDeliveryLines(
 
     if (componentKey) throw errors.reference(`Direct Sales Order row ${rowKey} must not declare a package component`);
     if (sourceLine.item_code !== item.item_code) throw errors.reference(`Delivery item ${item.item_code} does not match Sales Order row ${rowKey}`);
-    const requested = stockQtyMicros(item);
-    const ordered = stockQtyMicros(sourceLine);
+    if (text(item.uom) !== text(sourceLine.uom)) {
+      throw errors.validation(`Delivery row ${index + 1} must preserve Sales Order UOM ${sourceLine.uom}`);
+    }
+    const requested = toScaledInt(item.qty, 6, `Delivery row ${index + 1}.qty`);
+    const ordered = toScaledInt(sourceLine.qty, 6, `Sales Order row ${rowKey}.qty`);
     const prior = await context.reader.getFulfilledLineQuantityMicros(
       context.command.tenant_id, salesOrder.name, "Delivery", rowKey, "",
     );
@@ -167,9 +173,7 @@ export function salesOrderFulfillmentEntries(
   return items.map((item, index) => {
     const rowKey = text(item.sales_order_row_id);
     const componentKey = text(item.sales_package_component_key);
-    const quantity = kind === "Delivery" && componentKey
-      ? toScaledInt(item.qty, 6)
-      : (kind === "Delivery" ? stockQtyMicros(item) : pricedQtyMicros(item));
+    const quantity = kind === "Delivery" ? toScaledInt(item.qty, 6) : pricedQtyMicros(item);
     return {
       line_key: `${reverse ? "REV-" : ""}${kind === "Delivery" ? "DELIVERY" : "BILLING"}-${item.row_id || index + 1}`,
       sales_order: salesOrder,
