@@ -6,12 +6,13 @@ import {
   metadataChildGridHiddenColumns,
 } from "../dist/form/child-grid-presentation.js";
 
-function field(fieldname, surface) {
+function field(fieldname, surface, overrides = {}) {
   return {
     fieldname,
     label: fieldname,
     fieldtype: "Data",
     ...(surface ? { surface } : {}),
+    ...overrides,
   };
 }
 
@@ -32,11 +33,11 @@ function meta(overrides = {}) {
   };
 }
 
-test("viewPolicy owns exact compact/full column order without doctype knowledge", () => {
+test("enabled viewPolicy owns exact compact/full column order without doctype knowledge", () => {
   const input = meta({
     viewPolicy: {
-      form: { columns: ["item_code", "color", "qty", "rate", "discount_basis_rate", "policy_version"] },
-      quickEntry: { columns: ["item_code", "color", "qty", "rate"] },
+      form: { enabled: true, columns: ["item_code", "color", "qty", "rate", "discount_basis_rate", "policy_version"] },
+      quickEntry: { enabled: true, columns: ["item_code", "color", "qty", "rate"] },
     },
   });
 
@@ -52,9 +53,28 @@ test("surface policy can drive quick, expanded and internal columns without expl
   assert.deepEqual(metadataChildGridHiddenColumns(input, metadataChildGridColumns(input, true), false), ["discount_basis_rate"]);
 });
 
-test("internal fields never become business columns even if an explicit form list names them", () => {
-  const input = meta({ viewPolicy: { form: { columns: ["item_code", "policy_version", "qty"] } } });
+test("internal fields never become business columns even if an authored form list names them", () => {
+  const input = meta({ viewPolicy: { form: { enabled: true, columns: ["item_code", "policy_version", "qty"] } } });
   assert.deepEqual(metadataChildGridColumns(input, true).map((x) => x.fieldname), ["item_code", "qty"]);
+});
+
+test("compiler-default child viewPolicy and surfaces do not silently switch renderer", () => {
+  const input = {
+    name: "Compiler Default Child",
+    module: "Any Module",
+    fields: [
+      field("item_code", "quick", { reqd: 1, editMode: "editable" }),
+      field("note", "expanded", { editMode: "editable" }),
+      field("server_snapshot", "internal", { hidden: 1, editMode: "hidden" }),
+    ],
+    viewPolicy: {
+      form: { enabled: false, fields: ["item_code", "note"] },
+      quickEntry: { enabled: false, fields: ["item_code"] },
+    },
+    permissions: [],
+  };
+  assert.equal(hasMetadataChildGridPresentation(input), false);
+  assert.equal(metadataChildGridColumns(input, false), null);
 });
 
 test("legacy metadata returns null so renderer can preserve exact current UI during migration", () => {
