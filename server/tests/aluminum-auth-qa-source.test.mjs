@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 
 const seed = await readFile(new URL("../scripts/seed-purchase-qa-local.mjs", import.meta.url), "utf8");
 const fifo = await readFile(new URL("../../client/e2e-forge/auth-tests/purchase-fifo-lifecycle.spec.ts", import.meta.url), "utf8");
+const bulk = await readFile(new URL("../../client/e2e-forge/auth-tests/purchase-bulk-transaction.spec.ts", import.meta.url), "utf8");
 
 test("local authenticated QA seed uses counted aluminum stock plus Kg catch weight", () => {
   assert.match(seed, /stock_uom:\s*"Cây"/);
@@ -25,4 +26,13 @@ test("authenticated FIFO E2E asserts tracked Batch Bundle receipt rather than Kg
   assert.match(fifo, /serial_and_batch_bundle/);
   assert.match(fifo, /Batch \+ Serial and Batch Bundle \+ Stock Ledger/);
   assert.doesNotMatch(fifo, /conversion_factor:\s*1/);
+});
+
+test("authenticated bulk E2E uses counted stock and requires bundle-backed receipt rows", () => {
+  assert.match(bulk, /stock_uom:\s*"Cây"/);
+  assert.match(bulk, /stock_qty:\s*bars/);
+  assert.match(bulk, /serial_and_batch_bundle/);
+  assert.match(bulk, /stock_uom === "Cây"/);
+  assert.doesNotMatch(bulk, /conversion_factor:\s*1/);
+  assert.doesNotMatch(bulk, /stock_uom:\s*"Kg"/);
 });
