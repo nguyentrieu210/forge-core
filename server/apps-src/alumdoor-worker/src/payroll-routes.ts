@@ -144,7 +144,22 @@ export async function payrollPeriodList(input: { call: PayrollPlatformCall; args
   catch (error) { return fail("PAYROLL_LIST_FAILED", error instanceof Error ? error.message : "Không đọc được kỳ lương."); }
 }
 
-export async function payrollMySlips(input: { call: PayrollPlatformCall; args: Json }): Promise<Response> {
-  try { return json(await listDocs(input.call, "Salary Slip", { ...(text(input.args.period) ? { alu_payroll_entry: text(input.args.period) } : {}) })); }
-  catch (error) { return fail("PAYROLL_SLIP_LIST_FAILED", error instanceof Error ? error.message : "Không đọc được phiếu lương."); }
+export async function payrollPeriodSlips(input: { call: PayrollPlatformCall; args: Json }): Promise<Response> {
+  try {
+    const period = requiredText(input.args.period, "Kỳ lương");
+    return json(await listDocs(input.call, "Salary Slip", { alu_payroll_entry: period }));
+  } catch (error) { return fail("PAYROLL_PERIOD_SLIPS_FAILED", error instanceof Error ? error.message : "Không đọc được phiếu lương của kỳ."); }
+}
+
+export async function payrollMySlips(input: { call: PayrollPlatformCall; args: Json; actorUser: string }): Promise<Response> {
+  try {
+    const actorUser = requiredText(input.actorUser, "Tài khoản đăng nhập");
+    const employees = await listDocs(input.call, "Employee", { user_id: actorUser }, ["name", "user_id"]);
+    if (employees.length !== 1) throw new Error("Tài khoản phải được gắn duy nhất một Employee để xem phiếu lương.");
+    const employee = requiredText(employees[0]?.name, "Nhân viên");
+    return json(await listDocs(input.call, "Salary Slip", {
+      employee,
+      ...(text(input.args.period) ? { alu_payroll_entry: text(input.args.period) } : {}),
+    }));
+  } catch (error) { return fail("PAYROLL_SLIP_LIST_FAILED", error instanceof Error ? error.message : "Không đọc được phiếu lương."); }
 }

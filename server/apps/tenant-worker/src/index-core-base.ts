@@ -46,6 +46,14 @@ interface AggregateStub extends DurableObjectStub {
     nonceHash: string;
     deviceFingerprintHash?: string;
   }): Promise<JsonObject>;
+  submitAlumDoorAttendanceCorrection(input: {
+    tenantId: string; actor: Actor; workDate: string; segmentCode: string;
+    requestedIn?: string; requestedOut?: string; reason: string; attachment?: string;
+  }): Promise<JsonObject>;
+  reviewAlumDoorAttendanceCorrection(input: {
+    tenantId: string; actor: Actor; request: string; action: "approve" | "reject"; note?: string;
+  }): Promise<JsonObject>;
+  approveAlumDoorPayroll(input: { tenantId: string; actor: Actor; payrollEntry: string }): Promise<JsonObject>;
 }
 
 /**
@@ -1221,6 +1229,23 @@ async function serveFrappeApiInner(
         nonceHash: input.nonceHash,
         ...(input.deviceFingerprintHash ? { deviceFingerprintHash: input.deviceFingerprintHash } : {}),
       });
+    },
+    async submitAlumdoorAttendanceCorrection(input: {
+      workDate: string; segmentCode: string; requestedIn?: string; requestedOut?: string;
+      reason: string; attachment?: string;
+    }): Promise<JsonObject> {
+      const stub = env.AGGREGATES.getByName(`attendance-correction:${tenantId}:${encodeURIComponent(actor.user_id)}`) as AggregateStub;
+      return stub.submitAlumDoorAttendanceCorrection({ tenantId, actor, ...input });
+    },
+    async reviewAlumdoorAttendanceCorrection(input: {
+      request: string; action: "approve" | "reject"; note?: string;
+    }): Promise<JsonObject> {
+      const stub = env.AGGREGATES.getByName(`attendance-correction:${tenantId}:${encodeURIComponent(input.request)}`) as AggregateStub;
+      return stub.reviewAlumDoorAttendanceCorrection({ tenantId, actor, ...input });
+    },
+    async approveAlumdoorPayroll(input: { payrollEntry: string }): Promise<JsonObject> {
+      const stub = env.AGGREGATES.getByName(`payroll:${tenantId}:${encodeURIComponent(input.payrollEntry)}`) as AggregateStub;
+      return stub.approveAlumDoorPayroll({ tenantId, actor, payrollEntry: input.payrollEntry });
     },
     now,
     csrfToken,
