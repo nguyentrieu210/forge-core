@@ -1177,8 +1177,9 @@ brief.prints.push({
   doctype: "Purchase Order",
   default: true,
   css: [
-    "@page{size:A4 portrait;margin:0}",
-    "*{box-sizing:border-box}html,body{margin:0;width:210mm;min-height:297mm}body{font-family:Arial,'Liberation Sans',sans-serif;font-size:9px;color:#111;padding:23.7mm 8mm 8mm;font-kerning:none;letter-spacing:0;word-spacing:0}",
+    "@page{size:A4 portrait;margin:12mm 8mm 8mm}@page :first{margin-top:23.7mm}",
+    "*{box-sizing:border-box}html,body{margin:0}body{width:194mm;font-family:Arial,'Liberation Sans',sans-serif;font-size:9px;color:#111;padding:0;font-kerning:none;letter-spacing:0;word-spacing:0}",
+    "@media screen{html{width:210mm}body{width:210mm;min-height:297mm;padding:23.7mm 8mm 8mm}}",
     ".letterhead{position:relative;width:194mm;height:17mm;margin-left:0;overflow:hidden}",
     ".brand-logo{position:absolute;left:0;top:1.35mm;width:74mm;height:auto}",
     ".company-header-img{position:absolute;right:-13.5mm;top:0;width:114.3mm;height:auto;display:block}",
@@ -1243,12 +1244,11 @@ const fixture = (type, name) => {
   return f;
 };
 
-// ── G1. Chủ xưởng chốt lại ngày 30/07: nhôm nhập và tồn theo KG ──
-// Số cây/lá, số bó và chiều dài là quy cách vật lý để tính barem và theo dõi nhà máy giao;
-// không thay thế số lượng giao dịch. `qty` của đơn mua là kg barem, `qty` của phiếu nhập là
-// số lượng thực nhận theo ĐVT mua. Vì vậy profile nhôm phải giữ stock_uom = Kg.
-fixture("Measurement Profile", "Nhôm cây/lá").data.stock_uom = "Kg";
-note('G1 · Measurement Profile "Nhôm cây/lá": nhập/tồn Kg; cây/lá là số lượng phụ');
+// ── G1. Contract canonical 11/08: nhôm mua/định giá theo Kg, tồn vật lý theo Cây/Lá ──
+// Kg là catch weight và priced quantity; số cây/lá là stock quantity. Hai trục cùng nằm trên
+// Stock Ledger/Batch, tuyệt đối không dùng hệ số Kg↔Cây tĩnh và không tạo shadow balance.
+fixture("Measurement Profile", "Nhôm cây/lá").data.stock_uom = "Cây";
+note('G1 · Measurement Profile "Nhôm cây/lá": tồn Cây/Lá; Kg là catch weight và đơn vị mua/định giá');
 
 // ── G2. `leaf_formula` BẮT BUỘC mà không fixture nào khai ──
 // Thêm 9 trường chia lá vào Cutting Policy nhưng để nguyên 7 fixture bản cũ.
@@ -1361,7 +1361,38 @@ note("G3 · Warehouse: K36/K12 khai stock_role + mỗi kho có một kho đầu 
   note(`chốt chặn: ${brief.fixtures.length} fixture, không cái nào thiếu trường bắt buộc`);
 }
 
-writeFileSync(OUT, JSON.stringify(brief, null, 1) + "\n", "utf8");
+// ── ALUMINUM INVENTORY AUTHORITY CONVERGENCE ──
+// Effective package must be born canonical: purchase/price in Kg, physical stock in Cây/Lá,
+// Batch identity + catch weight, and qty_bar as exact purchase stock/allocation quantity.
+const technicalItemFields = [
+  { fieldname: "purchase_stock_qty_field", fieldtype: "Data", label: "Trường SL tồn mua", hidden: true, read_only: true },
+  { fieldname: "purchase_allocation_qty_field", fieldtype: "Data", label: "Trường SL phân bổ mua", hidden: true, read_only: true },
+  { fieldname: "purchase_allocation_uom", fieldtype: "Link", options: "UOM", label: "ĐVT phân bổ mua", hidden: true, read_only: true },
+];
+for (const field of technicalItemFields) {
+  if (!item.fields.some((existing) => typeof existing === "object" && existing?.fieldname === field.fieldname)) item.fields.push(field);
+}
+const canonicalAluminumProfile = fixture("Measurement Profile", "Nhôm cây/lá").data;
+canonicalAluminumProfile.stock_uom = "Cây";
+canonicalAluminumProfile.track_dimension_lot = true;
+canonicalAluminumProfile.require_piece_qty = true;
+canonicalAluminumProfile._desc = "Tồn nhôm theo số cây/lá có Batch và chiều dài; Kg là catch weight/đơn vị mua-định giá, không phải số lượng tồn.";
+for (const f of brief.fixtures) {
+  if (f?.type !== "Item" || f?.data?.inventory_mode !== "Nhôm cây/lá") continue;
+  f.data.stock_uom = "Cây";
+  f.data.default_purchase_uom = "Kg";
+  f.data.has_batch_no = 1;
+  f.data.has_catch_weight = 1;
+  f.data.weight_uom = "Kg";
+  f.data.purchase_stock_qty_field = "qty_bar";
+  f.data.purchase_allocation_qty_field = "qty_bar";
+  f.data.purchase_allocation_uom = "Cây";
+  f.data.allow_negative_stock = 0;
+  f.data.uom_conversions = [];
+}
+note('AL-INV · package canonical: Kg priced/catch-weight + Cây/Lá stock + Batch + qty_bar descriptors');
+
+writeFileSync(OUT, JSON.stringify(brief, null, 2) + "\n", "utf8");
 console.log(log.map((l) => "  " + l).join("\n"));
 console.log(`\nĐã ghi ${OUT}`);
 console.log(`doctypes=${brief.doctypes.length} version=${brief.version}`);
