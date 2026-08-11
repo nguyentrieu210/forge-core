@@ -5803,10 +5803,11 @@
           "fieldname": "is_stamped",
           "fieldtype": "Select",
           "options": "Có\nKhông",
-          "required": true,
+          "required": false,
           "default": "Không",
           "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'",
           "description": "Bắt buộc chọn rõ Có hoặc Không.",
+          "mandatory_depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'",
           "surface": "expanded"
         },
         {
@@ -6225,10 +6226,11 @@
           "fieldname": "is_stamped",
           "fieldtype": "Select",
           "options": "Có\nKhông",
-          "required": true,
+          "required": false,
           "default": "Không",
           "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'",
           "description": "Bắt buộc chọn rõ Có hoặc Không; lưu cùng lô nhận để đối chiếu giá nhà cung cấp.",
+          "mandatory_depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'",
           "surface": "expanded"
         },
         {
