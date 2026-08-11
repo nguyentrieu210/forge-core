@@ -114,6 +114,10 @@ export async function validateItemCatalogInvariants(
         return refuse(`${code}: nhôm catch-weight không được khai hệ số quy đổi Kg↔Cây tĩnh; số cây và kg thực là hai quan sát độc lập.`);
       }
       if (!checked(doc.is_stock_item)) return refuse(`${code}: nhôm cây/lá phải bật Quản lý tồn kho.`);
+      // Entrypoint uses this marker to bypass the historical Item validator that still requires
+      // a static default-purchase UOM conversion. For canonical catch-weight aluminum that rule
+      // is intentionally superseded by the exact purchase quantity contract above.
+      return Response.json({ ok: true, aluminum_contract: true, stock_uom: contract.stock_uom });
     }
     return accept();
   } catch (error) {
