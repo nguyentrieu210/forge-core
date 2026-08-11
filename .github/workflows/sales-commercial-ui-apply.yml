@@ -48,13 +48,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if git diff --quiet; then
-            echo "No UI patch changes"
+          git add client/packages client/scripts
+          if git diff --cached --quiet; then
+            echo "No UI source patch changes"
+            # Build/typecheck may leave tracked generated output outside the patch scope.
+            git reset --hard HEAD
+            git clean -fd
             exit 0
           fi
           git config user.name "Forge Sales UI Bot"
           git config user.email "actions@users.noreply.github.com"
-          git add client/packages client/scripts
           git commit -m "refactor(sales-ui): use options and server money [skip ci]"
           # Build/typecheck may leave tracked generated files outside the intended patch.
           # The validated source commit is already safe, so clean the worktree before rebasing.
