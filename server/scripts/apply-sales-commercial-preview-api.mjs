@@ -11,7 +11,10 @@ function replace(before, after, label) {
 
 replace(
 `import { errors, sha256Hex } from "../../core/src/index.js";`,
-`import { errors, sha256Hex } from "../../core/src/index.js";\nimport { resolveCommercialLine } from "../../clouderp-selling/src/index.js";`, "pricing resolver import");
+`import { errors, sha256Hex } from "../../core/src/index.js";\nimport { resolveCommercialLine, resolveSalesPackage } from "../../clouderp-selling/src/index.js";`, "pricing resolver import");
+replace(
+`import { resolveCommercialLine } from "../../clouderp-selling/src/index.js";`,
+`import { resolveCommercialLine, resolveSalesPackage } from "../../clouderp-selling/src/index.js";`, "package resolver import");
 
 replace(
 `    case "frappe.client.get_value":
@@ -50,14 +53,15 @@ async function previewSalesCommercialLine(args: FrappeArgs, context: FrappeRoute
     document: {},
     actor: context.actor,
   };
-  const facts: Record<string, unknown> = { ...line, item_group: item.data.item_group };
-  const resolved = await resolveCommercialLine({
+  const kernelContext = {
     command: fakeCommand,
     existing: null,
     now: context.now(),
     nextVersion: 1,
     reader: context.documents,
-  }, {
+  };
+  const facts: Record<string, unknown> = { ...line, item_group: item.data.item_group };
+  const resolved = await resolveCommercialLine(kernelContext, {
     itemCode,
     priceList,
     documentCurrency: currency,
@@ -72,10 +76,59 @@ async function previewSalesCommercialLine(args: FrappeArgs, context: FrappeRoute
     ...(Number.isFinite(Number(line.length_m)) ? { lengthM: Number(line.length_m) } : {}),
     ...(Number.isFinite(Number(line.set_count)) ? { setCount: Number(line.set_count) } : {}),
   });
-  return { ...resolved, rate: resolved.selling_rate, amount: resolved.net_before_tax, net_amount: resolved.net_before_tax };
+  const packageSnapshot = resolved.sales_package
+    ? await resolveSalesPackage(kernelContext, {
+      packageName: resolved.sales_package,
+      postingDate,
+      itemCode,
+      facts: { ...facts, ...resolved },
+    })
+    : undefined;
+  return {
+    ...resolved,
+    ...(packageSnapshot ? { sales_package_snapshot: packageSnapshot } : {}),
+    rate: resolved.selling_rate,
+    amount: resolved.net_before_tax,
+    net_amount: resolved.net_before_tax,
+  };
 }
 `;
 }
+
+replace(
+`  return { ...resolved, rate: resolved.selling_rate, amount: resolved.net_before_tax, net_amount: resolved.net_before_tax };`,
+`  const packageSnapshot = resolved.sales_package
+    ? await resolveSalesPackage(kernelContext, {
+      packageName: resolved.sales_package,
+      postingDate,
+      itemCode,
+      facts: { ...facts, ...resolved },
+    })
+    : undefined;
+  return {
+    ...resolved,
+    ...(packageSnapshot ? { sales_package_snapshot: packageSnapshot } : {}),
+    rate: resolved.selling_rate,
+    amount: resolved.net_before_tax,
+    net_amount: resolved.net_before_tax,
+  };`, "package snapshot preview result");
+
+replace(
+`  const resolved = await resolveCommercialLine({
+    command: fakeCommand,
+    existing: null,
+    now: context.now(),
+    nextVersion: 1,
+    reader: context.documents,
+  }, {`,
+`  const kernelContext = {
+    command: fakeCommand,
+    existing: null,
+    now: context.now(),
+    nextVersion: 1,
+    reader: context.documents,
+  };
+  const resolved = await resolveCommercialLine(kernelContext, {`, "shared preview context");
 
 fs.writeFileSync(target, source);
 console.log("canonical sales commercial preview API applied");
