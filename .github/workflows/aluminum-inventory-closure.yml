@@ -16,6 +16,9 @@ on:
       - "server/tests/stock-reservation-integrity.test.mjs"
       - "server/tests/manufacturing-*.test.mjs"
       - "server/scripts/alumdoor-aluminum-inventory-cutover-plan.mjs"
+      - "server/scripts/seed-purchase-qa-local.mjs"
+      - "client/e2e-forge/auth-tests/purchase-fifo-lifecycle.spec.ts"
+      - "client/e2e-forge/auth-tests/purchase-bulk-transaction.spec.ts"
       - "docs/agents/alumdoor/ALUMINUM_INVENTORY_CLOSURE_20260811.md"
       - ".github/workflows/aluminum-inventory-closure.yml"
 
@@ -87,13 +90,14 @@ jobs:
             tests/r5-03-purchase-allocation-measure.test.mjs \
             tests/catch-weight-valuation.test.mjs
 
-      - name: Validator and mixed-document boundary
+      - name: Validator mixed-document and authenticated-QA boundary
         working-directory: server
         run: |
           node --test \
             tests/alumdoor-item-validator.test.mjs \
             tests/aluminum-item-validator-boundary.test.mjs \
-            tests/aluminum-validation-bridge.test.mjs
+            tests/aluminum-validation-bridge.test.mjs \
+            tests/aluminum-auth-qa-source.test.mjs
 
       - name: Aluminum ATP reservation and cut closure
         working-directory: server
