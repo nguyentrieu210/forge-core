@@ -63,17 +63,18 @@ export default {
 
     const body = await request.clone().json().catch(() => null) as { doctype?: string } | null;
     if (body?.doctype === "Item") {
-      const baseResponse = await baseWorker.fetch(request.clone(), env, ctx);
-      if (!baseResponse.ok) {
-        if (baseResponse.status !== 422) return baseResponse;
-        const message = await responseMessage(baseResponse);
-        // Only the historical static transaction-UOM factor rule is superseded. Earlier legacy
-        // checks (Item Group, Measurement Profile, colors, enums...) remain authoritative.
-        if (!/chưa có hệ số quy đổi/i.test(message)) return baseResponse;
-      }
+      // Preserve the main-branch contract: catalog invariants own business-facing validation
+      // priority. The historical validator remains authoritative for Item Group/Profile/color/UOM
+      // checks after those invariants pass.
       const invariantResponse = await validateItemCatalogInvariants(request.clone(), env);
       if (!invariantResponse.ok) return invariantResponse;
-      return invariantResponse;
+      const marker = await invariantResponse.clone().json().catch(() => ({})) as { aluminum_contract?: boolean };
+      const baseResponse = await baseWorker.fetch(request.clone(), env, ctx);
+      if (baseResponse.ok) return invariantResponse;
+      if (baseResponse.status !== 422) return baseResponse;
+      const message = await responseMessage(baseResponse);
+      if (marker.aluminum_contract && /chưa có hệ số quy đổi/i.test(message)) return invariantResponse;
+      return baseResponse;
     }
 
     if (body?.doctype && PURCHASE_VALIDATION_DOCTYPES.has(body.doctype)) {
