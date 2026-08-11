@@ -37,6 +37,10 @@ function fieldObjects(doctype) {
   return (doctype.fields ?? []).map((field, index) => parseField(field, index, doctype.name));
 }
 
+function existing(names, fieldNames) {
+  return names.filter((fieldname) => fieldNames.has(fieldname));
+}
+
 function exactSurface(field, policy) {
   if (field.hidden || isLayout(field.fieldtype)) return "internal";
   if (!policy.full.includes(field.fieldname)) return "internal";
@@ -49,12 +53,22 @@ function defaultSurface(field, listed) {
   return "expanded";
 }
 
+function genericPolicy(fields, listed) {
+  const renderable = fields.filter((field) => !field.hidden && !isLayout(field.fieldtype));
+  const full = renderable.map((field) => field.fieldname);
+  let quick = renderable
+    .filter((field) => field.required || listed.has(field.fieldname))
+    .map((field) => field.fieldname);
+  if (!quick.length && full.length) quick = [full[0]];
+  return { quick, full };
+}
+
 /**
  * Make the presentation contract explicit in the Alumdoor source brief.
  *
- * This mutates only child-table field presentation. It never changes field order, type,
- * validation, permissions, formulas, defaults or business values. The base brief compiler then
- * derives canonical viewPolicy.form/quickEntry from these surfaces.
+ * This mutates only child-table presentation. It never changes field order, type, validation,
+ * permissions, formulas, defaults or business values. The brief UI-policy adapter attaches the
+ * authored form/quickEntry field order to canonical viewPolicy after base compilation.
  */
 export function applyAlumdoorChildPresentation(brief) {
   if (!brief || !Array.isArray(brief.doctypes)) return { migrated: 0, doctypes: [] };
@@ -62,12 +76,19 @@ export function applyAlumdoorChildPresentation(brief) {
   for (const doctype of brief.doctypes) {
     if (!doctype || doctype.child !== true) continue;
     const fields = fieldObjects(doctype);
-    const exact = EXACT.get(doctype.name);
+    const fieldNames = new Set(fields.map((field) => field.fieldname));
     const listed = new Set(doctype.list ?? []);
+    const declared = EXACT.get(doctype.name);
+    const policy = declared
+      ? { quick: existing(declared.quick, fieldNames), full: existing(declared.full, fieldNames) }
+      : genericPolicy(fields, listed);
+
     doctype.fields = fields.map((field) => ({
       ...field,
-      surface: exact ? exactSurface(field, exact) : defaultSurface(field, listed),
+      surface: declared ? exactSurface(field, policy) : defaultSurface(field, listed),
     }));
+    doctype.form = { fields: policy.full };
+    doctype.quickEntry = { fields: policy.quick };
     migrated.push(doctype.name);
   }
   return { migrated: migrated.length, doctypes: migrated };
