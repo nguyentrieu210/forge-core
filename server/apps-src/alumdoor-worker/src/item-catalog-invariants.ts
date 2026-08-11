@@ -1,3 +1,5 @@
+import { aluminumItemContract } from "./aluminum-purchase-closure.js";
+
 interface ValidatorSubject {
   doctype: string;
   name: string;
@@ -101,6 +103,17 @@ export async function validateItemCatalogInvariants(
     const productionStage = stage === "Bán thành phẩm" || stage === "Thành phẩm";
     if ((produced || productionStage) && !checked(doc.include_item_in_manufacturing)) {
       return refuse(`${code}: mặt hàng bán thành phẩm/thành phẩm hoặc tự sản xuất phải bật Dùng trong sản xuất.`);
+    }
+
+    if (String(doc.inventory_mode ?? "").trim() === "Nhôm cây/lá") {
+      const contract = aluminumItemContract(doc);
+      if (!contract.ok) {
+        return refuse(`${code}: cấu hình tồn nhôm chưa hội tụ — ${contract.issues.join("; ")}.`);
+      }
+      if (Array.isArray(doc.uom_conversions) && doc.uom_conversions.length > 0) {
+        return refuse(`${code}: nhôm catch-weight không được khai hệ số quy đổi Kg↔Cây tĩnh; số cây và kg thực là hai quan sát độc lập.`);
+      }
+      if (!checked(doc.is_stock_item)) return refuse(`${code}: nhôm cây/lá phải bật Quản lý tồn kho.`);
     }
     return accept();
   } catch (error) {
