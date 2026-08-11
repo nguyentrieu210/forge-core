@@ -5,7 +5,8 @@ import { fromScaledInt, toScaledInt } from "../../money/src/index.js";
 import { PayrollEntryController } from "./enterprise-controllers.js";
 import type { PayrollEntryData, SalarySlipData } from "./enterprise-types.js";
 
-const ALU_STATES = new Set(["draft", "calculated", "pending_approval", "approved", "paid", "cancelled", "invalidated"]);
+const EDITABLE_STATES = new Set(["draft", "calculated", "pending_approval", "invalidated"]);
+const PAID_ROLES = new Set(["AlumDoor Payroll Approver", "HR Manager", "System Manager", "Administrator"]);
 
 /**
  * Keeps the ordinary Payroll Entry contract intact while adding the AlumDoor period
@@ -24,13 +25,11 @@ export class AlumDoorAwarePayrollEntryController extends PayrollEntryController 
     if (input.end_date < input.start_date) throw errors.validation("Payroll end_date must not precede start_date");
 
     const requestedState = text(input.alu_state) || "draft";
-    if (!ALU_STATES.has(requestedState)) throw errors.validation("AlumDoor payroll state is invalid");
+    const existingState = text(context.existing?.data.alu_state);
+    const state = resolveState(context, requestedState, existingState);
     if (context.command.action === "submit" && input.salary_slips.length === 0) {
       throw errors.validation("Approved AlumDoor payroll requires at least one Salary Slip");
     }
-    const state = context.command.action === "submit" ? "approved"
-      : context.command.action === "cancel" ? "cancelled"
-        : requestedState;
 
     const standardWorkDaysBp = integer(input.alu_standard_work_days_bp, "standard work days", 1, 310_000);
     const branch = text(input.branch);
@@ -101,51 +100,54 @@ export class AlumDoorAwarePayrollEntryController extends PayrollEntryController 
       alu_advance_vnd: advanceVnd,
       alu_deduction_vnd: deductionVnd,
       ...(context.command.action === "submit" ? { alu_approved_by: context.command.actor.user_id, alu_approved_at: context.now } : {}),
+      ...(state === "paid" ? { alu_paid_by: context.command.actor.user_id, alu_paid_at: context.now } : {}),
     };
   }
 }
 
+function resolveState(context: ControllerContext<PayrollEntryData>, requested: string, existing: string): string {
+  if (context.command.action === "submit") {
+    if (!["calculated", "pending_approval"].includes(existing || requested)) {
+      throw errors.lifecycle("Only calculated or pending approval payroll can be approved");
+    }
+    return "approved";
+  }
+  if (context.command.action === "cancel") {
+    if (existing !== "approved") throw errors.lifecycle("Only approved payroll can be cancelled");
+    return "cancelled";
+  }
+  if (requested === "paid") {
+    if (context.existing?.docstatus !== 1 || existing !== "approved") throw errors.lifecycle("Only approved submitted payroll can be marked paid");
+    if (!context.command.actor.roles.some((role) => PAID_ROLES.has(role)) && context.command.actor.user_id !== "Administrator") {
+      throw errors.permission("Payroll approver is required to mark payroll paid");
+    }
+    return "paid";
+  }
+  if (!EDITABLE_STATES.has(requested)) {
+    throw errors.lifecycle(`Payroll state ${requested} cannot be set by an ordinary save`);
+  }
+  if (context.existing?.docstatus === 1) throw errors.lifecycle("Submitted payroll is immutable except mark-paid or cancel");
+  if (existing === "pending_approval" && requested === "calculated") return "calculated";
+  if (existing === "calculated" && requested === "draft") throw errors.lifecycle("Calculated payroll cannot return to draft; recalculate or invalidate it");
+  return requested;
+}
+
 async function assertNoOverlappingPeriod(
-  context: ControllerContext<PayrollEntryData>,
-  company: string,
-  branch: string,
-  fromDate: string,
-  toDate: string,
+  context: ControllerContext<PayrollEntryData>, company: string, branch: string, fromDate: string, toDate: string,
 ): Promise<void> {
   const periods = await context.reader.listDocumentsByDoctype<JsonObject>(context.command.tenant_id, "Payroll Entry");
   for (const period of periods) {
     if (period.name === context.command.aggregate.name || period.docstatus === 2) continue;
     if (text(period.data.alu_state) === "cancelled" || !text(period.data.alu_state)) continue;
     if (text(period.data.company) !== company || text(period.data.branch) !== branch) continue;
-    const otherFrom = text(period.data.start_date);
-    const otherTo = text(period.data.end_date);
-    if (!otherFrom || !otherTo) continue;
-    if (fromDate <= otherTo && otherFrom <= toDate) {
+    const otherFrom = text(period.data.start_date); const otherTo = text(period.data.end_date);
+    if (otherFrom && otherTo && fromDate <= otherTo && otherFrom <= toDate) {
       throw errors.reference(`AlumDoor Payroll Entry ${period.name} overlaps this active payroll period`);
     }
   }
 }
 
-function text(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function requiredText(value: unknown, field: string): string {
-  const valueText = text(value);
-  if (!valueText) throw errors.reference(`${field} is required`);
-  return valueText;
-}
-
-function integer(value: unknown, field: string, min: number, max: number): number {
-  const number = typeof value === "number" ? value : Number(value);
-  if (!Number.isSafeInteger(number) || number < min || number > max) {
-    throw errors.validation(`${field} must be an integer between ${min} and ${max}`);
-  }
-  return number;
-}
-
-function safeAdd(left: number, right: number, field: string): number {
-  const value = Number(BigInt(left) + BigInt(right));
-  if (!Number.isSafeInteger(value)) throw errors.validation(`${field} exceeds safe integer bounds`);
-  return value;
-}
+function text(value: unknown): string { return typeof value === "string" ? value.trim() : ""; }
+function requiredText(value: unknown, field: string): string { const valueText = text(value); if (!valueText) throw errors.reference(`${field} is required`); return valueText; }
+function integer(value: unknown, field: string, min: number, max: number): number { const number = typeof value === "number" ? value : Number(value); if (!Number.isSafeInteger(number) || number < min || number > max) throw errors.validation(`${field} must be an integer between ${min} and ${max}`); return number; }
+function safeAdd(left: number, right: number, field: string): number { const value = Number(BigInt(left) + BigInt(right)); if (!Number.isSafeInteger(value)) throw errors.validation(`${field} exceeds safe integer bounds`); return value; }
