@@ -8,6 +8,7 @@ import {
   type AppliedPricingAdjustment,
   type PricingRuleSnapshot,
 } from "../../clouderp-pricing/src/commercial-policy.js";
+import { resolveSalesOption } from "./sales-option-resolver.js";
 
 const QTY_SCALE = 6;
 const ONE_QTY = 1_000_000;
@@ -18,8 +19,8 @@ export interface ResolveCommercialLineInput {
   documentCurrency: string;
   postingDate: string;
   uom?: string;
+  /** Optional technical overrides used by migration/tests; normal operator flow uses sales_option. */
   priceVariant?: string;
-  /** Optional independent Item Price variant used only as the discount base. */
   discountBasisVariant?: string;
   pricedQty: number;
   partyType?: "Customer" | "Supplier";
@@ -35,6 +36,12 @@ export interface ResolveCommercialLineInput {
 }
 
 export interface ResolvedCommercialLine extends JsonObject {
+  sales_option?: string;
+  sales_option_code?: string;
+  sales_option_label?: string;
+  sales_option_version?: number;
+  sales_mode?: string;
+  sales_package?: string;
   item_price: string;
   price_variant: string;
   base_rate: string;
@@ -70,8 +77,21 @@ export async function resolveCommercialLine(
   input: ResolveCommercialLineInput,
 ): Promise<ResolvedCommercialLine> {
   const pricedQtyMicros = quantityMicros(input.pricedQty, "pricedQty");
-  const requestedVariant = normalizePriceVariant(input.priceVariant);
-  const requestedBasisVariant = normalizePriceVariant(input.discountBasisVariant ?? requestedVariant);
+  const resolvedOption = await resolveSalesOption(context, {
+    itemCode: input.itemCode,
+    itemMaster: { item_group: input.facts.item_group },
+    facts: input.facts,
+    ...(text(input.facts.sales_option) ? { requestedOption: text(input.facts.sales_option) } : {}),
+    ...(text(input.facts.sales_mode) ? { legacySalesMode: text(input.facts.sales_mode) } : {}),
+    // If this Item has no configured options the resolver itself returns STANDARD. If options
+    // exist but selection is ambiguous it fails closed; this flag only protects legacy rows.
+    allowLegacyUnselected: Boolean(input.facts.legacy_unselected_sales_option),
+  });
+
+  const requestedVariant = normalizePriceVariant(input.priceVariant ?? resolvedOption.price_variant);
+  const requestedBasisVariant = normalizePriceVariant(
+    input.discountBasisVariant ?? resolvedOption.discount_basis_variant ?? requestedVariant,
+  );
   const sharedPriceContext = {
     itemCode: input.itemCode,
     qtyMicros: pricedQtyMicros,
@@ -95,6 +115,9 @@ export async function resolveCommercialLine(
 
   const facts = {
     ...input.facts,
+    ...(resolvedOption.sales_option ? { sales_option: resolvedOption.sales_option } : {}),
+    ...(resolvedOption.sales_option_code ? { sales_option_code: resolvedOption.sales_option_code } : {}),
+    ...(resolvedOption.sales_mode ? { sales_mode: resolvedOption.sales_mode } : {}),
     price_variant: rawPrice.price_variant,
     discount_basis_variant: discountBasisPrice.price_variant,
   };
@@ -124,7 +147,7 @@ export async function resolveCommercialLine(
   const grossMinor = multiplyMinorByQuantity(sellingRateMinor, pricedQtyMicros, "selling rate");
 
   // Discount basis is deliberately independent of the selected selling rate. This handles
-  // cases such as selling WITH_RAIL while discounting from the STANDARD/NO_RAIL list price.
+  // selling one configured option while discounting against another declared base variant.
   const discountBasisRateMinor = discountBasisPrice.rate_minor;
   const discountBasisAmountMinor = multiplyMinorByQuantity(discountBasisRateMinor, pricedQtyMicros, "discount basis");
   const discountPercentageMicros = input.discountPercentageOverride === undefined
@@ -147,6 +170,12 @@ export async function resolveCommercialLine(
   if (netBeforeTaxMinor < 0) throw errors.validation("Line net before tax cannot be negative");
 
   return {
+    ...(resolvedOption.sales_option ? { sales_option: resolvedOption.sales_option } : {}),
+    ...(resolvedOption.sales_option_code ? { sales_option_code: resolvedOption.sales_option_code } : {}),
+    ...(resolvedOption.sales_option_label ? { sales_option_label: resolvedOption.sales_option_label } : {}),
+    ...(resolvedOption.option_version ? { sales_option_version: resolvedOption.option_version } : {}),
+    ...(resolvedOption.sales_mode ? { sales_mode: resolvedOption.sales_mode } : {}),
+    ...(resolvedOption.sales_package ? { sales_package: resolvedOption.sales_package } : {}),
     item_price: rawPrice.item_price,
     price_variant: rawPrice.price_variant,
     base_rate: rawPrice.rate,
@@ -220,4 +249,8 @@ function sumSafe(values: number[], field: string): number {
     if (!Number.isSafeInteger(total)) throw errors.validation(`${field} exceeds safe integer range`);
   }
   return total;
+}
+
+function text(value: unknown): string {
+  return typeof value === "string" ? value.normalize("NFC").trim() : "";
 }
