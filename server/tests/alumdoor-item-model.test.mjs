@@ -207,7 +207,7 @@ test("V2 purchase receipt exposes dimensions and area weight without mixing kg/m
   assert.equal(v2Field("Purchase Receipt Item", "is_stamped")?.default, "Không");
   assert.equal(
     v2Brief.fixtures.find((entry) => entry.type === "Measurement Profile" && entry.name === "Nhôm cây/lá")?.data?.stock_uom,
-    "Kg",
+    "Cây",
   );
 });
 

@@ -92,7 +92,7 @@ function aluminiumLine(lengthM: number, bars: number): JsonRecord {
     item_name: "Nhôm AL71 QA",
     inventory_mode: "Nhôm cây/lá",
     measurement_profile: "Nhôm cây/lá",
-    material_specification: "AL71",
+    material_specification: "AL71-QA-SPEC",
     stock_uom: "Cây",
     uom: "Kg",
     qty: baremKg,
