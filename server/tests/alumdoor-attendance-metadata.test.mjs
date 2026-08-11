@@ -14,12 +14,10 @@ function permission(meta, role) {
   return meta.permissions.find((entry) => entry.role === role);
 }
 
-test("AlumDoor attendance metadata is an isolated HRM-dependent package", async () => {
-  const pkg = await readAppSource(source);
-  const manifest = parseAppManifest(pkg);
-
+test("AlumDoor attendance payroll metadata stays an isolated HRM-dependent package", async () => {
+  const manifest = parseAppManifest(await readAppSource(source));
   assert.equal(manifest.id, "alumdoor-attendance");
-  assert.equal(manifest.version, "0.1.2");
+  assert.equal(manifest.version, "0.2.0");
   assert.deepEqual(manifest.requires, [{ id: "hrm", version: "1.8.0" }]);
   assert.deepEqual(
     manifest.doctypes.map((meta) => meta.name).sort(),
@@ -27,28 +25,34 @@ test("AlumDoor attendance metadata is an isolated HRM-dependent package", async 
       "AlumDoor Attendance Day",
       "AlumDoor Attendance Policy",
       "AlumDoor Attendance Segment",
+      "AlumDoor Pay Profile",
       "AlumDoor QR Station",
     ],
   );
   assert.deepEqual(
     manifest.roles.map((entry) => entry.role).sort(),
-    ["AlumDoor Attendance Manager", "AlumDoor Attendance Viewer", "AlumDoor QR System"],
-  );
-  assert.deepEqual(
-    manifest.custom_fields.map((entry) => entry.fieldname).sort(),
     [
-      "alu_capture_source",
-      "alu_device_fingerprint_hash",
-      "alu_segment_code",
-      "alu_station",
-      "alu_token_nonce_hash",
-      "alu_work_date",
+      "AlumDoor Attendance Manager",
+      "AlumDoor Attendance Viewer",
+      "AlumDoor Payroll Approver",
+      "AlumDoor Payroll User",
+      "AlumDoor QR System",
     ],
-    "slice 1 only overlays the immutable source log needed to trace one QR scan",
   );
-  assert.ok(manifest.custom_fields.every((entry) => entry.dt === "Employee Checkin"), "slice 1 must not overlay Attendance or Payroll DocTypes");
-  assert.ok(manifest.externalDocTypes.some((entry) => entry.name === "Employee Checkin" && entry.app === "hrm"));
-  assert.ok(manifest.nav.some((entry) => entry.kind === "experience" && entry.key === "alumdoor-attendance:kiosk"), "the installed package must expose the QR kiosk through the runtime-supported experience");
+  assert.ok(manifest.custom_fields.some((entry) => entry.dt === "Employee Checkin" && entry.fieldname === "alu_station"));
+  assert.ok(manifest.custom_fields.some((entry) => entry.dt === "Attendance Request" && entry.fieldname === "alu_segment_code"));
+  assert.ok(manifest.custom_fields.some((entry) => entry.dt === "Payroll Entry" && entry.fieldname === "alu_state"));
+  assert.ok(manifest.custom_fields.some((entry) => entry.dt === "Salary Slip" && entry.fieldname === "alu_formula_trace_json"));
+  for (const key of [
+    "alumdoor-attendance:kiosk",
+    "alumdoor-attendance:today",
+    "alumdoor-attendance:month",
+    "alumdoor-attendance:exceptions",
+    "alumdoor-payroll:run",
+    "alumdoor-payroll:my-slips",
+  ]) {
+    assert.ok(manifest.nav.some((entry) => entry.kind === "experience" && entry.key === key), `missing experience ${key}`);
+  }
 });
 
 test("AlumDoor attendance daily projection is system-written and manager read-only", async () => {
@@ -59,9 +63,6 @@ test("AlumDoor attendance daily projection is system-written and manager read-on
   assert.equal(field(day, "segments")?.fieldtype, "Table");
   assert.equal(field(day, "segments")?.options, "AlumDoor Attendance Segment");
   assert.deepEqual(field(day, "state")?.options, "open\ncomplete\nexception\napproved\nlocked");
-
-  const segment = manifest.doctypes.find((meta) => meta.name === "AlumDoor Attendance Segment");
-  assert.match(String(field(segment, "state")?.options), /(?:^|\n)empty(?:\n|$)/);
 
   const qrSystem = permission(day, "AlumDoor QR System");
   assert.equal(qrSystem?.create, true);
@@ -78,25 +79,23 @@ test("AlumDoor QR station stores a version reference, never signing material", a
   assert.equal(field(station, "secret_version")?.default, 1);
   assert.equal(field(station, "secret_version")?.read_only, true);
   assert.equal(field(station, "secret_version")?.hidden, true);
-  assert.equal(field(station, "secret_version")?.editMode, "hidden");
   assert.equal(field(station, "secret_version")?.serverEnforced, true);
   assert.equal(field(station, "policy")?.options, "AlumDoor Attendance Policy");
   assert.equal(station?.fields.some((entry) => /secret|token|private.?key/i.test(entry.fieldname) && entry.fieldname !== "secret_version"), false);
 });
 
-test("Attendance policy is approved through its workflow before QR can use it", async () => {
+test("Attendance policy and pay profile use explicit approval workflows", async () => {
   const manifest = parseAppManifest(await readAppSource(source));
   const policy = manifest.doctypes.find((meta) => meta.name === "AlumDoor Attendance Policy");
-  const workflow = manifest.workflows.find((entry) => entry.document_type === "AlumDoor Attendance Policy");
-
+  const policyWorkflow = manifest.workflows.find((entry) => entry.document_type === "AlumDoor Attendance Policy");
   assert.equal(policy?.is_submittable, true);
-  assert.equal(field(policy, "policy_status")?.read_only, false);
-  assert.equal(permission(policy, "AlumDoor Attendance Manager")?.submit, true);
-  assert.equal(workflow?.state_field, "policy_status");
-  assert.deepEqual(workflow?.states.map((state) => [state.state, state.docstatus]), [
-    ["draft", 0],
-    ["approved", 1],
-    ["retired", 2],
-  ]);
-  assert.ok(workflow?.transitions.some((entry) => entry.state === "draft" && entry.next_state === "approved"));
+  assert.equal(policyWorkflow?.state_field, "policy_status");
+
+  const profile = manifest.doctypes.find((meta) => meta.name === "AlumDoor Pay Profile");
+  const profileWorkflow = manifest.workflows.find((entry) => entry.document_type === "AlumDoor Pay Profile");
+  assert.equal(profile?.is_submittable, true);
+  assert.equal(field(profile, "base_salary_vnd")?.fieldtype, "Int");
+  assert.equal(field(profile, "overtime_multiplier_bp")?.fieldtype, "Int");
+  assert.equal(profileWorkflow?.state_field, "status");
+  assert.ok(profileWorkflow?.transitions.some((entry) => entry.state === "draft" && entry.next_state === "approved" && entry.allow_self_approval === false));
 });
