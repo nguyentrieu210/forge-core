@@ -6,14 +6,6 @@ import { pricedQtyMicros } from "../../clouderp-core/src/uom.js";
 import { packageComponent, parseSalesPackageSnapshot } from "./sales-package-resolver.js";
 import type { SalesItem, SalesOrderData } from "./types.js";
 
-/**
- * Validate Delivery rows against the exact Sales Order source line/component.
- *
- * Direct sales progress stays in the Sales Order UOM; stock conversion remains the stock
- * ledger's authority. Package components use their frozen component UOM. This keeps billable,
- * physical and stock quantities separate while preventing duplicate item rows from sharing
- * fulfillment progress.
- */
 export async function assertSalesOrderDeliveryLines(
   context: ControllerContext<JsonObject>,
   salesOrder: CanonicalDocument<SalesOrderData>,
@@ -33,9 +25,7 @@ export async function assertSalesOrderDeliveryLines(
       const component = packageComponent(snapshot, componentKey);
       if (!component) throw errors.reference(`Package component ${componentKey} does not belong to Sales Order row ${rowKey}`);
       if (component.item_code !== item.item_code) throw errors.reference(`Delivery item ${item.item_code} does not match package component ${componentKey}`);
-      if (text(item.uom) !== component.uom) {
-        throw errors.validation(`Delivery package component ${componentKey} must use frozen UOM ${component.uom}`);
-      }
+      if (text(item.uom) !== component.uom) throw errors.validation(`Delivery package component ${componentKey} must use frozen UOM ${component.uom}`);
       const requested = toScaledInt(item.qty, 6, `Delivery row ${index + 1}.qty`);
       const prior = await context.reader.getFulfilledLineQuantityMicros(
         context.command.tenant_id, salesOrder.name, "Delivery", rowKey, componentKey,
@@ -55,9 +45,7 @@ export async function assertSalesOrderDeliveryLines(
 
     if (componentKey) throw errors.reference(`Direct Sales Order row ${rowKey} must not declare a package component`);
     if (sourceLine.item_code !== item.item_code) throw errors.reference(`Delivery item ${item.item_code} does not match Sales Order row ${rowKey}`);
-    if (text(item.uom) !== text(sourceLine.uom)) {
-      throw errors.validation(`Delivery row ${index + 1} must preserve Sales Order UOM ${sourceLine.uom}`);
-    }
+    if (text(item.uom) !== text(sourceLine.uom)) throw errors.validation(`Delivery row ${index + 1} must preserve Sales Order UOM ${sourceLine.uom}`);
     const requested = toScaledInt(item.qty, 6, `Delivery row ${index + 1}.qty`);
     const ordered = toScaledInt(sourceLine.qty, 6, `Sales Order row ${rowKey}.qty`);
     const prior = await context.reader.getFulfilledLineQuantityMicros(
@@ -75,19 +63,21 @@ export async function assertSalesOrderDeliveryLines(
   }
 }
 
-/**
- * Rebuild an SO-derived invoice from the frozen commercial line. Current Item Price/Pricing
- * Rule masters are intentionally ignored. Partial billing allocates frozen money by cumulative
- * quantity so the final invoice absorbs rounding and the full series reconciles exactly.
- */
+export interface FreezeSalesOrderBillingOptions {
+  /** Draft/save may preview an over-billed request; cumulative progress is enforced on submit. */
+  enforceRemaining?: boolean;
+}
+
 export async function freezeSalesOrderBillingLines(
   context: ControllerContext<JsonObject>,
   salesOrder: CanonicalDocument<SalesOrderData>,
   requestedItems: SalesItem[],
   currencyScale: number,
+  options: FreezeSalesOrderBillingOptions = {},
 ): Promise<SalesItem[]> {
   const source = sourceLines(salesOrder);
   const result: SalesItem[] = [];
+  const enforceRemaining = options.enforceRemaining !== false;
   for (const [index, item] of requestedItems.entries()) {
     const resolved = resolveSourceLine(source, item, `Sales Invoice row ${index + 1}`, salesOrder.name);
     const rowKey = resolved.rowKey;
@@ -97,24 +87,33 @@ export async function freezeSalesOrderBillingLines(
 
     const currentQty = pricedQtyMicros(item);
     const sourceQty = pricedQtyMicros(sourceLine);
-    const priorQty = await context.reader.getFulfilledLineQuantityMicros(
-      context.command.tenant_id, salesOrder.name, "Billing", rowKey, "",
-    );
-    if (priorQty + currentQty > sourceQty) {
+    if (currentQty > sourceQty) {
       throw errors.reference(`Billing quantity exceeds Sales Order row ${rowKey}`, {
         sales_order: salesOrder.name,
         sales_order_row_id: rowKey,
         ordered_qty_micros: sourceQty,
-        already_billed_qty_micros: priorQty,
         requested_qty_micros: currentQty,
       });
     }
+    const persistedPriorQty = await context.reader.getFulfilledLineQuantityMicros(
+      context.command.tenant_id, salesOrder.name, "Billing", rowKey, "",
+    );
+    if (enforceRemaining && persistedPriorQty + currentQty > sourceQty) {
+      throw errors.reference(`Billing quantity exceeds Sales Order row ${rowKey}`, {
+        sales_order: salesOrder.name,
+        sales_order_row_id: rowKey,
+        ordered_qty_micros: sourceQty,
+        already_billed_qty_micros: persistedPriorQty,
+        requested_qty_micros: currentQty,
+      });
+    }
+    const allocationPriorQty = enforceRemaining ? persistedPriorQty : 0;
 
     const rateMinor = sourceLine.rate_minor ?? toScaledInt(sourceLine.rate, currencyScale, `${rowKey}.rate`);
-    const discountMinor = allocatedMoney(sourceLine.discount_amount_minor ?? 0, sourceQty, priorQty, currentQty, `${rowKey}.discount`);
-    const adjustmentMinor = allocatedMoney(sourceLine.adjustment_amount_minor ?? 0, sourceQty, priorQty, currentQty, `${rowKey}.adjustment`);
-    const taxableAdjustmentMinor = allocatedMoney(sourceLine.taxable_adjustment_amount_minor ?? 0, sourceQty, priorQty, currentQty, `${rowKey}.taxable_adjustment`);
-    const basisMinor = allocatedMoney(sourceLine.discount_basis_amount_minor ?? 0, sourceQty, priorQty, currentQty, `${rowKey}.discount_basis`);
+    const discountMinor = allocatedMoney(sourceLine.discount_amount_minor ?? 0, sourceQty, allocationPriorQty, currentQty, `${rowKey}.discount`);
+    const adjustmentMinor = allocatedMoney(sourceLine.adjustment_amount_minor ?? 0, sourceQty, allocationPriorQty, currentQty, `${rowKey}.adjustment`);
+    const taxableAdjustmentMinor = allocatedMoney(sourceLine.taxable_adjustment_amount_minor ?? 0, sourceQty, allocationPriorQty, currentQty, `${rowKey}.taxable_adjustment`);
+    const basisMinor = allocatedMoney(sourceLine.discount_basis_amount_minor ?? 0, sourceQty, allocationPriorQty, currentQty, `${rowKey}.discount_basis`);
     const grossMinor = multiplyMoneyByQty(rateMinor, currentQty, `${rowKey}.gross`);
     const netMinor = safeAdd([grossMinor, -discountMinor, adjustmentMinor], `${rowKey}.net`);
 
@@ -204,9 +203,7 @@ function resolveSourceLine(
     const [rowKey, line] = candidates[0]!;
     return { rowKey, line };
   }
-  if (candidates.length === 0) {
-    throw errors.reference(`${label} cannot infer a Sales Order source row for item ${requested.item_code}; sales_order_row_id is required`);
-  }
+  if (candidates.length === 0) throw errors.reference(`${label} cannot infer a Sales Order source row for item ${requested.item_code}; sales_order_row_id is required`);
   throw errors.validation(`${label} matches multiple Sales Order rows for item ${requested.item_code}; sales_order_row_id is required`);
 }
 
