@@ -99,16 +99,6 @@ function reservationsCompete(request: ReservationData, other: ReservationData): 
   return true;
 }
 
-/**
- * A single-threshold availability check is insufficient for variable-length stock.
- *
- * Example: one 5m bar exists. A 3m reservation already promises it, then a 5m reservation
- * arrives. Looking only at the new 5m threshold sees one 5m bar and zero previous >=5m
- * reservations, so both promises would be accepted against the same physical bar.
- *
- * Feasibility for nested length classes is equivalent to checking every active breakpoint:
- * for each L, demand whose minimum length is >= L must not exceed stock whose length is >= L.
- */
 export async function assertReservationFeasibleAcrossThresholds(
   context: ReservationContext,
   request: ReservationData,
@@ -191,10 +181,6 @@ export async function assertReservationFeasibleAcrossThresholds(
   }
 }
 
-/**
- * Hardens the reservation lifecycle without creating another stock ledger.
- * Reservation identity is immutable; corrections release the old promise and create a new one.
- */
 export class StockReservationIntegrityController extends StockReservationController {
   override async normalize(context: ReservationContext): Promise<ReservationData> {
     const input = context.command.document;
@@ -224,7 +210,11 @@ export class StockReservationIntegrityController extends StockReservationControl
     const normalized = await super.normalize(context);
     const initialMicros = typeof previous.initial_qty_reserved_micros === "number"
       ? previous.initial_qty_reserved_micros
-      : toScaledInt(previous.initial_qty_reserved ?? previous.qty_reserved, 6, "initial_qty_reserved");
+      : toScaledInt(
+          decimalInput(previous.initial_qty_reserved ?? previous.qty_reserved, "initial_qty_reserved"),
+          6,
+          "initial_qty_reserved",
+        );
     const withSnapshot = {
       ...normalized,
       initial_qty_reserved: fromScaledInt(initialMicros, 6),
