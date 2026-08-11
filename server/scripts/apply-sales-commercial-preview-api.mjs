@@ -120,7 +120,12 @@ async function previewSalesCommercialLine(args: FrappeArgs, context: FrappeRoute
   const resolved = await resolveCommercialLine(kernelContext, {`, "shared preview context");
 
   replace(
-`  return { ...resolved, rate: resolved.selling_rate, amount: resolved.net_before_tax, net_amount: resolved.net_before_tax };`,
+`  return {
+    ...resolved,
+    rate: resolved.selling_rate,
+    amount: resolved.net_before_tax,
+    net_amount: resolved.net_before_tax,
+  };`,
 `  const packageSnapshot = resolved.sales_package
     ? await resolveSalesPackage(kernelContext, {
       packageName: resolved.sales_package,
