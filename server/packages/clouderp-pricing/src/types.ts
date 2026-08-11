@@ -7,10 +7,9 @@ export interface PricingContext {
   priceList: string;
   documentCurrency: string;
   uom?: string;
-  /**
-   * Existing callers keep legacy behavior by default. Commercial composition can ask for
-   * the raw Item Price and apply Pricing Rule effects exactly once in the shared resolver.
-   */
+  /** Missing/blank remains STANDARD for backward compatibility. */
+  priceVariant?: string;
+  /** Existing callers keep legacy behavior unless commercial composition asks for raw price. */
   applyPricingRules?: boolean;
   partyType?: "Customer" | "Supplier";
   party?: string;
@@ -24,6 +23,7 @@ export interface ResolvedPrice extends JsonObject {
   currency: string;
   currency_scale: number;
   item_price: string;
+  price_variant: string;
   pricing_rule?: string;
   discount_percentage?: string;
 }
