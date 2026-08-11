@@ -47,7 +47,7 @@ function label(field: DocField): string {
  * Business-neutral child-table renderer.
  *
  * Metadata owns column order and compact/expanded surfaces. This component deliberately has no
- * Sales/Purchase/Alumdoor branches. Doctypes without an explicit presentation policy fall back to
+ * doctype/domain-specific branches. Doctypes without an explicit presentation policy fall back to
  * the established grid unchanged while the migration is in progress.
  */
 export function MetadataChildGrid(props: ChildGridProps) {
