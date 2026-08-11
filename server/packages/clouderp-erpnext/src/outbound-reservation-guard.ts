@@ -2,6 +2,7 @@ import type { JsonObject, StockLedgerEntry } from "../../contracts/src/index.js"
 import { errors } from "../../core/src/index.js";
 import type { ControllerContext } from "../../document-kernel/src/index.js";
 import { fromScaledInt, toScaledInt } from "../../money/src/index.js";
+import { withReservationLifecycleReader } from "./reservation-lifecycle-reader.js";
 
 interface ReservationData extends JsonObject {
   item_code: string;
@@ -32,18 +33,6 @@ function decimal(value: unknown, field: string): string | number {
   throw errors.validation(`${field} là bắt buộc và phải là số`);
 }
 
-/**
- * Protects promised stock at the final pre-commit plan boundary.
- *
- * Controllers are free to normalize UOM, resolve batches and derive valuation in their own
- * domain. This guard consumes the resulting Stock Ledger plan instead of reimplementing those
- * rules. For each aluminium length breakpoint it asks one invariant question:
- *
- *   stock before posting - this outbound plan >= promises owned by other sources
- *
- * It therefore covers Delivery, Material Issue/Transfer, purchase return and cancellation of
- * an inward receipt using exactly the batch/warehouse quantities that would be committed.
- */
 export async function assertStockPlanRespectsReservations<T extends JsonObject>(
   context: ControllerContext<T>,
   stockEntries: readonly StockLedgerEntry[],
@@ -52,21 +41,22 @@ export async function assertStockPlanRespectsReservations<T extends JsonObject>(
   const outbound = stockEntries.filter((entry) => entry.actual_qty_micros < 0 && text(entry.batch_no));
   if (!outbound.length) return;
 
+  const effectiveContext = withReservationLifecycleReader(context);
   const ownSources = new Set([...ownSourceNames].map(text).filter(Boolean));
-  const reservations = await context.reader.listDocumentsByDoctype<ReservationData>(
-    context.command.tenant_id,
+  const reservations = await effectiveContext.reader.listDocumentsByDoctype<ReservationData>(
+    effectiveContext.command.tenant_id,
     "Stock Reservation",
   );
   const active = reservations.filter((document) =>
     document.data.state === "Đang giữ"
-    && (!document.data.expires_at || document.data.expires_at > context.now)
+    && (!document.data.expires_at || document.data.expires_at > effectiveContext.now)
     && !ownSources.has(text(document.data.source_name)));
   if (!active.length) return;
 
   const groups = new Map<string, ConsumptionGroup>();
   for (const entry of outbound) {
     const batchNo = text(entry.batch_no);
-    const batch = await context.reader.getMasterRecordData(context.command.tenant_id, "Batch", batchNo);
+    const batch = await effectiveContext.reader.getMasterRecordData(effectiveContext.command.tenant_id, "Batch", batchNo);
     if (!batch) throw errors.reference(`Lô ${batchNo} không tồn tại`);
     if (batch.item_code && text(batch.item_code) !== entry.item_code) {
       throw errors.reference(`Lô ${batchNo} không thuộc mặt hàng ${entry.item_code}`);
@@ -96,11 +86,11 @@ export async function assertStockPlanRespectsReservations<T extends JsonObject>(
     });
     if (!compatible.length) continue;
 
-    const positions = await context.reader.listTrackedStockPositions(context.command.tenant_id, group.itemCode);
+    const positions = await effectiveContext.reader.listTrackedStockPositions(effectiveContext.command.tenant_id, group.itemCode);
     const stock: Array<{ qtyMicros: number; lengthMicros: number }> = [];
     for (const position of positions) {
       if (position.warehouse !== group.warehouse || position.qty_micros <= 0) continue;
-      const batch = await context.reader.getMasterRecordData(context.command.tenant_id, "Batch", position.batch_no);
+      const batch = await effectiveContext.reader.getMasterRecordData(effectiveContext.command.tenant_id, "Batch", position.batch_no);
       if (!batch) throw errors.reference(`Lô ${position.batch_no} không tồn tại`);
       if (text(batch.color) !== group.color || text(batch.condition) !== group.condition) continue;
       stock.push({
