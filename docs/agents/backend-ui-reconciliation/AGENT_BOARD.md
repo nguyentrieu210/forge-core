@@ -2,19 +2,20 @@
 
 Program: `program/backend-ui-reconciliation-20260811`
 Source baseline: `main@cecb19c51855ab3e6a05ce84261d717c630c96b7`
+Worker fork point: `program/backend-ui-reconciliation-20260811@c4209b8318ac36110ca84094d905ce724ffae3d5`
 Status vocabulary: `BOOTSTRAPPED | RUNNING | BLOCKED | READY | CONVERGING | DONE | SUPERSEDED/CLOSED`
 
-## Planned topology
+## Current topology
 
-| Agent | Branch | PR | Mission | Initial status | Depends / blocker |
-|---|---|---:|---|---|---|
-| UI-REC-01 TRUTH | `agent/ui-rec-01-backend-meta-20260811` | — | Backend/schema ↔ metadata truth + validators | BOOTSTRAPPED | — |
-| UI-REC-02 NAV | `agent/ui-rec-02-sidebar-master-20260811` | — | AlumDoor sidebar/catalog/master data IA | BOOTSTRAPPED | UI-REC-01 findings for final closure |
-| UI-REC-03 FORMS | `agent/ui-rec-03-form-list-workspace-20260811` | — | Form/List/Workspace projection audit and fixes | BOOTSTRAPPED | UI-REC-01; Grid program for child-table acceptance |
-| UI-REC-04 COVERAGE | `agent/ui-rec-04-project-coverage-20260811` | — | Cross-app coverage sweep and remediation routing | BOOTSTRAPPED | UI-REC-01 matrix |
-| UI-REC-05 QA | `agent/ui-rec-05-qa-gates-20260811` | — | Static drift gates + E2E/convergence evidence | BOOTSTRAPPED | UI-REC-01/02/03/04 + Grid candidate |
+| Agent | Branch | Exact bootstrap head | PR | Mission | Status | Depends / blocker |
+|---|---|---|---:|---|---|---|
+| UI-REC-01 TRUTH | `agent/ui-rec-01-backend-meta-20260811` | `f6bfb42f3ce4483269a68e0fb3192556ea8a7f4f` | — | Backend/schema ↔ metadata truth + validators | BOOTSTRAPPED | — |
+| UI-REC-02 NAV | `agent/ui-rec-02-sidebar-master-20260811` | `5089ffb694ebbcc4b9e281d3db26bcfff8155daa` | — | AlumDoor sidebar/catalog/master data IA | BOOTSTRAPPED | UI-REC-01 findings for final closure |
+| UI-REC-03 FORMS | `agent/ui-rec-03-form-list-workspace-20260811` | `3ce2f6c73c78e602c6232eb597ef4c2f749b4214` | — | Form/List/Workspace projection audit and fixes | BOOTSTRAPPED | UI-REC-01; Grid program for child-table acceptance |
+| UI-REC-04 COVERAGE | `agent/ui-rec-04-project-coverage-20260811` | `96ceb3168e3d564ca7c199accaf1de996a22049e` | — | Cross-app coverage sweep and remediation routing | BOOTSTRAPPED | UI-REC-01 matrix |
+| UI-REC-05 QA | `agent/ui-rec-05-qa-gates-20260811` | `469b535d6226030b417730c2a5b7945c1c984d5d` | — | Static drift gates + E2E/convergence evidence | BOOTSTRAPPED | UI-REC-01/02/03/04 + Grid candidate |
 
-Coordinator/control branch is not counted as a worker.
+Coordinator/control branch is not counted as a worker. A branch is not called `RUNNING` until it has substantive audit/implementation work beyond the bootstrap handoff commit.
 
 ## Ownership
 
