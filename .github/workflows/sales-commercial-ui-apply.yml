@@ -1,0 +1,55 @@
+name: Sales Commercial UI Apply
+
+on:
+  pull_request:
+    branches:
+      - exp/alumdoor-pricing-policy
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sales-commercial-ui-apply
+  cancel-in-progress: true
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: feat/sales-commercial-complete-20260811
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Apply metadata-driven Sales grid
+        working-directory: client
+        run: node scripts/apply-sales-commercial-grid.mjs
+      - name: Client typecheck
+        run: pnpm run client:typecheck
+      - name: Client tests
+        run: pnpm run client:test
+      - name: Client build
+        run: pnpm run client:build
+      - name: Commit validated UI patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo "No UI patch changes"
+            exit 0
+          fi
+          git config user.name "Forge Sales UI Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add client/packages client/scripts
+          git commit -m "refactor(sales-ui): use options and server money [skip ci]"
+          git pull --rebase origin feat/sales-commercial-complete-20260811
+          git push origin HEAD:feat/sales-commercial-complete-20260811
