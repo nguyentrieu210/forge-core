@@ -76,9 +76,10 @@ interface PartialReleaseSnapshot {
 }
 
 /**
- * Reducing an ACTIVE reservation is a release of a promise, not proof of stock consumption.
- * It is allowed only as an explicit audited business action with a reason. The document stays
- * active for its remaining quantity. Client-declared `Đã dùng` remains forbidden separately.
+ * Reducing an ACTIVE reservation releases part of a promise; it is not proof that stock was
+ * consumed. The mutation remains auditable through document version + actor/time/delta. A
+ * caller may supply a more specific reason; otherwise the server records the canonical reason.
+ * Client-declared `Đã dùng` remains forbidden separately.
  */
 function partialReleaseSnapshot(
   current: ReservationData,
@@ -89,10 +90,8 @@ function partialReleaseSnapshot(
   const before = toScaledInt(previous.qty_reserved, 6, "qty_reserved");
   const after = toScaledInt(current.qty_reserved, 6, "qty_reserved");
   if (after >= before) return null;
-  const reason = text(current.partial_release_reason ?? current.released_reason);
-  if (!reason) {
-    throw errors.validation("Giảm một phần giữ chỗ phải nhập lý do nhả phần giữ");
-  }
+  const reason = text(current.partial_release_reason ?? current.released_reason)
+    || "Điều chỉnh giảm giữ chỗ";
   return { releasedMicros: before - after, releasedReason: reason };
 }
 
