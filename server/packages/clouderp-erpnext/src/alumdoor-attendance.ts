@@ -21,6 +21,7 @@ import {
 import * as H from "./hrm-shared.js";
 
 const INTERNAL_SCAN_ROLE = "AlumDoor QR System";
+const INTERNAL_CORRECTION_ROLE = "AlumDoor Attendance System";
 const INTERNAL_PAYROLL_ROLE = "AlumDoor Payroll System";
 const DAY_DOCTYPE = "AlumDoor Attendance Day";
 const SEGMENT_DOCTYPE = "AlumDoor Attendance Segment";
@@ -32,21 +33,23 @@ export class AlumDoorAttendanceDayController implements DocumentController<JsonO
 
   async buildPlan(context: ControllerContext<JsonObject>): Promise<MutationPlan<JsonObject>> {
     const isScan = context.command.actor.roles.includes(INTERNAL_SCAN_ROLE);
+    const isCorrection = context.command.actor.roles.includes(INTERNAL_CORRECTION_ROLE);
     const isPayroll = context.command.actor.roles.includes(INTERNAL_PAYROLL_ROLE);
-    if (!isScan && !isPayroll) {
-      throw errors.permission("AlumDoor Attendance Day chỉ được cập nhật từ giao dịch QR hoặc điều phối lương nội bộ.");
+    if (!isScan && !isCorrection && !isPayroll) {
+      throw errors.permission("AlumDoor Attendance Day chỉ được cập nhật từ giao dịch QR, phiếu sửa công đã duyệt hoặc điều phối lương nội bộ.");
     }
     if (context.command.action !== "create" && context.command.action !== "save") {
       throw errors.lifecycle("AlumDoor Attendance Day chỉ hỗ trợ tạo hoặc cập nhật nội bộ.");
     }
-    if (isPayroll && context.command.action !== "save") {
-      throw errors.lifecycle("Điều phối lương chỉ được khóa bản ghi công đã tồn tại.");
+    if ((isCorrection || isPayroll) && context.command.action !== "save") {
+      throw errors.lifecycle("Điều phối sửa công/lương chỉ được cập nhật bản ghi công đã tồn tại.");
     }
-    if (H.text(context.existing?.data.state) === "locked" && isScan) {
+    const existingState = H.text(context.existing?.data.state);
+    if (existingState === "locked" && (isScan || isCorrection)) {
       throw errors.lifecycle("LOCKED_BY_PAYROLL: Ngày công đã khóa bởi kỳ lương; hãy tạo điều chỉnh ở kỳ sau.");
     }
 
-    const data = await normalizeAttendanceDay(context, isPayroll);
+    const data = await normalizeAttendanceDay(context, isPayroll, isCorrection);
     const document: CanonicalDocument<JsonObject> = {
       tenant_id: context.command.tenant_id,
       doctype: this.doctype,
@@ -61,6 +64,11 @@ export class AlumDoorAttendanceDayController implements DocumentController<JsonO
       children: childRows(data),
     };
 
+    const eventType = isPayroll
+      ? "alumdoor_attendance_day.locked"
+      : isCorrection
+        ? "alumdoor_attendance_day.corrected"
+        : `alumdoor_attendance_day.${context.command.action === "create" ? "created" : "updated"}`;
     return {
       command: context.command,
       document,
@@ -69,7 +77,7 @@ export class AlumDoorAttendanceDayController implements DocumentController<JsonO
       payment_entries: [],
       fulfillment_entries: [],
       events: [domainEvent({
-        type: isPayroll ? "alumdoor_attendance_day.locked" : `alumdoor_attendance_day.${context.command.action === "create" ? "created" : "updated"}`,
+        type: eventType,
         tenantId: context.command.tenant_id,
         aggregate: context.command.aggregate,
         aggregateVersion: context.nextVersion,
@@ -97,7 +105,7 @@ export class AlumDoorAttendanceDayController implements DocumentController<JsonO
   }
 }
 
-async function normalizeAttendanceDay(context: ControllerContext<JsonObject>, payrollLock: boolean): Promise<JsonObject> {
+async function normalizeAttendanceDay(context: ControllerContext<JsonObject>, payrollLock: boolean, correction: boolean): Promise<JsonObject> {
   const input = context.command.document;
   const employeeName = H.requiredText(input.employee, "Employee");
   const workDate = H.requiredDate(input.work_date, "Work date");
@@ -133,6 +141,9 @@ async function normalizeAttendanceDay(context: ControllerContext<JsonObject>, pa
   if (payrollLock && !["complete", "approved", "locked"].includes(calculated.state)) {
     throw errors.validation(`PAYROLL_BLOCKED: Không thể khóa ngày công ${workDate} ở trạng thái ${calculated.state}.`);
   }
+  if (correction && calculated.state !== "complete") {
+    throw errors.validation(`ATTENDANCE_CORRECTION_INCOMPLETE: Phiếu sửa phải tạo ra ngày công hoàn chỉnh; trạng thái hiện tại ${calculated.state}.`);
+  }
   const requestedPayroll = H.text(input.locked_by_payroll);
   const existingPayroll = H.text(context.existing?.data.locked_by_payroll);
   if (payrollLock && !requestedPayroll) throw errors.validation("Payroll lock requires locked_by_payroll");
@@ -157,7 +168,7 @@ async function normalizeAttendanceDay(context: ControllerContext<JsonObject>, pa
       actual_minutes: segment.actualMinutes,
       regular_minutes: segment.regularMinutes,
       overtime_minutes: segment.overtimeMinutes,
-      state: segment.status,
+      state: correction && segment.code === H.text(input.corrected_segment_code) ? "corrected" : segment.status,
       calculation_version: context.nextVersion,
     };
   });
@@ -169,7 +180,7 @@ async function normalizeAttendanceDay(context: ControllerContext<JsonObject>, pa
     department,
     work_date: workDate,
     policy: policyName,
-    state: payrollLock ? "locked" : calculated.state,
+    state: payrollLock ? "locked" : correction ? "approved" : calculated.state,
     ...(calculated.exceptionCode ? { exception_code: calculated.exceptionCode } : {}),
     ...(payrollLock ? { locked_by_payroll: requestedPayroll, locked_at: context.now } : {}),
     regular_minutes: calculated.regularMinutes,
