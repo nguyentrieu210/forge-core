@@ -33,6 +33,7 @@ import {
 } from "./door-formulas.js";
 import { salesItemContext } from "./sales-item-context.js";
 import { previewChildRow } from "./ui-child-preview.js";
+import { previewDocument } from "./ui-document-preview.js";
 import {
   confirmSupplierOffset,
   planCapacity,
@@ -1469,48 +1470,15 @@ async function applyCutV2(call: PlatformCall, args: Record<string, unknown>): Pr
   if (cut.cut_state !== "Đã cắt") {
     await submitV2Doc(call, "Cut Order", name, cut as V2CutOrder & Record<string, unknown>);
   }
-  const reservations = await consumeReservationsForCut(call, name, cut.so_reference);
   const paint = await syncPaintJobsFromCut(call, name, 1);
   return answer({
     cut_order: name,
     submitted: true,
     idempotent: cut.cut_state === "Đã cắt",
-    reservations,
+    reservation_consumption: "derived-from-cut-order-stock-ledger",
     paint,
-    message: `Đã cắt và trừ tồn theo phiếu ${name}; ${reservations.used} phiếu giữ chỗ đã chuyển sang Đã dùng.`
-      + (reservations.failed.length ? ` Cần kiểm tra lại: ${reservations.failed.join(", ")}.` : ""),
+    message: `Đã cắt và trừ tồn theo phiếu ${name}; lượng giữ chỗ đã dùng được suy từ Stock Ledger của phiếu cắt.`,
   });
-}
-
-async function consumeReservationsForCut(
-  call: PlatformCall,
-  cutOrder: string,
-  sourceReference?: string,
-): Promise<{ used: number; failed: string[] }> {
-  const sourceNames = new Set([cutOrder, String(sourceReference ?? "").trim()].filter(Boolean));
-  const query = new URLSearchParams({
-    fields: JSON.stringify(["name", "source_name", "state", "modified"]),
-    filters: JSON.stringify([["state", "=", "Đang giữ"]]),
-    limit_page_length: "5000",
-  });
-  const response = await call(`resource/Stock%20Reservation?${query}`);
-  if (!response.ok) return { used: 0, failed: ["không đọc được danh sách giữ chỗ"] };
-  const rows = ((await response.json()) as {
-    data?: Array<{ name?: string; source_name?: string; state?: string; modified?: string }>;
-  }).data ?? [];
-  let used = 0;
-  const failed: string[] = [];
-  for (const row of rows) {
-    const reservation = String(row.name ?? "");
-    if (!reservation || !sourceNames.has(String(row.source_name ?? ""))) continue;
-    const saved = await call(`resource/Stock%20Reservation/${encodeURIComponent(reservation)}`, {
-      method: "PUT",
-      body: JSON.stringify({ state: "Đã dùng", modified: row.modified }),
-    });
-    if (saved.ok) used += 1;
-    else failed.push(reservation);
-  }
-  return { used, failed };
 }
 
 async function reverseCutV2(call: PlatformCall, args: Record<string, unknown>): Promise<Response> {
@@ -3190,6 +3158,7 @@ export default {
         if (method === "alumdoor.attendance.scan") return await attendanceScan({ request, call, env, args });
         if (method === "alumdoor.sales.item_context") return await salesItemContext(call, args);
     if (method === "alumdoor.ui.preview_child_row") return await previewChildRow(call, args);
+        if (method === "alumdoor.ui.preview_document") return await previewDocument(call, args);
         if (method === "alumdoor.sales.production_line_context") return await calculateSalesProductionLine(call, args);
         if (method === "alumdoor.sales.preview_production") return await previewSalesProduction(call, args);
         if (method === "alumdoor.sales.create_production") return await createSalesProduction(call, args);
