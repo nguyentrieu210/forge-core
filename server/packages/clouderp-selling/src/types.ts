@@ -1,6 +1,7 @@
 import type { JsonObject } from "../../contracts/src/index.js";
 import type { DecimalInput } from "../../money/src/index.js";
 import type { UomLine } from "../../clouderp-core/src/types.js";
+import type { PricingRuleSnapshot } from "../../clouderp-pricing/src/commercial-policy.js";
 
 export interface SalesItem extends UomLine {
   row_id: string;
@@ -22,12 +23,28 @@ export interface SalesItem extends UomLine {
   batch_no?: string;
   serial_nos?: string[];
   item_price?: string;
+  /** Raw Item Price before Pricing Rule effects. */
+  base_rate?: DecimalInput;
+  base_rate_minor?: number;
   /** Price-list baseline retained when a salesperson overrides the line rate. */
   standard_rate?: DecimalInput;
-  /** Server-derived flag: submitted rate differs from the active price list. */
+  /** Server-derived flag: submitted rate differs from the active commercial policy. */
   rate_requires_approval?: boolean;
   pricing_rule?: string;
+  /** Policy percentage is retained for audit even when UI displays only money. */
   discount_percentage?: string;
+  discount_basis_rate?: DecimalInput;
+  discount_basis_rate_minor?: number;
+  discount_basis_amount?: string;
+  discount_basis_amount_minor?: number;
+  discount_amount?: string;
+  discount_amount_minor?: number;
+  adjustment_amount?: string;
+  adjustment_amount_minor?: number;
+  taxable_adjustment_amount?: string;
+  taxable_adjustment_amount_minor?: number;
+  pricing_as_of?: string;
+  pricing_rule_snapshots?: PricingRuleSnapshot[];
   /** Source Quotation child row. Required when a Sales Order declares against_quotation. */
   quotation_item?: string;
 }
@@ -68,19 +85,17 @@ interface SalesTotalsData extends JsonObject {
   additional_discount_percentage?: DecimalInput | undefined;
   discount_amount?: DecimalInput | undefined;
   discount_amount_minor?: number;
-  /** Optional commercial surcharge, used by Alumdoor sales orders. */
+  /** Sum of line policy adjustments. Kept for compatibility/reporting, not client authority. */
   surcharge_amount?: DecimalInput | undefined;
   surcharge_amount_minor?: number;
   /**
-   * Alumdoor khai VAT bằng một tỷ lệ ở đầu đơn thay vì bảng `taxes` của ERPNext, và in
-   * "Tổng tiền hàng" là số TRƯỚC chiết khấu. Ba trường này để controller chốt được cả ba
-   * con số đó thay vì tin vào giá trị client gửi lên.
+   * Alumdoor compatibility tax projection. Canonical commercial line money is already
+   * server-derived before these fields are calculated.
    */
   total_amount?: DecimalInput | undefined;
   vat_rate?: DecimalInput | undefined;
   vat_amount?: DecimalInput | undefined;
   vat_amount_minor?: number;
-  /** Gốc tính thuế: tiền hàng − chiết khấu + phụ thu (phụ thu không chịu CK nhưng chịu VAT). */
   vat_base_amount?: DecimalInput | undefined;
 }
 
@@ -112,7 +127,7 @@ export interface SalesOrderData extends SalesTotalsData, CurrencyContextData {
   /** Server-owned amendment generation; starts at 1 and increments from amended_from. */
   revision_no?: number;
   items: SalesItem[];
-  /** Server-derived: a line price/discount differs from Alumdoor's standard policy and needs approval. */
+  /** Server-derived: manual rate/discount differs from commercial policy and needs approval. */
   discount_requires_approval?: boolean;
   taxes?: TaxRow[];
   delivered_percentage?: string;
