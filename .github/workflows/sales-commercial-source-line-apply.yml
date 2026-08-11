@@ -33,7 +33,7 @@ jobs:
       - name: Apply source-line and progress contracts
         working-directory: server
         run: |
-          node scripts/apply-sales-line-fulfillment-contract.mjs
+          node scripts/apply-sales-line-fulfillment-v2.mjs
           node scripts/apply-sales-order-progress.mjs
       - name: Build before commit
         working-directory: server
