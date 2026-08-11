@@ -8,7 +8,8 @@ import type { SalesItem, SalesOrderData } from "./types.js";
 
 /**
  * Validate physical Delivery rows against the exact Sales Order source line/component.
- * Duplicate item codes on different configured doors therefore never share progress.
+ * Legacy callers without row identity are supported only when the item maps to exactly one
+ * source line. Ambiguous duplicate-item orders always require sales_order_row_id.
  */
 export async function assertSalesOrderDeliveryLines(
   context: ControllerContext<JsonObject>,
@@ -17,9 +18,10 @@ export async function assertSalesOrderDeliveryLines(
 ): Promise<void> {
   const source = sourceLines(salesOrder);
   for (const [index, item] of items.entries()) {
-    const rowKey = requiredText(item.sales_order_row_id, `Delivery row ${index + 1} sales_order_row_id`);
-    const sourceLine = source.get(rowKey);
-    if (!sourceLine) throw errors.reference(`Sales Order row ${rowKey} does not belong to ${salesOrder.name}`);
+    const resolved = resolveSourceLine(source, item, `Delivery row ${index + 1}`, salesOrder.name);
+    const rowKey = resolved.rowKey;
+    const sourceLine = resolved.line;
+    item.sales_order_row_id = rowKey;
     const snapshot = parseSalesPackageSnapshot(sourceLine.sales_package_snapshot);
     const componentKey = text(item.sales_package_component_key);
 
@@ -81,9 +83,9 @@ export async function freezeSalesOrderBillingLines(
   const source = sourceLines(salesOrder);
   const result: SalesItem[] = [];
   for (const [index, item] of requestedItems.entries()) {
-    const rowKey = requiredText(item.sales_order_row_id, `Sales Invoice row ${index + 1} sales_order_row_id`);
-    const sourceLine = source.get(rowKey);
-    if (!sourceLine) throw errors.reference(`Sales Order row ${rowKey} does not belong to ${salesOrder.name}`);
+    const resolved = resolveSourceLine(source, item, `Sales Invoice row ${index + 1}`, salesOrder.name);
+    const rowKey = resolved.rowKey;
+    const sourceLine = resolved.line;
     if (sourceLine.item_code !== item.item_code) throw errors.reference(`Sales Invoice item ${item.item_code} does not match Sales Order row ${rowKey}`);
     if (text(item.uom) !== text(sourceLine.uom)) throw errors.validation(`Sales Invoice row ${index + 1} must preserve Sales Order UOM ${sourceLine.uom}`);
 
@@ -163,20 +165,45 @@ export function salesOrderFulfillmentEntries(
   reverse = false,
 ): FulfillmentEntry[] {
   return items.map((item, index) => {
-    const rowKey = requiredText(item.sales_order_row_id, `${kind} row ${index + 1} sales_order_row_id`);
+    const rowKey = text(item.sales_order_row_id);
     const componentKey = text(item.sales_package_component_key);
-    const quantity = kind === "Delivery" && componentKey ? toScaledInt(item.qty, 6) : (kind === "Delivery" ? stockQtyMicros(item) : pricedQtyMicros(item));
+    const quantity = kind === "Delivery" && componentKey
+      ? toScaledInt(item.qty, 6)
+      : (kind === "Delivery" ? stockQtyMicros(item) : pricedQtyMicros(item));
     return {
       line_key: `${reverse ? "REV-" : ""}${kind === "Delivery" ? "DELIVERY" : "BILLING"}-${item.row_id || index + 1}`,
       sales_order: salesOrder,
       kind,
       item_code: item.item_code,
       qty_micros: reverse ? -quantity : quantity,
-      sales_order_line_key: rowKey,
+      ...(rowKey ? { sales_order_line_key: rowKey } : {}),
       ...(componentKey ? { package_component_key: componentKey } : {}),
       posting_at: postingAt,
     };
   });
+}
+
+function resolveSourceLine(
+  source: Map<string, SalesItem>,
+  requested: SalesItem,
+  label: string,
+  salesOrder: string,
+): { rowKey: string; line: SalesItem } {
+  const explicit = text(requested.sales_order_row_id);
+  if (explicit) {
+    const line = source.get(explicit);
+    if (!line) throw errors.reference(`Sales Order row ${explicit} does not belong to ${salesOrder}`);
+    return { rowKey: explicit, line };
+  }
+  const candidates = [...source.entries()].filter(([, line]) => line.item_code === requested.item_code);
+  if (candidates.length === 1) {
+    const [rowKey, line] = candidates[0]!;
+    return { rowKey, line };
+  }
+  if (candidates.length === 0) {
+    throw errors.reference(`${label} cannot infer a Sales Order source row for item ${requested.item_code}; sales_order_row_id is required`);
+  }
+  throw errors.validation(`${label} matches multiple Sales Order rows for item ${requested.item_code}; sales_order_row_id is required`);
 }
 
 function sourceLines(salesOrder: CanonicalDocument<SalesOrderData>): Map<string, SalesItem> {
@@ -218,12 +245,6 @@ function safeAdd(values: number[], field: string): number {
     if (!Number.isSafeInteger(total)) throw errors.validation(`${field} exceeds safe integer range`);
   }
   return total;
-}
-
-function requiredText(value: unknown, label: string): string {
-  const normalized = text(value);
-  if (!normalized) throw errors.validation(`${label} is required`);
-  return normalized;
 }
 
 function text(value: unknown): string {
