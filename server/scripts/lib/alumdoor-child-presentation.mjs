@@ -160,6 +160,21 @@ function genericPolicy(doctypeName, fields, listed) {
   return { full, quick };
 }
 
+function applySurface(field, surface) {
+  if (surface !== "internal" || isLayout(field.fieldtype)) return { ...field, surface };
+  // An internal field has no operator input surface. Leaving it editable would create an
+  // impossible contract: the manifest promises user input for a value the UI deliberately
+  // never renders. The canonical parser therefore rejects internal+editable. Marking it
+  // hidden is presentation policy only; server/controller code can still populate it.
+  return {
+    ...field,
+    surface,
+    hidden: true,
+    editMode: "hidden",
+    serverEnforced: true,
+  };
+}
+
 /**
  * Materialise AlumDoor child-grid presentation into the canonical brief source.
  *
@@ -186,12 +201,12 @@ export function applyAlumdoorChildPresentation(brief) {
       : genericPolicy(doctype.name, fields, listed);
     const preview = previewPolicy(doctype.name);
 
-    doctype.fields = fields.map((field) => ({
-      ...field,
-      surface: declared
+    doctype.fields = fields.map((field) => applySurface(
+      field,
+      declared
         ? exactSurface(doctype.name, field, policy)
         : defaultSurface(doctype.name, field, listed),
-    }));
+    ));
     doctype.form = { fields: policy.full, ...preview };
     doctype.quickEntry = { fields: policy.quick, ...preview };
     migrated += 1;
