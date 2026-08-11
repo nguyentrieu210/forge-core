@@ -10,6 +10,8 @@ on:
     paths:
       - "server/packages/clouderp-pricing/**"
       - "server/packages/clouderp-selling/**"
+      - "server/migrations/tenant/0117_sales_pricing_authority.sql"
+      - "server/scripts/test-sales-pricing-authority-migration.py"
       - "server/tests/commercial-*.test.mjs"
       - ".github/workflows/sales-pricing-authority-validation.yml"
 
@@ -23,7 +25,7 @@ concurrency:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - name: Checkout exact head
         uses: actions/checkout@v4
@@ -47,4 +49,8 @@ jobs:
 
       - name: Commercial pricing regressions
         working-directory: server
-        run: node --test tests/commercial-pricing-policy.test.mjs tests/commercial-line-authority.test.mjs tests/sales-uom-pricing.test.mjs tests/sales-price-field-lookup.test.mjs
+        run: node --test tests/commercial-pricing-policy.test.mjs tests/commercial-line-authority.test.mjs tests/sales-uom-pricing.test.mjs tests/sales-price-field-lookup.test.mjs tests/transaction-closure-sales-o2c.test.mjs
+
+      - name: Pricing Rule migration replay
+        working-directory: server
+        run: python3 scripts/test-sales-pricing-authority-migration.py
