@@ -48,10 +48,16 @@ function decimal(value: unknown): string | number | null {
  *    consume the promise. Consumption is allocated longest-minimum-first, because a long bar
  *    can satisfy a shorter requirement but the reverse is impossible.
  *
- * Raw reservation documents remain append/audit facts. Only this read projection derives the
- * effective `qty_reserved` / `state` used by ATP and outbound guards.
+ * `excludedSourceNames` is request-scoped ownership, not a stored state mutation. It lets a
+ * Cut/Delivery operation consume stock promised to its own Production/Sales source while all
+ * other promises remain protected.
  */
-export function reservationLifecycleReader(reader: DomainReader, tenantId: string): DomainReader {
+export function reservationLifecycleReader(
+  reader: DomainReader,
+  tenantId: string,
+  excludedSourceNames: Iterable<string> = [],
+): DomainReader {
+  const excluded = new Set([...excludedSourceNames].map(text).filter(Boolean));
   return new Proxy(reader, {
     get(target, property, receiver) {
       if (property === "listDocumentsByDoctype") {
@@ -64,6 +70,7 @@ export function reservationLifecycleReader(reader: DomainReader, tenantId: strin
             const data = document.data as ReservationSourceData;
             const sourceDoctype = text(data.source_doctype);
             const sourceName = text(data.source_name);
+            if (sourceName && excluded.has(sourceName)) continue;
             if (!sourceDoctype || !sourceName) {
               sourceOpen.push(document);
               continue;
@@ -201,12 +208,14 @@ function matchesReservation(
 
 export function withReservationLifecycleReader<T extends JsonObject>(
   context: ControllerContext<T>,
+  excludedSourceNames: Iterable<string> = [],
 ): ControllerContext<T> {
   return {
     ...context,
     reader: reservationLifecycleReader(
       context.reader as unknown as DomainReader,
       context.command.tenant_id,
+      excludedSourceNames,
     ),
   };
 }
