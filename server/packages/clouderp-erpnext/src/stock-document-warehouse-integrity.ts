@@ -11,6 +11,7 @@ import {
   type DeliveryNoteData,
 } from "../../clouderp-selling/src/index.js";
 import { requireLeafWarehouse } from "../../clouderp-stock/src/index.js";
+import { assertStockPlanRespectsReservations } from "./outbound-reservation-guard.js";
 
 type WarehouseLine = JsonObject & { warehouse?: string };
 type WarehouseScopedDocument = JsonObject & {
@@ -18,13 +19,6 @@ type WarehouseScopedDocument = JsonObject & {
   items?: WarehouseLine[];
 };
 
-/**
- * Canonical guard for stock documents whose posting warehouse is carried on item rows.
- *
- * Historical documents may point to warehouses that are now disabled/grouped, therefore
- * this guard deliberately runs only on submit. Cancel must remain able to reverse the
- * exact historical posting through the ledger even after master-data lifecycle changes.
- */
 export async function assertPostingWarehouses(
   context: ControllerContext<JsonObject>,
   document: WarehouseScopedDocument,
@@ -57,21 +51,29 @@ implements DocumentController<T> {
   }
 }
 
-/**
- * Overrides the O2C Delivery Note controller at the ERPNext registry layer so every
- * outward delivery shares the same company/leaf warehouse boundary as Stock Entry,
- * Stock Return and Stock Reconciliation.
- */
+/** Delivery uses the Sales Order lineage as its own reservation source. */
 export class WarehouseScopedDeliveryNoteController
 extends WarehouseScopedController<DeliveryNoteData> {
   readonly doctype = "Delivery Note";
   protected readonly delegate = new DeliveryNoteController();
+
+  override async buildPlan(context: ControllerContext<DeliveryNoteData>): Promise<MutationPlan<DeliveryNoteData>> {
+    if (context.command.action === "submit") {
+      await assertPostingWarehouses(
+        context as unknown as ControllerContext<JsonObject>,
+        context.command.document,
+      );
+    }
+    const plan = await this.delegate.buildPlan(context);
+    const source = context.command.action === "cancel" ? context.existing?.data : context.command.document;
+    await assertStockPlanRespectsReservations(context, plan.stock_entries, [
+      context.command.aggregate.name,
+      text(source?.against_sales_order),
+    ]);
+    return plan;
+  }
 }
 
-/**
- * Replaces only the physical/accounting reversal portion of a Purchase Receipt cancel plan.
- * Procurement/allocation extensions produced by the rollout-aware delegate stay untouched.
- */
 export async function exactPurchaseReceiptCancellationPlan(
   context: ControllerContext<PurchaseReceiptData>,
   plan: MutationPlan<PurchaseReceiptData>,
@@ -102,14 +104,6 @@ export async function exactPurchaseReceiptCancellationPlan(
   };
 }
 
-/**
- * Wraps the rollout-aware Purchase Receipt controller rather than bypassing it, so the
- * purchase-allocation rollout switch remains intact while warehouse posting is hardened.
- *
- * Cancellation lets the delegate build procurement/allocation reversal facts, then replaces
- * reconstructed Stock/GL rows with the exact rows from the submitted revision. That keeps
- * allocation v1 behavior while making quantity/value/account reversal audit-exact.
- */
 export class WarehouseScopedPurchaseReceiptController
 extends WarehouseScopedController<PurchaseReceiptData> {
   readonly doctype = "Purchase Receipt";
@@ -121,11 +115,15 @@ extends WarehouseScopedController<PurchaseReceiptData> {
         context as unknown as ControllerContext<JsonObject>,
         context.command.document,
       );
-      return this.delegate.buildPlan(context);
+      const plan = await this.delegate.buildPlan(context);
+      await assertStockPlanRespectsReservations(context, plan.stock_entries, [context.command.aggregate.name]);
+      return plan;
     }
     if (context.command.action !== "cancel") return this.delegate.buildPlan(context);
-    const plan = await this.delegate.buildPlan(context);
-    return exactPurchaseReceiptCancellationPlan(context, plan);
+    const delegated = await this.delegate.buildPlan(context);
+    const exact = await exactPurchaseReceiptCancellationPlan(context, delegated);
+    await assertStockPlanRespectsReservations(context, exact.stock_entries, [context.command.aggregate.name]);
+    return exact;
   }
 }
 
