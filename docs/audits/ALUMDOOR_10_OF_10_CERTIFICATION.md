@@ -17,64 +17,61 @@ No partial rounding. A gate is either `PASS = 1.0` or `OPEN = 0.0`. A 9/10 resul
 | 3 | UX completeness | 0.0 | Needs create/edit/save/submit/cancel/link/grid/filter validation per operational screen with real runtime evidence. |
 | 4 | Sales closure | 0.0 | Strong O2C unit evidence exists; final real-data end-to-end certification remains open. |
 | 5 | Purchase closure | 0.0 | Purchase Receipt warehouse boundary and exact Stock/GL cancel are verified; full real-data P2P chain remains open. |
-| 6 | Inventory integrity | 0.0 | P0/exact-reversal/reservation-threshold slice verified; consumption evidence, source lifecycle and generic outbound reservation guard remain open. |
+| 6 | Inventory integrity | **1.0 PASS** | No open P0/P1 inventory correctness blocker after exact reversal, lifecycle-aware reservations, Cut-ledger consumption projection and generic outbound reservation protection. Remaining 5,000-row scan work is fail-closed P2 scalability. |
 | 7 | Manufacturing closure | 0.0 | Strong Work Order/Cut/manufacture evidence exists; final golden real-data chain not yet certified. |
-| 8 | Accounting reconciliation | 0.0 | Stock/GL/AR/AP controls exist; final Alumdoor golden-chain reconciliation is open. |
+| 8 | Accounting reconciliation | 0.0 | Stock/GL/AR/AP controls exist; final Alumdoor golden-chain reconciliation and backdate/repost finance closure are open. |
 | 9 | Real-data certification | 0.0 | Pricing lab real data exists; full vertical transaction chain on disposable Alumdoor data clone remains open. |
-| 10 | Regression / print / performance | 0.0 | Build + 2025/2025 server unit + metadata UI contract are green; visual/E2E/print/performance certification remains open. |
+| 10 | Regression / print / performance | 0.0 | Build + full server unit + metadata UI contract are green; visual/E2E/print/performance certification remains open. |
 
-**Current certified score: 0/10.** This intentionally does not reward partial gates. Evidence can be strong without the gate being complete.
+**Current certified score: 1/10.** No partial gates are counted.
 
 ## Latest verified checkpoint — 2026-08-11
 
 Self-hosted runner `alumdoor-runner` on `DESKTOP-JTFCUTT` tested experiment commit:
 
-`3193acc42c9af588cd64f1238ecb876a09126f0f`
+`b662b323ed00e0d273fe38659be346ad6b382c02`
 
-Workflow: `Test local runner` run #56, run id `31446707358`, job id `93642385301`.
+Workflow: `Test local runner` run #61, run id `31448043854`, job id `93646390695`.
 
 Verified results:
 
 - server TypeScript build: PASS
 - MetaForge views TypeScript build: PASS
 - metadata child-grid presentation contract: 4/4 PASS
-- focused inventory integrity slice: 28/28 PASS
-- full server suite: 2025/2025 PASS
+- focused inventory integrity slice: 36/36 PASS
+- full server suite: 2036/2036 PASS
 - full-suite fail: 0
 - marker: `ALUMDOOR_INVENTORY_FULL_SERVER_UNIT_PASS`
 
-### Inventory controls verified at this checkpoint
+### Inventory controls certified at this checkpoint
 
 1. Delivery Note rejects cross-company, disabled and group posting warehouses before stock planning.
 2. Purchase Receipt keeps rollout/allocation behavior and shares the same leaf/company warehouse boundary.
 3. Purchase Receipt cancel preserves procurement/allocation reversal facts but replaces reconstructed Stock/GL with exact submitted-revision reversals.
-4. Stock Reservation checks all nested length breakpoints; one physical bar cannot satisfy incompatible promises at multiple thresholds.
-5. Partial reservation release stays `Đang giữ` and records actor, time, delta, cumulative released quantity and canonical/custom reason.
-6. Client cannot declare reservation `Đã dùng`; consumption state remains server-evidence-only.
-7. Stock Return cancel reverses exact submitted Stock/GL rows without replaying current valuation.
-8. Delivery Note, Purchase Receipt and Stock Return share the company-wide inventory coordinator with Stock Entry, Cut Order, Work Order and Stock Reconciliation.
+4. Stock Return cancellation reverses exact submitted Stock/GL rows without replaying current valuation.
+5. Stock Reservation checks every nested length breakpoint; one long bar cannot satisfy incompatible promises at multiple thresholds.
+6. Partial reservation release remains `Đang giữ` and records actor, time, delta, cumulative released quantity and canonical/custom reason.
+7. Client cannot directly declare `Đã dùng`.
+8. Effective reservation consumption is derived from **submitted Cut Order Stock Ledger** facts for the same Production Order; partial cutting reduces effective `qty_reserved`, full consumption derives `Đã dùng`, and allocation is longest-minimum-first.
+9. Cancellation of a reservation source removes that promise from effective ATP without rewriting the immutable reservation audit record; missing historical sources remain conservative and do not silently release stock.
+10. Generic `assertStockPlanRespectsReservations()` protects batch-tracked outbound Stock Ledger plans by item/warehouse/color/condition and every reservation length breakpoint. Own source lineage can consume its own promise; other promises remain protected.
+11. Stock Entry, Delivery Note, Purchase Receipt cancellation and Stock Return use the generic outbound reservation guard in addition to Cut Order's specialized allocation guard.
+12. Delivery Note, Purchase Receipt, Stock Return, Stock Entry, Cut Order, Work Order and Stock Reconciliation share the company-wide inventory coordinator, so reservation/stock read-check-write sequences are serialized per company.
+13. D1 remains the final write-time authority for aggregate negative stock, batch negative stock, serial state and bundle usage.
 
-## Inventory remaining blockers
+## Inventory residual work — non-blocking for correctness gate
 
-### INV-P2-01 — bounded reservation scan scalability
+### INV-P2-01 — targeted active-reservation query
 
-Production D1 does **not** silently truncate at 5,000. `D1RolloutPurchaseAllocationDomainStore` counts rows and `assertControllerDocumentScanCount()` fails closed when the controller scan bound is exceeded. Correctness is therefore protected; a targeted active-reservation reader is still required for scale and is now P2, not P1 correctness.
+Production D1 does **not** silently truncate at 5,000. `D1RolloutPurchaseAllocationDomainStore` counts rows and `assertControllerDocumentScanCount()` fails closed when the controller scan bound is exceeded. A narrow active-reservation query is still desirable for scale, but this is P2 performance work, not an inventory correctness blocker.
 
-### INV-P1-01 — `Đã dùng` requires canonical consumption evidence
+### Cross-domain dependency
 
-Direct client mutation is now blocked. The remaining work is positive evidence: submitted Cut/Delivery/Stock Entry lineage must derive consumed quantity and the terminal `Đã dùng` state when the promise is fully consumed.
-
-### INV-P1-02 — source lifecycle releases promises
-
-Cancellation/closure of the source Sales/Production/Cut document must deterministically release or terminate its active reservations with audit evidence.
-
-### INV-P1-03 — generic outbound reservation guard
-
-All stock-consuming paths must respect active promises using one server guard under the company inventory coordinator. Cut Order already has a specialized reservation protection; Delivery/Material Issue/Transfer/Purchase Return must converge on the same invariant.
+Backdated valuation/repost may require downstream Finance restatement. That remains tracked under **Accounting reconciliation**, not the physical-inventory correctness gate; stock-side replay itself remains deterministic/fail-closed.
 
 ## Golden UI metadata work verified
 
-`client/packages/views/src/form/child-grid-presentation.ts` now defines a business-neutral presentation contract:
+`client/packages/views/src/form/child-grid-presentation.ts` defines a business-neutral presentation contract:
 
 - `viewPolicy.form.columns/fields` controls full detail order;
 - `viewPolicy.quickEntry.columns/fields` controls compact parent-form order;
