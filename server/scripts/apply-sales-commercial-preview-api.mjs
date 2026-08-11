@@ -22,6 +22,7 @@ replace(
     case "metaforge.api.preview_sales_commercial_line":
       return methodResponse(await previewSalesCommercialLine(args, context));`, "preview method route");
 
+if (!source.includes("async function previewSalesCommercialLine(")) {
 source += `
 
 /** Read-only preview using the exact same selling resolver used by Quotation/Sales Order. */
@@ -34,7 +35,6 @@ async function previewSalesCommercialLine(args: FrappeArgs, context: FrappeRoute
   if (!itemCode) throw errors.validation("item_code is required");
   if (!priceList) throw errors.validation("price_list is required");
 
-  // Permission is evaluated on the actual Item before any pricing master is read.
   const item = await loadReadable("Item", itemCode, context);
   const qty = Number(line.qty ?? line.priced_qty ?? 0);
   if (!Number.isFinite(qty) || qty <= 0) throw errors.validation("qty must be greater than zero");
@@ -50,10 +50,7 @@ async function previewSalesCommercialLine(args: FrappeArgs, context: FrappeRoute
     document: {},
     actor: context.actor,
   };
-  const facts: Record<string, unknown> = {
-    ...line,
-    item_group: item.data.item_group,
-  };
+  const facts: Record<string, unknown> = { ...line, item_group: item.data.item_group };
   const resolved = await resolveCommercialLine({
     command: fakeCommand,
     existing: null,
@@ -75,14 +72,10 @@ async function previewSalesCommercialLine(args: FrappeArgs, context: FrappeRoute
     ...(Number.isFinite(Number(line.length_m)) ? { lengthM: Number(line.length_m) } : {}),
     ...(Number.isFinite(Number(line.set_count)) ? { setCount: Number(line.set_count) } : {}),
   });
-  return {
-    ...resolved,
-    rate: resolved.selling_rate,
-    amount: resolved.net_before_tax,
-    net_amount: resolved.net_before_tax,
-  };
+  return { ...resolved, rate: resolved.selling_rate, amount: resolved.net_before_tax, net_amount: resolved.net_before_tax };
 }
 `;
+}
 
 fs.writeFileSync(target, source);
 console.log("canonical sales commercial preview API applied");
