@@ -29,6 +29,10 @@ const EXACT = new Map([
   ["Purchase Receipt Item", { quick: PURCHASE_COMPACT_FIELDS, full: PURCHASE_RECEIPT_FULL_FIELDS }],
 ]);
 
+const SALES_PREVIEW = new Set(["Quotation Item", "Sales Order Item", "Delivery Note Item", "Sales Invoice Item"]);
+const PURCHASE_PREVIEW = new Set(["Supplier Quotation Item", "Purchase Order Item", "Purchase Receipt Item", "Purchase Invoice Item"]);
+const PREVIEW_METHOD = "alumdoor.ui.preview_child_row";
+
 function isLayout(fieldtype) {
   return ["Heading", "Section Break", "Column Break", "HTML", "Tab Break", "Fold", "Button"].includes(fieldtype);
 }
@@ -51,6 +55,22 @@ function requiredEditableNames(fields, full) {
 function closeQuickOverRequired(fields, full, preferredQuick) {
   const wanted = new Set([...preferredQuick, ...requiredEditableNames(fields, full)]);
   return full.filter((fieldname) => wanted.has(fieldname));
+}
+
+function previewPolicy(doctypeName) {
+  if (SALES_PREVIEW.has(doctypeName)) {
+    return {
+      previewMethod: PREVIEW_METHOD,
+      previewParentFields: ["customer", "customer_group", "selling_price_list", "currency"],
+    };
+  }
+  if (PURCHASE_PREVIEW.has(doctypeName)) {
+    return {
+      previewMethod: PREVIEW_METHOD,
+      previewParentFields: ["company", "currency", "transaction_date"],
+    };
+  }
+  return {};
 }
 
 /**
@@ -102,13 +122,14 @@ export function applyAlumdoorChildPresentation(brief) {
           return { quick: closeQuickOverRequired(fields, full, preferredQuick), full };
         })()
       : genericPolicy(fields, listed);
+    const preview = previewPolicy(doctype.name);
 
     doctype.fields = fields.map((field) => ({
       ...field,
       surface: declared ? exactSurface(field, policy) : defaultSurface(field, listed),
     }));
-    doctype.form = { fields: policy.full };
-    doctype.quickEntry = { fields: policy.quick };
+    doctype.form = { fields: policy.full, ...preview };
+    doctype.quickEntry = { fields: policy.quick, ...preview };
     migrated.push(doctype.name);
   }
   return { migrated: migrated.length, doctypes: migrated };
