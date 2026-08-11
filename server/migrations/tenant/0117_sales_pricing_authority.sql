@@ -63,3 +63,10 @@ SET metadata_json = json_insert(metadata_json, '$.fields[#]', json('{"fieldname"
     revision = revision + 1, modified_by = 'migration-0117', modified_at = '2026-08-11T00:00:00.000Z'
 WHERE doctype='Pricing Rule' AND json_valid(metadata_json)
   AND NOT EXISTS (SELECT 1 FROM json_each(metadata_json,'$.fields') f WHERE json_extract(f.value,'$.fieldname')='conditions');
+
+-- Keep the compiled metadata revision aligned with the authoritative row revision after any
+-- subset of fields was appended. This final statement is replay-safe and does not increment.
+UPDATE doctype_definitions
+SET metadata_json = json_set(metadata_json, '$.revision', revision)
+WHERE doctype='Pricing Rule' AND json_valid(metadata_json)
+  AND COALESCE(json_extract(metadata_json,'$.revision'), -1) <> revision;
