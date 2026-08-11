@@ -41,6 +41,18 @@ function existing(names, fieldNames) {
   return names.filter((fieldname) => fieldNames.has(fieldname));
 }
 
+function requiredEditableNames(fields, full) {
+  const allowed = new Set(full);
+  return fields
+    .filter((field) => allowed.has(field.fieldname) && field.required && !field.read_only && !field.hidden && !isLayout(field.fieldtype))
+    .map((field) => field.fieldname);
+}
+
+function closeQuickOverRequired(fields, full, preferredQuick) {
+  const wanted = new Set([...preferredQuick, ...requiredEditableNames(fields, full)]);
+  return full.filter((fieldname) => wanted.has(fieldname));
+}
+
 /**
  * `surface` describes how a field itself behaves; it is not a grid-membership flag.
  * `form.fields`/`quickEntry.fields` decide whether the field is shown in this table view.
@@ -86,7 +98,8 @@ export function applyAlumdoorChildPresentation(brief) {
       ? (() => {
           const full = existing(declared.full, fieldNames);
           const visible = new Set(full);
-          return { quick: existing(declared.quick, fieldNames).filter((fieldname) => visible.has(fieldname)), full };
+          const preferredQuick = existing(declared.quick, fieldNames).filter((fieldname) => visible.has(fieldname));
+          return { quick: closeQuickOverRequired(fields, full, preferredQuick), full };
         })()
       : genericPolicy(fields, listed);
 
