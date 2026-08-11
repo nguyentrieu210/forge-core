@@ -87,8 +87,8 @@
     { "key": "AlumDoor QR Station", "label": "Trạm QR", "kind": "doctype", "icon": "scan-line", "group": "Chấm công & ca", "required_roles": ["AlumDoor Attendance Manager", "HR Manager", "System Manager"] },
     { "key": "AlumDoor Attendance Policy", "label": "Chính sách ca", "kind": "doctype", "icon": "timer", "group": "Chấm công & ca", "required_roles": ["AlumDoor Attendance Manager", "HR Manager", "System Manager"] },
     { "key": "AlumDoor Pay Profile", "label": "Hồ sơ lương", "kind": "doctype", "icon": "badge-dollar-sign", "group": "Lương", "required_roles": ["AlumDoor Payroll User", "AlumDoor Payroll Approver", "HR Manager", "System Manager"] },
-    { "key": "alumdoor-payroll:run", "label": "Tính lương", "kind": "experience", "icon": "calculator", "group": "Lương", "required_roles": ["AlumDoor Payroll User", "AlumDoor Payroll Approver", "HR Manager", "System Manager"] },
-    { "key": "alumdoor-payroll:my-slips", "label": "Phiếu lương của tôi", "kind": "experience", "icon": "receipt-text", "group": "Lương" }
+    { "key": "alumdoor-attendance:payroll-run", "label": "Tính lương", "kind": "experience", "icon": "calculator", "group": "Lương", "required_roles": ["AlumDoor Payroll User", "AlumDoor Payroll Approver", "HR Manager", "System Manager"] },
+    { "key": "alumdoor-attendance:payroll-my-slips", "label": "Phiếu lương của tôi", "kind": "experience", "icon": "receipt-text", "group": "Lương" }
   ],
   "hooks": []
 }
