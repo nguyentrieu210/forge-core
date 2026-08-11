@@ -57,7 +57,7 @@ test("attendance-native methods reject browsers and every non-AlumDoor callback 
     });
 
     for (const [method, body] of [
-      [METHODS.scan, { station: "QR-XUONG-01", nonce_hash: "a".repeat(64) }],
+      [METHODS.scan, { station: "QR-XUONG-01", station_token_hash: "a".repeat(64), request_id: "12345678-1234-4234-9234-123456789012", latitude: 10, longitude: 106, accuracy: 10 }],
       [METHODS.config, { station: "QR-XUONG-01" }],
     ]) {
       const result = await invoke(method, body, routerContext);
@@ -87,6 +87,12 @@ test("verified AlumDoor callback gets only the bounded scan and QR-config seams"
             policy: "ATP-2026-00001",
             secret_version: 9,
             is_active: true,
+            company: "Demo",
+            branch: "BR-A",
+            latitude: 10.7769,
+            longitude: 106.7009,
+            allowed_radius_m: 50,
+            max_gps_accuracy_m: 50,
             private_station_note: "must not leave the router",
           };
         }
@@ -94,7 +100,8 @@ test("verified AlumDoor callback gets only the bounded scan and QR-config seams"
           return {
             policy_status: "approved",
             timezone: "Asia/Ho_Chi_Minh",
-            qr_ttl_seconds: 15,
+            duplicate_scan_window_seconds: 60,
+            max_devices_per_employee: 2,
             effective_from: "2026-01-01",
             effective_to: "2026-12-31",
             private_policy_note: "must not leave the router",
@@ -107,16 +114,26 @@ test("verified AlumDoor callback gets only the bounded scan and QR-config seams"
 
   const scan = await invoke(METHODS.scan, {
     station: "QR-XUONG-01",
-    nonce_hash: "AB".repeat(32),
-    device_fingerprint_hash: "fingerprint-1",
+    station_token_hash: "AB".repeat(32),
+    request_id: "12345678-1234-4234-9234-123456789012",
+    latitude: 10.7769,
+    longitude: 106.7009,
+    accuracy: 12,
+    device_id: "device_installation_0001",
+    credential_hash: "CD".repeat(32),
     ignored_client_value: "not part of the native seam",
   }, routerContext);
   assert.equal(scan.response.status, 200);
   assert.deepEqual(scan.body.message, { segment: "SHIFT1", log_type: "IN", idempotent: false });
   assert.deepEqual(scanCalls, [{
     station: "QR-XUONG-01",
-    nonceHash: "ab".repeat(32),
-    deviceFingerprintHash: "fingerprint-1",
+    stationTokenHash: "ab".repeat(32),
+    requestId: "12345678-1234-4234-9234-123456789012",
+    latitude: 10.7769,
+    longitude: 106.7009,
+    accuracy: 12,
+    deviceId: "device_installation_0001",
+    credentialHash: "cd".repeat(32),
   }]);
   assert.deepEqual(documentCalls, [], "scan must not gain generic document-read access");
 
@@ -131,10 +148,10 @@ test("verified AlumDoor callback gets only the bounded scan and QR-config seams"
   ]);
   assert.deepEqual(Object.keys(config.body.message).sort(), ["policy", "station"]);
   assert.deepEqual(Object.keys(config.body.message.station).sort(), [
-    "is_active", "policy", "secret_version", "station_code", "station_name",
+    "allowed_radius_m", "branch", "company", "is_active", "latitude", "longitude", "max_gps_accuracy_m", "policy", "secret_version", "station_code", "station_name",
   ]);
   assert.deepEqual(Object.keys(config.body.message.policy).sort(), [
-    "effective_from", "effective_to", "policy_status", "qr_ttl_seconds", "timezone",
+    "duplicate_scan_window_seconds", "effective_from", "effective_to", "max_devices_per_employee", "policy_status", "timezone",
   ]);
   assert.equal(config.body.message.station.private_station_note, undefined);
   assert.equal(config.body.message.policy.private_policy_note, undefined);

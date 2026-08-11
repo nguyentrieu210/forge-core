@@ -95,8 +95,34 @@ export class AggregateCoordinator extends DurableObject<TenantEnv> {
   async commitAlumDoorAttendanceScan(input: AlumDoorAttendanceScanInput): Promise<JsonObject> {
     return this.withAttendanceExecutor(() => {
       const { kernel, store } = this.commandServices();
-      return commitAlumDoorAttendanceScan(input, { kernel, store });
+      return this.commitRateLimitedAttendanceScan(input, kernel, store);
     });
+  }
+
+  private async commitRateLimitedAttendanceScan(
+    input: AlumDoorAttendanceScanInput,
+    kernel: DocumentKernel,
+    store: D1RolloutPurchaseAllocationDomainStore,
+  ): Promise<JsonObject> {
+    const registration = Boolean(input.employeeCode && input.newCredentialHash);
+    if (registration) {
+      const key = "attendance-registration-attempts";
+      const now = Date.now();
+      const storage = (this.ctx as unknown as { storage: {
+        get<T>(key: string): Promise<T | undefined>;
+        put(key: string, value: unknown): Promise<void>;
+        delete(key: string): Promise<boolean>;
+      } }).storage;
+      const recent = ((await storage.get<number[]>(key)) ?? []).filter((at: number) => now - at < 15 * 60_000);
+      if (recent.length >= 5) throw errors.rateLimited("Đã thử đăng ký thiết bị quá nhiều lần. Vui lòng chờ 15 phút hoặc liên hệ quản lý.");
+      await storage.put(key, [...recent, now]);
+    }
+    const result = await commitAlumDoorAttendanceScan(input, { kernel, store });
+    if (registration && result.device_registered === true) {
+      const storage = (this.ctx as unknown as { storage: { delete(key: string): Promise<boolean> } }).storage;
+      await storage.delete("attendance-registration-attempts");
+    }
+    return result;
   }
 
   async submitAlumDoorAttendanceCorrection(input: AlumDoorAttendanceCorrectionSubmitInput): Promise<JsonObject> {

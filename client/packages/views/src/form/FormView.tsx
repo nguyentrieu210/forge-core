@@ -326,6 +326,7 @@ export function FormView(props: FormViewProps) {
     isNew: props.isNew ?? (!doc.name || doc.name === "new"),
     dirty: form.formState.isDirty,
     hasWorkflow: (props.transitions?.length ?? 0) > 0 || props.hasWorkflow === true,
+    hasEditableFields: resolved.some((item) => !item.layout && item.visible && !item.readOnly),
     saving: props.saving,
     allowRename: meta.allow_rename === 1,
     perms: props.perms ?? { create: true, write: true, submit: true, cancel: true, delete: true, amend: true },
@@ -641,7 +642,7 @@ function Field({ id, rf, width, form, registry, services, docName, parentDoctype
             {choiceOptions.map((option) => <label key={option} className="flex min-h-8 cursor-pointer items-center gap-2 text-sm"><Checkbox checked={f.value === option} disabled={rf.readOnly} onCheckedChange={(checked) => { if (checked === true) { f.onChange(option); if (fieldState.error) form.clearErrors(field.fieldname); } }} aria-label={field.optionLabels?.[option] ?? option} /><span>{field.optionLabels?.[option] ?? option}</span></label>)}
           </div>
         ) : (
-          <Control field={field} id={id} value={f.value} onChange={(v) => { f.onChange(v); if (fieldState.error) form.clearErrors(field.fieldname); }} readOnly={rf.readOnly} masked={rf.masked} error={fieldState.error?.message} describedBy={fieldState.error ? `${id}-error` : undefined} required={rf.required} label={displayLabel} services={services} docname={docName} linkTarget={linkTarget} parentDoctype={parentDoctype} docValues={controlValues} roles={roles} />
+          <Control field={field} id={id} value={f.value} onChange={(v) => { f.onChange(v); if (fieldState.error) form.clearErrors(field.fieldname); }} setFieldValue={(fieldname, value) => form.setValue(fieldname, value, { shouldDirty: true, shouldTouch: true, shouldValidate: true })} readOnly={rf.readOnly} masked={rf.masked} error={fieldState.error?.message} describedBy={fieldState.error ? `${id}-error` : undefined} required={rf.required} label={displayLabel} services={services} docname={docName} linkTarget={linkTarget} parentDoctype={parentDoctype} docValues={controlValues} roles={roles} />
         );
         const label = (
           <>

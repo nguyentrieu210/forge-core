@@ -45,6 +45,12 @@ export interface DocField {
   form_region?: "main" | "aside" | "full";
   /** Giới hạn riêng bề ngang control, vẫn giữ vùng bố cục của field. */
   form_control_width?: "compact";
+  /**
+   * Presentation-only adapter for numeric values whose storage unit is intentionally
+   * machine-friendly. The control converts at the UI boundary and keeps the document
+   * value unchanged (for example 420 stored minutes is shown as 07:00).
+   */
+  ui_control?: "time_of_day_minutes" | "duration_minutes" | "coordinate_pair";
   valueSource?: "user" | "default" | "link" | "formula" | "system" | "workflow";
   editMode?: "editable" | "readonly" | "set_once" | "immutable_after_submit" | "hidden";
   surface?: "quick" | "expanded" | "internal";

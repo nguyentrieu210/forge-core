@@ -15,7 +15,7 @@ const POLICY = "AlumDoor Attendance Policy";
 const source = path.resolve(import.meta.dirname, "..", "apps-src", "alumdoor-attendance");
 const manager = { user_id: "attendance.manager@example.com", roles: ["AlumDoor Attendance Manager"] };
 
-async function setup({ policyStatusReadOnly } = {}) {
+async function setup({ policyStatusReadOnly, legacyQrTtl = false } = {}) {
   const manifest = parseAppManifest(await readAppSource(source));
   const metadata = new InMemoryMetadataStore();
   for (const meta of manifest.doctypes) {
@@ -24,6 +24,15 @@ async function setup({ policyStatusReadOnly } = {}) {
       const state = copied.fields.find((field) => field.fieldname === "policy_status");
       assert.ok(state, "policy must expose its workflow state");
       state.read_only = policyStatusReadOnly;
+    }
+    if (copied.name === POLICY && legacyQrTtl) {
+      copied.fields.push({
+        fieldname: "qr_ttl_seconds",
+        label: "Legacy QR TTL",
+        fieldtype: "Int",
+        default: 15,
+        allow_on_submit: true,
+      });
     }
     await metadata.putDocType(TENANT, copied, "Administrator", NOW);
   }
@@ -39,7 +48,7 @@ async function setup({ policyStatusReadOnly } = {}) {
     new MetadataPermissionService(metadata),
     () => NOW,
   );
-  return { kernel, store };
+  return { kernel, metadata, store };
 }
 
 async function execute(kernel, input) {
@@ -102,6 +111,78 @@ test("a writable policy_status enables the expected GenericMetadataController tr
   const approved = await store.getDocument(TENANT, POLICY, draft.name);
   assert.equal(approved.docstatus, 1);
   assert.equal(approved.data.policy_status, "approved");
+});
+
+test("an approved policy can save allow_on_submit fields without leaving approved state", async () => {
+  const { kernel, store } = await setup();
+  await createDraft(kernel);
+  const draft = await store.getDocument(TENANT, POLICY, "ATP-2026-00001");
+  await execute(kernel, {
+    commandId: "attendance-policy-approve-before-edit",
+    doctype: POLICY,
+    name: draft.name,
+    action: "submit",
+    expectedVersion: draft.version,
+    document: { ...draft.data, policy_status: "approved" },
+  });
+
+  const approved = await store.getDocument(TENANT, POLICY, draft.name);
+  await execute(kernel, {
+    commandId: "attendance-policy-edit-approved",
+    doctype: POLICY,
+    name: approved.name,
+    action: "save",
+    expectedVersion: approved.version,
+    document: {
+      ...approved.data,
+      duplicate_scan_window_seconds: 60,
+      max_devices_per_employee: 2,
+    },
+  });
+
+  const updated = await store.getDocument(TENANT, POLICY, draft.name);
+  assert.equal(updated.docstatus, 1);
+  assert.equal(updated.status, "approved");
+  assert.equal(updated.data.policy_status, "approved");
+  assert.equal(updated.data.duplicate_scan_window_seconds, 60);
+  assert.equal(updated.data.max_devices_per_employee, 2);
+});
+
+test("saving after a metadata upgrade drops an unchanged retired field", async () => {
+  const { kernel, metadata, store } = await setup({ legacyQrTtl: true });
+  await createDraft(kernel);
+  const draft = await store.getDocument(TENANT, POLICY, "ATP-2026-00001");
+  await execute(kernel, {
+    commandId: "attendance-policy-approve-legacy",
+    doctype: POLICY,
+    name: draft.name,
+    action: "submit",
+    expectedVersion: draft.version,
+    document: { ...draft.data, policy_status: "approved" },
+  });
+
+  const approved = await store.getDocument(TENANT, POLICY, draft.name);
+  assert.equal(approved.data.qr_ttl_seconds, 15);
+  const upgradedMeta = await metadata.getDocType(TENANT, POLICY);
+  upgradedMeta.fields = upgradedMeta.fields.filter((entry) => entry.fieldname !== "qr_ttl_seconds");
+  await metadata.putDocType(TENANT, upgradedMeta, "Administrator", NOW);
+
+  await execute(kernel, {
+    commandId: "attendance-policy-save-after-upgrade",
+    doctype: POLICY,
+    name: approved.name,
+    action: "save",
+    expectedVersion: approved.version,
+    document: {
+      ...approved.data,
+      duplicate_scan_window_seconds: 60,
+      max_devices_per_employee: 2,
+    },
+  });
+
+  const updated = await store.getDocument(TENANT, POLICY, approved.name);
+  assert.equal(updated.docstatus, 1);
+  assert.equal(updated.data.qr_ttl_seconds, undefined);
 });
 
 test("a read-only policy_status cannot advance a GenericMetadataController workflow", async () => {

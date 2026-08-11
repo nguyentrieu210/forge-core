@@ -43,8 +43,16 @@ interface AggregateStub extends DurableObjectStub {
     tenantId: string;
     actor: Actor;
     station: string;
-    nonceHash: string;
-    deviceFingerprintHash?: string;
+    stationTokenHash: string;
+    requestId: string;
+    latitude: number;
+    longitude: number;
+    accuracy: number;
+    deviceId?: string;
+    credentialHash?: string;
+    employeeCode?: string;
+    newCredentialHash?: string;
+    deviceLabel?: string;
   }): Promise<JsonObject>;
   submitAlumDoorAttendanceCorrection(input: {
     tenantId: string; actor: Actor; workDate: string; segmentCode: string;
@@ -54,6 +62,15 @@ interface AggregateStub extends DurableObjectStub {
     tenantId: string; actor: Actor; request: string; action: "approve" | "reject"; note?: string;
   }): Promise<JsonObject>;
   approveAlumDoorPayroll(input: { tenantId: string; actor: Actor; payrollEntry: string }): Promise<JsonObject>;
+}
+
+const PUBLIC_ATTENDANCE_METHOD_PATHS = new Set([
+  "/api/method/alumdoor.attendance.resolve_station",
+  "/api/method/alumdoor.attendance.scan",
+]);
+
+function isPublicAttendanceMethodPath(pathname: string): boolean {
+  return PUBLIC_ATTENDANCE_METHOD_PATHS.has(pathname);
 }
 
 /**
@@ -1047,7 +1064,7 @@ async function serveFrappeApiInner(
     // have real sessions enabled.
     actor = staticDevelopmentActor(env.DEV_ACTOR_JSON);
     fullName = actor.user_id;
-  } else if (isWebFormPath(url.pathname) || isPublicFilePath(url.pathname) || isStorefrontPath(url.pathname)) {
+  } else if (isWebFormPath(url.pathname) || isPublicFilePath(url.pathname) || isStorefrontPath(url.pathname) || isPublicAttendanceMethodPath(url.pathname)) {
     /**
      * The one surface a visitor with no session may reach.
      *
@@ -1213,21 +1230,26 @@ async function serveFrappeApiInner(
     },
     async commitAlumdoorAttendanceScan(input: {
       station: string;
-      nonceHash: string;
-      deviceFingerprintHash?: string;
+      stationTokenHash: string;
+      requestId: string;
+      latitude: number;
+      longitude: number;
+      accuracy: number;
+      deviceId?: string;
+      credentialHash?: string;
+      employeeCode?: string;
+      newCredentialHash?: string;
+      deviceLabel?: string;
     }): Promise<JsonObject> {
-      // One user has one deterministic QR stream.  This is intentionally narrower
-      // than a tenant-wide coordinator, so two employees can scan at the same time
-      // while one employee cannot race their own IN/OUT toggle.
+      // One registered installation has one deterministic stream. Employee identity
+      // is resolved from the credential inside the coordinator, never from Guest.
       const stub = env.AGGREGATES.getByName(
-        `attendance:${tenantId}:${encodeURIComponent(actor.user_id)}`,
+        `attendance-device:${tenantId}:${encodeURIComponent(input.deviceId ?? input.requestId)}`,
       ) as AggregateStub;
       return stub.commitAlumDoorAttendanceScan({
         tenantId,
         actor,
-        station: input.station,
-        nonceHash: input.nonceHash,
-        ...(input.deviceFingerprintHash ? { deviceFingerprintHash: input.deviceFingerprintHash } : {}),
+        ...input,
       });
     },
     async submitAlumdoorAttendanceCorrection(input: {

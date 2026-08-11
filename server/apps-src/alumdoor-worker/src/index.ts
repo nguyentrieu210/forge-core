@@ -50,9 +50,15 @@ import {
   syncPaintJobsFromCut,
   validateProductionRequest,
 } from "./sales-production.js";
-import { attendanceChallenge, attendanceScan } from "./attendance-routes.js";
 import {
-  attendanceExceptions, attendanceMonth, attendanceReviewCorrection,
+  attendanceChallenge,
+  attendanceResolveStation,
+  attendanceRotateStationQr,
+  attendanceScan,
+  attendanceStationQr,
+} from "./attendance-routes.js";
+import {
+  attendanceCorrectionRequests, attendanceExceptions, attendanceMonth, attendanceReviewCorrection,
   attendanceSubmitCorrection, attendanceToday,
 } from "./attendance-operational-routes.js";
 import {
@@ -3162,11 +3168,15 @@ export default {
         }
 
         const call = platformCaller(request, env);
-        if (method === "alumdoor.attendance.challenge") return await attendanceChallenge({ request, call, env, args });
+        if (method === "alumdoor.attendance.challenge") return await attendanceChallenge();
+        if (method === "alumdoor.attendance.station_qr") return await attendanceStationQr({ request, call, env, args });
+        if (method === "alumdoor.attendance.rotate_station_qr") return await attendanceRotateStationQr({ request, call, env, args });
+        if (method === "alumdoor.attendance.resolve_station") return await attendanceResolveStation({ request, call, env, args });
         if (method === "alumdoor.attendance.scan") return await attendanceScan({ request, call, env, args });
         if (method === "alumdoor.attendance.today") return await attendanceToday({ call, args });
         if (method === "alumdoor.attendance.month") return await attendanceMonth({ call, args });
         if (method === "alumdoor.attendance.exceptions") return await attendanceExceptions({ call, args });
+        if (method === "alumdoor.attendance.correction_requests") return await attendanceCorrectionRequests({ call });
         if (method === "alumdoor.attendance.submit_correction") return await attendanceSubmitCorrection({ call, args });
         if (method === "alumdoor.attendance.review_correction") return await attendanceReviewCorrection({ call, args });
         if (method === "alumdoor.payroll.period_list") return await payrollPeriodList({ call, args });

@@ -95,6 +95,8 @@ export interface DocFieldMeta extends JsonObject {
   form_width?: "full" | "two_thirds" | "half" | "third";
   form_region?: "main" | "aside" | "full";
   form_control_width?: "compact";
+  /** Presentation-only control for integer minute values; storage remains numeric minutes. */
+  ui_control?: "time_of_day_minutes" | "duration_minutes" | "coordinate_pair";
   /** Immutable after the first save — enforced by the generic controller. */
   set_only_once?: boolean;
   /** Refuses a negative value. */
@@ -245,6 +247,8 @@ export interface DocTypeMeta extends JsonObject {
   track_changes?: boolean;
   track_seen?: boolean;
   allow_rename?: boolean;
+  /** Explicit opt-in for configuration masters; linked-document and ledger guards still apply. */
+  allow_delete_non_draft?: boolean;
   autoname?: string;
   title_field?: string;
   image_field?: string;

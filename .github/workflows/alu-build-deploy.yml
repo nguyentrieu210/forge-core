@@ -221,7 +221,7 @@ jobs:
           } | sort -u)
           for file in "${dirty[@]}"; do
             case "$file" in
-              client/apps/kho/dist-mobile/*|server/apps/gateway-worker/public/*) ;;
+              client/apps/kho/dist-mobile/*|client/apps/kho/dist-attendance-mobile/*|server/apps/gateway-worker/public/*) ;;
               *)
                 echo "Refusing full release: unexpected worktree change after exact build: $file"
                 exit 1

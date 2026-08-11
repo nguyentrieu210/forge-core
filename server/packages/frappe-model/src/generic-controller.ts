@@ -11,6 +11,7 @@ import { canWriteField } from "./permission.js";
 
 export class GenericMetadataController implements DocumentController<JsonObject> {
   readonly doctype = "*";
+  readonly allowSubmittedSave = true;
   constructor(private readonly metadata: MetadataStore) {}
 
   async buildPlan(context: ControllerContext<JsonObject>): Promise<MutationPlan<JsonObject>> {
@@ -68,7 +69,15 @@ async function normalizeDocument(context: ControllerContext<JsonObject>, meta: D
   const known = new Map(meta.fields.map((field) => [field.fieldname, field]));
   for (const key of Object.keys(input)) {
     if (key.startsWith("_") || ["workflow_state"].includes(key)) continue;
-    if (!known.has(key)) throw errors.validation(`Unknown field ${meta.name}.${key}`);
+    if (!known.has(key)) {
+      // A metadata upgrade may retire a field while old documents still carry its
+      // last stored value. The form echoes the complete document on save. Accept
+      // only that unchanged legacy value and omit it from the new normalized
+      // document; a caller still cannot invent or modify an unknown field.
+      const legacy = context.existing?.data[key];
+      if (legacy !== undefined && sameJsonValue(input[key], legacy)) continue;
+      throw errors.validation(`Unknown field ${meta.name}.${key}`);
+    }
   }
   for (const field of meta.fields) {
     if (isLayoutField(field)) continue;

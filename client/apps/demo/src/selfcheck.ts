@@ -1403,6 +1403,16 @@ check("Form actions: metadata-driven (docstatus/perms/workflow)", () => {
   // Draft + write → Lưu
   assert.ok(kinds({ ...base, perms: { write: true } }).includes("save"), "Draft+write → save");
 
+  // Submitted + field allow_on_submit + write → vẫn lưu được cấu hình.
+  assert.ok(
+    kinds({ ...base, docstatus: 1, hasEditableFields: true, perms: { write: true } }).includes("save"),
+    "Submitted+editable field+write → save",
+  );
+  assert.ok(
+    !kinds({ ...base, docstatus: 1, hasEditableFields: false, perms: { write: true } }).includes("save"),
+    "Submitted không có field editable → không save",
+  );
+
   // Draft + submittable + submit, KHÔNG workflow → có submit
   assert.ok(kinds({ ...base, isSubmittable: true, perms: { write: true, submit: true } }).includes("submit"), "submit khi submittable+submit");
 

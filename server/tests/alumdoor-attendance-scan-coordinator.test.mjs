@@ -12,6 +12,8 @@ function setup() {
   const store = new InMemoryMutationStore();
   store.seedMaster("Employee", "EMP-1", "demo", {
     user_id: "worker@example.test",
+    employee_number: "NV001",
+    employee_name: "Nguyễn Văn A",
     employee_status: "Äang lÃ m viá»‡c",
     company: "Demo",
     branch: "BR-A",
@@ -30,12 +32,19 @@ function setup() {
     shift3_latest_out_minute: 1439,
     regular_daily_cap_minutes: 480,
     effective_from: "2026-01-01",
+    duplicate_scan_window_seconds: 60,
+    max_devices_per_employee: 2,
   });
   store.seedMaster("AlumDoor QR Station", "GATE-A", "demo", {
     station_code: "GATE-A",
     station_name: "Cá»•ng A",
     policy: "CA-1",
     branch: "BR-A",
+    company: "Demo",
+    latitude: 10.7769,
+    longitude: 106.7009,
+    allowed_radius_m: 50,
+    max_gps_accuracy_m: 50,
     secret_version: 1,
     is_active: 1,
   });
@@ -43,12 +52,25 @@ function setup() {
     registerStockControllers(registerErpCoreControllers(createO2CControllerRegistry())),
   );
   const kernel = new DocumentKernel(registry, store, { assert() {} }, () => current);
-  const scan = (nonce) => commitAlumDoorAttendanceScan({
-    tenantId: "demo",
-    actor: { user_id: "worker@example.test", roles: ["Employee"] },
-    station: "GATE-A",
-    nonceHash: nonce,
-  }, { kernel, store, now: () => current });
+  let registered = false;
+  const credentialHash = "c".repeat(64);
+  const scan = async (requestId, roles = ["Employee"], overrides = {}) => {
+    const result = await commitAlumDoorAttendanceScan({
+      tenantId: "demo",
+      actor: { user_id: "Guest", roles },
+      station: "GATE-A",
+      stationTokenHash: "f".repeat(64),
+      requestId,
+      latitude: 10.7769,
+      longitude: 106.7009,
+      accuracy: 10,
+      deviceId: "device_installation_0001",
+      ...(registered ? { credentialHash } : { employeeCode: "NV001", newCredentialHash: credentialHash, deviceLabel: "Điện thoại test" }),
+      ...overrides,
+    }, { kernel, store, now: () => current });
+    if (result.device_registered) registered = true;
+    return result;
+  };
   return {
     store,
     scan,
@@ -58,7 +80,7 @@ function setup() {
 
 const nonceA = "a".repeat(64);
 const nonceB = "b".repeat(64);
-const nonceC = "c".repeat(64);
+const nonceC = "d".repeat(64);
 
 test("QR scan creates immutable standard checkin and one three-segment day atomically", async () => {
   const { store, scan } = setup();
@@ -72,9 +94,22 @@ test("QR scan creates immutable standard checkin and one three-segment day atomi
   assert.equal(checkin.docstatus, 1);
   assert.equal(checkin.data.source, "Device");
   assert.equal(checkin.data.alu_segment_code, "SHIFT1");
+  assert.equal(checkin.data.alu_verification_method, "GPS");
+  assert.equal(checkin.data.alu_attendance_device, "device_installation_0001");
+  assert.equal(checkin.data.geofence_passed, 1);
+  assert.equal(first.employee.employee_name, "Nguyễn Văn A");
   assert.equal(day.version, 1);
   assert.equal(day.data.segments[0].state, "open");
   assert.equal(day.data.segments.length, 3);
+});
+
+test("first QR scan succeeds for an administrator carrying all attendance system roles", async () => {
+  const { store, scan } = setup();
+  const result = await scan(nonceA, ["Administrator", "AlumDoor Attendance System", "AlumDoor Payroll System"]);
+  assert.equal(result.replayed, false);
+  const day = await store.getDocument("demo", "AlumDoor Attendance Day", result.day.name);
+  assert.equal(day.version, 1);
+  assert.equal(day.data.segments[0].state, "open");
 });
 
 test("same QR replay does not toggle the segment a second time", async () => {
@@ -88,7 +123,7 @@ test("same QR replay does not toggle the segment a second time", async () => {
   assert.equal(day.data.segments[0].state, "open");
 });
 
-test("a new QR closes only its own shift and recalculates the day", async () => {
+test("a new request outside the duplicate window closes only its own shift and recalculates the day", async () => {
   const { store, scan, setTime } = setup();
   const first = await scan(nonceA);
   setTime("2026-08-10T02:00:00.000Z"); // 09:00 local
@@ -106,6 +141,7 @@ test("a completed segment refuses another scan without leaving a stray checkin",
   const first = await scan(nonceA);
   setTime("2026-08-10T02:00:00.000Z");
   await scan(nonceB);
+  setTime("2026-08-10T02:01:01.000Z");
   await assert.rejects(scan(nonceC), (error) => {
     assert.equal(error.code, "INVALID_LIFECYCLE_TRANSITION");
     return true;
@@ -114,4 +150,31 @@ test("a completed segment refuses another scan without leaving a stray checkin",
   assert.equal(checkins.length, 2);
   const day = await store.getDocument("demo", "AlumDoor Attendance Day", first.day.name);
   assert.equal(day.version, 2);
+});
+
+test("GPS accuracy and geofence are enforced before device registration", async () => {
+  const { scan } = setup();
+  await assert.rejects(scan(nonceA, ["Employee"], { accuracy: 800 }), (error) => {
+    assert.equal(error.code, "VALIDATION_ERROR");
+    assert.match(error.message, /chưa đủ chính xác/i);
+    return true;
+  });
+  await assert.rejects(scan(nonceB, ["Employee"], { latitude: 10.7869 }), (error) => {
+    assert.equal(error.code, "VALIDATION_ERROR");
+    assert.match(error.message, /ngoài khu vực/i);
+    return true;
+  });
+});
+
+test("unknown device receives registration-required only after valid GPS", async () => {
+  const { store } = setup();
+  const registry = registerErpNextCoreControllers(registerStockControllers(registerErpCoreControllers(createO2CControllerRegistry())));
+  const kernel = new DocumentKernel(registry, store, { assert() {} }, () => "2026-08-10T00:00:00.000Z");
+  const result = await commitAlumDoorAttendanceScan({
+    tenantId: "demo", actor: { user_id: "Guest", roles: [] }, station: "GATE-A",
+    stationTokenHash: "f".repeat(64), requestId: nonceA,
+    latitude: 10.7769, longitude: 106.7009, accuracy: 10,
+  }, { kernel, store, now: () => "2026-08-10T00:00:00.000Z" });
+  assert.equal(result.registration_required, true);
+  assert.equal((await store.listDocumentsByDoctype("demo", "Employee Checkin")).length, 0);
 });

@@ -1,268 +1,249 @@
-/**
- * AlumDoor QR attendance app methods.
- *
- * This worker is deliberately stateless: it only signs/verifies a short station challenge
- * and then hands the authenticated scan to the tenant's native atomic transaction.  It does
- * not know an employee id, does not write D1, and never returns the QR signing secret.
- */
+/** AlumDoor static-station QR, GPS and registered-device app methods. */
 import {
   AttendanceQrError,
-  inspectAttendanceQr,
-  issueAttendanceQr,
-  verifyAttendanceQr,
+  inspectStaticAttendanceStationToken,
+  issueStaticAttendanceStationToken,
+  randomCredential,
+  sha256Hex,
+  verifyStaticAttendanceStationToken,
 } from "./attendance-qr.js";
 
 export type AttendancePlatformCall = (path: string, init?: RequestInit) => Promise<Response>;
-
-export interface AttendanceRouteEnv {
-  /** Dedicated HMAC secret. This must not be shared with the platform's internal auth key. */
-  ALUMDOOR_ATTENDANCE_QR_SECRET?: string;
-}
-
+export interface AttendanceRouteEnv { ALUMDOOR_ATTENDANCE_QR_SECRET?: string; }
 type Json = Record<string, unknown>;
 
 interface StationDocument extends Json {
-  name?: unknown;
-  station_code?: unknown;
-  station_name?: unknown;
-  policy?: unknown;
-  secret_version?: unknown;
-  is_active?: unknown;
+  station_code?: unknown; station_name?: unknown; company?: unknown; branch?: unknown; policy?: unknown;
+  secret_version?: unknown; is_active?: unknown; latitude?: unknown; longitude?: unknown;
+  allowed_radius_m?: unknown; max_gps_accuracy_m?: unknown;
 }
-
 interface PolicyDocument extends Json {
-  name?: unknown;
-  policy_status?: unknown;
-  timezone?: unknown;
-  qr_ttl_seconds?: unknown;
-  effective_from?: unknown;
-  effective_to?: unknown;
-}
-
-interface QrConfigDocument extends Json {
-  station?: unknown;
-  policy?: unknown;
+  policy_status?: unknown; timezone?: unknown; effective_from?: unknown; effective_to?: unknown;
+  duplicate_scan_window_seconds?: unknown; max_devices_per_employee?: unknown;
 }
 
 const json = (value: unknown, status = 200): Response => new Response(JSON.stringify(value), {
   status,
-  headers: { "content-type": "application/json" },
+  headers: { "content-type": "application/json", "cache-control": "no-store", "x-content-type-options": "nosniff" },
 });
-
-function fail(code: string, message: string, status = 422): Response {
-  return json({ code, message }, status);
-}
+const fail = (code: string, message: string, status = 422): Response => json({ code, message }, status);
 
 class AttendanceRouteError extends Error {
-  constructor(
-    readonly code: string,
-    message: string,
-    readonly status = 422,
-  ) {
-    super(message);
-    this.name = "AttendanceRouteError";
-  }
+  constructor(readonly code: string, message: string, readonly status = 422) { super(message); this.name = "AttendanceRouteError"; }
 }
 
-function nonEmptyText(value: unknown, label: string, max = 160): string {
-  if (typeof value !== "string") throw new Error(`${label} là bắt buộc.`);
+function text(value: unknown, label: string, max = 320): string {
+  if (typeof value !== "string") throw new AttendanceRouteError("VALIDATION_ERROR", `${label} là bắt buộc.`);
   const normalized = value.trim();
   if (!normalized || normalized.length > max || /[\u0000-\u001f]/u.test(normalized)) {
-    throw new Error(`${label} không hợp lệ.`);
+    throw new AttendanceRouteError("VALIDATION_ERROR", `${label} không hợp lệ.`);
   }
   return normalized;
 }
 
-function truthy(value: unknown): boolean {
-  return value === true || value === 1 || value === "1" || String(value ?? "").trim().toLowerCase() === "true";
+function optionalText(value: unknown, label: string, max = 320): string | undefined {
+  if (value === undefined || value === null || value === "") return undefined;
+  return text(value, label, max);
 }
 
-function integerInRange(value: unknown, fallback: number, min: number, max: number, label: string): number {
-  if (value === undefined || value === null || value === "") return fallback;
-  const parsed = typeof value === "number" ? value : Number(value);
-  if (!Number.isInteger(parsed) || parsed < min || parsed > max) throw new Error(`${label} không hợp lệ.`);
+function number(value: unknown, label: string, minimum: number, maximum: number): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < minimum || parsed > maximum) {
+    throw new AttendanceRouteError("INVALID_LOCATION", `${label} không hợp lệ.`);
+  }
   return parsed;
 }
 
-function isoDateFor(timezone: string, now: Date): string {
-  try {
-    const parts = new Intl.DateTimeFormat("en-CA", {
-      timeZone: timezone,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).formatToParts(now);
-    const part = (type: string): string => parts.find((entry) => entry.type === type)?.value ?? "";
-    const year = part("year");
-    const month = part("month");
-    const day = part("day");
-    if (!/^\d{4}$/u.test(year) || !/^\d{2}$/u.test(month) || !/^\d{2}$/u.test(day)) throw new Error();
-    return `${year}-${month}-${day}`;
-  } catch {
-    throw new Error("Múi giờ trong chính sách chấm công không hợp lệ.");
-  }
+function integer(value: unknown, fallback: number, min: number, max: number): number {
+  if (value === undefined || value === null || value === "") return fallback;
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < min || parsed > max) throw new AttendanceRouteError("VALIDATION_ERROR", "Cấu hình chính sách không hợp lệ.");
+  return parsed;
 }
 
-function dateText(value: unknown, label: string): string | null {
-  if (value === undefined || value === null || value === "") return null;
-  const date = String(value).trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/u.test(date)) throw new Error(`${label} không hợp lệ.`);
-  return date;
-}
+function truthy(value: unknown): boolean { return value === true || value === 1 || value === "1" || String(value ?? "").toLowerCase() === "true"; }
 
 function activeSecret(env: AttendanceRouteEnv): string {
-  const secret = env.ALUMDOOR_ATTENDANCE_QR_SECRET?.trim();
-  if (!secret) throw new AttendanceRouteError(
-    "ATTENDANCE_QR_MISCONFIGURED",
-    "Chưa cấu hình khóa QR chấm công của AlumDoor.",
-    503,
-  );
-  return secret;
+  const value = env.ALUMDOOR_ATTENDANCE_QR_SECRET?.trim();
+  if (!value) throw new AttendanceRouteError("ATTENDANCE_QR_MISCONFIGURED", "Chưa cấu hình khóa QR chấm công.", 503);
+  return value;
 }
 
 function trustedTenant(request: Request): string {
   const tenant = request.headers.get("x-cloudforge-tenant")?.trim() ?? "";
-  if (!tenant || tenant.length > 160 || /[\u0000-\u001f]/u.test(tenant)) {
-    throw new AttendanceRouteError("AUTH_REQUIRED", "Không nhận được tenant tin cậy từ nền tảng.", 403);
-  }
+  if (!tenant || tenant.length > 160 || /[\u0000-\u001f]/u.test(tenant)) throw new AttendanceRouteError("AUTH_REQUIRED", "Không nhận được tenant tin cậy.", 403);
   return tenant;
 }
 
-function jsonObject(value: unknown, label: string): Json {
-  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`${label} trả về dữ liệu không hợp lệ.`);
+function actorRoles(request: Request): string[] {
+  const encoded = request.headers.get("x-cloudforge-identity") ?? "";
+  try {
+    const raw = atob(encoded.replaceAll("-", "+").replaceAll("_", "/").padEnd(Math.ceil(encoded.length / 4) * 4, "="));
+    const identity = JSON.parse(raw) as { actor?: { roles?: unknown } };
+    return Array.isArray(identity.actor?.roles) ? identity.actor.roles.filter((role): role is string => typeof role === "string") : [];
+  } catch { return []; }
+}
+
+function requireManager(request: Request): void {
+  const allowed = new Set(["Administrator", "System Manager", "HR Manager", "AlumDoor Attendance Manager"]);
+  if (!actorRoles(request).some((role) => allowed.has(role))) throw new AttendanceRouteError("PERMISSION_DENIED", "Bạn không có quyền quản lý mã QR trạm.", 403);
+}
+
+function isoDateFor(timezone: string, now: Date): string {
+  try {
+    const parts = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
+    const part = (type: string) => parts.find((entry) => entry.type === type)?.value ?? "";
+    return `${part("year")}-${part("month")}-${part("day")}`;
+  } catch { throw new AttendanceRouteError("VALIDATION_ERROR", "Múi giờ chính sách không hợp lệ."); }
+}
+
+function date(value: unknown): string | undefined {
+  if (value === undefined || value === null || value === "") return undefined;
+  const result = String(value).trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/u.test(result)) throw new AttendanceRouteError("VALIDATION_ERROR", "Ngày hiệu lực không hợp lệ.");
+  return result;
+}
+
+function object(value: unknown, label: string): Json {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new AttendanceRouteError("UPSTREAM_INVALID", `${label} trả dữ liệu không hợp lệ.`, 502);
   return value as Json;
 }
 
-async function loadActiveStationPolicy(input: {
-  call: AttendancePlatformCall;
-  stationCode: string;
-  now: Date;
-}): Promise<{ station: StationDocument; policy: PolicyDocument; stationCode: string; secretVersion: string; ttlSeconds: number }> {
-  // This is a narrow native callback, intentionally not a generic resource read.  Employees
-  // can scan a station challenge without gaining browse permission over attendance setup.
-  const response = await input.call("method/metaforge.api.get_alumdoor_attendance_qr_config", {
-    method: "POST",
-    body: JSON.stringify({ station: input.stationCode }),
-  });
-  if (!response.ok) throw new Error(`Không đọc được cấu hình QR chấm công (HTTP ${response.status}).`);
+async function loadStation(input: { call: AttendancePlatformCall; station: string; now: Date }) {
+  const response = await input.call("method/metaforge.api.get_alumdoor_attendance_qr_config", { method: "POST", body: JSON.stringify({ station: input.station }) });
+  if (!response.ok) throw new AttendanceRouteError("STATION_NOT_FOUND", "Không tìm thấy trạm chấm công.", response.status === 404 ? 404 : 422);
   const payload = await response.json() as { message?: unknown; data?: unknown };
-  const config = jsonObject(payload.message ?? payload.data ?? payload, "Cấu hình QR chấm công") as QrConfigDocument;
-  const station = jsonObject(config.station, "Trạm QR") as StationDocument;
-  const policy = jsonObject(config.policy, "Chính sách ca") as PolicyDocument;
-  const canonicalStation = nonEmptyText(station.station_code ?? station.name ?? input.stationCode, "Trạm QR");
-  if (canonicalStation !== input.stationCode) throw new Error("Trạm QR không khớp với cấu hình hiện hành.");
-  if (!truthy(station.is_active)) throw new Error("Trạm QR đang ngừng hoạt động.");
-
-  nonEmptyText(station.policy, "Chính sách ca");
-  if (String(policy.policy_status ?? "").trim().toLowerCase() !== "approved") {
-    throw new Error("Chính sách ca chưa được duyệt hoặc đã ngừng dùng.");
-  }
-
-  const timezone = nonEmptyText(policy.timezone ?? "Asia/Ho_Chi_Minh", "Múi giờ", 100);
+  const config = object(payload.message ?? payload.data ?? payload, "Cấu hình trạm");
+  const station = object(config.station, "Trạm") as StationDocument;
+  const policy = object(config.policy, "Chính sách") as PolicyDocument;
+  const stationCode = text(station.station_code ?? input.station, "Trạm", 160);
+  if (stationCode !== input.station || !truthy(station.is_active)) throw new AttendanceRouteError("STATION_INACTIVE", "Trạm chấm công đang ngừng hoạt động.", 410);
+  if (String(policy.policy_status ?? "").trim().toLowerCase() !== "approved") throw new AttendanceRouteError("POLICY_INACTIVE", "Chính sách ca chưa được duyệt hoặc đã ngừng dùng.");
+  const timezone = text(policy.timezone ?? "Asia/Ho_Chi_Minh", "Múi giờ", 100);
   const today = isoDateFor(timezone, input.now);
-  const effectiveFrom = dateText(policy.effective_from, "Ngày hiệu lực từ");
-  const effectiveTo = dateText(policy.effective_to, "Ngày hiệu lực đến");
-  if (!effectiveFrom || effectiveFrom > today || (effectiveTo && effectiveTo < today)) {
-    throw new Error("Chính sách ca chưa có hiệu lực tại thời điểm này.");
-  }
-
-  const secretVersion = nonEmptyText(String(station.secret_version ?? ""), "Phiên bản khóa QR", 64);
-  const ttlSeconds = integerInRange(policy.qr_ttl_seconds, 15, 5, 60, "Chu kỳ QR");
-  return { station, policy, stationCode: canonicalStation, secretVersion, ttlSeconds };
+  const from = date(policy.effective_from);
+  const to = date(policy.effective_to);
+  if (!from || from > today || (to && to < today)) throw new AttendanceRouteError("POLICY_INACTIVE", "Chính sách ca chưa có hiệu lực.");
+  return {
+    station, policy, stationCode,
+    stationName: typeof station.station_name === "string" && station.station_name.trim() ? station.station_name.trim() : stationCode,
+    tokenVersion: text(String(station.secret_version ?? "1"), "Phiên bản QR", 64),
+    allowedRadiusM: number(station.allowed_radius_m, "Bán kính trạm", 1, 100_000),
+    maxGpsAccuracyM: number(station.max_gps_accuracy_m, "Sai số GPS tối đa", 1, 10_000),
+  };
 }
 
-function fingerprint(value: unknown): string | undefined {
-  if (value === undefined || value === null || value === "") return undefined;
-  const hash = nonEmptyText(value, "Mã nhận diện thiết bị", 64).toLowerCase();
-  if (!/^[a-f0-9]{64}$/u.test(hash)) throw new Error("Mã nhận diện thiết bị phải là SHA-256.");
-  return hash;
+async function verifiedStation(input: { request: Request; call: AttendancePlatformCall; env: AttendanceRouteEnv; token: string; now: Date }) {
+  const tenant = trustedTenant(input.request);
+  const peek = inspectStaticAttendanceStationToken(input.token);
+  if (peek.tenant !== tenant) throw new AttendanceRouteError("QR_STATION_MISMATCH", "Mã QR không thuộc doanh nghiệp này.");
+  const loaded = await loadStation({ call: input.call, station: peek.station, now: input.now });
+  const verified = await verifyStaticAttendanceStationToken({
+    token: input.token, tenant, station: loaded.stationCode, tokenVersion: loaded.tokenVersion, secret: activeSecret(input.env),
+  });
+  return { tenant, ...loaded, tokenHash: verified.tokenHash };
+}
+
+function location(args: Json): { latitude: number; longitude: number; accuracy: number } {
+  const raw = object(args.location, "Vị trí");
+  return {
+    latitude: number(raw.latitude, "Vĩ độ", -90, 90),
+    longitude: number(raw.longitude, "Kinh độ", -180, 180),
+    accuracy: number(raw.accuracy, "Sai số GPS", 0.01, 100_000),
+  };
 }
 
 function attendanceError(error: unknown): Response {
-  if (error instanceof AttendanceQrError) {
-    const status = error.code === "QR_EXPIRED" ? 410 : 422;
-    return fail(error.code, error.message, status);
-  }
+  if (error instanceof AttendanceQrError) return fail(error.code, error.message, error.code === "QR_REVOKED" ? 410 : 422);
   if (error instanceof AttendanceRouteError) return fail(error.code, error.message, error.status);
-  const message = error instanceof Error ? error.message : "Không xử lý được QR chấm công.";
-  return fail("ATTENDANCE_QR_INVALID", message);
+  return fail("ATTENDANCE_ERROR", error instanceof Error ? error.message : "Không thể chấm công.");
 }
 
-/** POST alumdoor.attendance.challenge — issue one deterministic HMAC challenge for this 15s bucket. */
-export async function attendanceChallenge(input: {
-  request: Request;
-  call: AttendancePlatformCall;
-  env: AttendanceRouteEnv;
-  args: Json;
-  now?: Date;
-}): Promise<Response> {
-  try {
-    const tenant = trustedTenant(input.request);
-    const stationCode = nonEmptyText(input.args.station, "Trạm QR");
-    const now = input.now ?? new Date();
-    const station = await loadActiveStationPolicy({ call: input.call, stationCode, now });
-    const challenge = await issueAttendanceQr({
-      tenant,
-      station: station.stationCode,
-      secret: activeSecret(input.env),
-      secretVersion: station.secretVersion,
-      ttlSeconds: station.ttlSeconds,
-      now,
-    });
-    return json({
-      station: station.stationCode,
-      station_name: typeof station.station.station_name === "string" ? station.station.station_name : station.stationCode,
-      token: challenge.token,
-      issued_at: new Date(challenge.issuedAt * 1_000).toISOString(),
-      expires_at: new Date(challenge.expiresAt * 1_000).toISOString(),
-      server_time: now.toISOString(),
-      refresh_after_seconds: station.ttlSeconds,
-    });
-  } catch (error) {
-    return attendanceError(error);
-  }
+/** Deprecated deliberately: static station QR has no challenge/countdown endpoint. */
+export async function attendanceChallenge(): Promise<Response> {
+  return fail("DYNAMIC_QR_REMOVED", "QR động đã ngừng sử dụng. Hãy in mã QR cố định của trạm.", 410);
 }
 
-/** POST alumdoor.attendance.scan — verify one station challenge then delegate the atomic write natively. */
-export async function attendanceScan(input: {
-  request: Request;
-  call: AttendancePlatformCall;
-  env: AttendanceRouteEnv;
-  args: Json;
-  now?: Date;
-}): Promise<Response> {
+export async function attendanceStationQr(input: { request: Request; call: AttendancePlatformCall; env: AttendanceRouteEnv; args: Json; now?: Date }): Promise<Response> {
   try {
+    requireManager(input.request);
     const tenant = trustedTenant(input.request);
-    const token = nonEmptyText(input.args.token, "Mã QR", 8_192);
-    // This only discovers which public station config is needed to verify the signature.
-    // No field from this unverified payload is persisted or returned as a scan result.
-    const peek = inspectAttendanceQr(token);
-    if (peek.tenant !== tenant) return fail("QR_STATION_MISMATCH", "Mã QR không thuộc tenant này.");
+    const stationCode = text(input.args.station, "Trạm", 160);
+    const loaded = await loadStation({ call: input.call, station: stationCode, now: input.now ?? new Date() });
+    const issued = await issueStaticAttendanceStationToken({ tenant, station: loaded.stationCode, tokenVersion: loaded.tokenVersion, secret: activeSecret(input.env) });
+    return json({ station: loaded.stationCode, station_name: loaded.stationName, token: issued.token, token_version: loaded.tokenVersion });
+  } catch (error) { return attendanceError(error); }
+}
 
-    const now = input.now ?? new Date();
-    const station = await loadActiveStationPolicy({ call: input.call, stationCode: peek.station, now });
-    if (peek.secret_version !== station.secretVersion) {
-      return fail("QR_EXPIRED", "Mã QR vừa hết hạn, hướng camera vào mã mới.", 410);
+export async function attendanceRotateStationQr(input: { request: Request; call: AttendancePlatformCall; env: AttendanceRouteEnv; args: Json; now?: Date }): Promise<Response> {
+  try {
+    requireManager(input.request);
+    const tenant = trustedTenant(input.request);
+    const stationCode = text(input.args.station, "Trạm", 160);
+    const rotated = await input.call("method/metaforge.api.rotate_alumdoor_attendance_station_qr", { method: "POST", body: JSON.stringify({ station: stationCode }) });
+    if (!rotated.ok) return rotated;
+    const loaded = await loadStation({ call: input.call, station: stationCode, now: input.now ?? new Date() });
+    const issued = await issueStaticAttendanceStationToken({ tenant, station: loaded.stationCode, tokenVersion: loaded.tokenVersion, secret: activeSecret(input.env) });
+    return json({ station: loaded.stationCode, station_name: loaded.stationName, token: issued.token, token_version: loaded.tokenVersion });
+  } catch (error) { return attendanceError(error); }
+}
+
+export async function attendanceResolveStation(input: { request: Request; call: AttendancePlatformCall; env: AttendanceRouteEnv; args: Json; now?: Date }): Promise<Response> {
+  try {
+    const token = text(input.args.token, "Mã QR", 8_192);
+    const station = await verifiedStation({ request: input.request, call: input.call, env: input.env, token, now: input.now ?? new Date() });
+    return json({ station: station.stationCode, station_name: station.stationName, allowed_radius_m: station.allowedRadiusM, max_gps_accuracy_m: station.maxGpsAccuracyM });
+  } catch (error) { return attendanceError(error); }
+}
+
+export async function attendanceScan(input: { request: Request; call: AttendancePlatformCall; env: AttendanceRouteEnv; args: Json; now?: Date }): Promise<Response> {
+  try {
+    const token = text(input.args.token, "Mã QR", 8_192);
+    const station = await verifiedStation({ request: input.request, call: input.call, env: input.env, token, now: input.now ?? new Date() });
+    const gps = location(input.args);
+    const deviceId = optionalText(input.args.device_id, "Mã thiết bị", 128);
+    const credential = optionalText(input.args.device_credential, "Credential thiết bị", 512);
+    const employeeCode = optionalText(input.args.employee_code, "Mã nhân viên", 80);
+    const requestId = text(input.args.request_id, "Mã yêu cầu", 128);
+    if (!deviceId && credential) throw new AttendanceRouteError("DEVICE_CREDENTIAL_INVALID", "Thông tin thiết bị không hợp lệ.");
+
+    let registrationCredential: string | undefined;
+    let registrationDeviceId: string | undefined;
+    if (employeeCode && !credential) {
+      registrationCredential = randomCredential();
+      registrationDeviceId = deviceId ?? randomCredential(18);
     }
-    const verified = await verifyAttendanceQr({
-      token,
-      tenant,
-      station: station.stationCode,
-      secret: activeSecret(input.env),
-      ttlSeconds: station.ttlSeconds,
-      now,
-    });
-    const deviceFingerprint = fingerprint(input.args.device_fingerprint_hash);
     const response = await input.call("method/metaforge.api.commit_alumdoor_attendance_scan", {
       method: "POST",
       body: JSON.stringify({
         station: station.stationCode,
-        nonce_hash: verified.nonceHash,
-        ...(deviceFingerprint ? { device_fingerprint_hash: deviceFingerprint } : {}),
+        station_token_hash: station.tokenHash,
+        request_id: requestId,
+        latitude: gps.latitude,
+        longitude: gps.longitude,
+        accuracy: gps.accuracy,
+        ...(deviceId && credential ? { device_id: deviceId, credential_hash: await sha256Hex(credential) } : {}),
+        ...(employeeCode && registrationCredential && registrationDeviceId ? {
+          employee_code: employeeCode,
+          device_id: registrationDeviceId,
+          new_credential_hash: await sha256Hex(registrationCredential),
+          device_label: optionalText(input.args.device_label, "Tên thiết bị", 160) ?? "Điện thoại chấm công",
+        } : {}),
       }),
     });
-    return response;
-  } catch (error) {
-    return attendanceError(error);
-  }
+    if (!response.ok) return response;
+    const payload = await response.json() as { message?: Json; data?: Json };
+    const result = object(payload.message ?? payload.data ?? payload, "Kết quả chấm công");
+    return json({
+      ...result,
+      ...(truthy(result.device_registered) && registrationCredential && registrationDeviceId
+        ? { device_registration: { device_id: registrationDeviceId, credential: registrationCredential } }
+        : {}),
+    });
+  } catch (error) { return attendanceError(error); }
 }
+
+export const attendancePolicyDefaults = {
+  duplicateWindowSeconds(policy: PolicyDocument): number { return integer(policy.duplicate_scan_window_seconds, 60, 5, 900); },
+  maxDevices(policy: PolicyDocument): number { return integer(policy.max_devices_per_employee, 2, 1, 20); },
+};

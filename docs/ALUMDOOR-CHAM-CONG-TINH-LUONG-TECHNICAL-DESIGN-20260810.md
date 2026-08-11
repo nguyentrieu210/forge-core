@@ -450,3 +450,6 @@ Không thêm AI vào đường ghi hoặc duyệt lương. Trợ lý AlumDoor hi
 - [x] Migration chỉ ở dạng kế hoạch; chưa scaffold, chưa chạy DB, chưa viết code.
 
 Điểm còn là nợ tài liệu repo, không chặn thiết kế module: `docs/AI_PROJECT_CONTEXT.md` và `docs/PROJECT_STRUCTURE.md` hiện chưa tồn tại; sẽ bổ sung ở Pha tài liệu/release để phản ánh đúng code sau triển khai.
+# Cập nhật kiến trúc ngày 2026-08-11
+
+Thiết kế QR challenge 15 giây trong tài liệu gốc đã được **thay thế** bởi [ALUMDOOR-ATTENDANCE-STATIC-QR-GPS-DEVICE-20260811.md](./ALUMDOOR-ATTENDANCE-STATIC-QR-GPS-DEVICE-20260811.md). Transaction `Employee Checkin` + `AlumDoor Attendance Day` vẫn là nguồn sự thật và không bị thay thế.

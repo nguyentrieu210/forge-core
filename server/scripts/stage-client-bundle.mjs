@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 /**
- * Stages the generic runtime plus the phone warehouse PWA where the Gateway can deploy
- * both from the same origin as the API.
+ * Stages the generic runtime plus the phone warehouse and attendance PWAs where the
+ * Gateway can deploy all clients from the same origin as the API.
  *
- *   node scripts/stage-client-bundle.mjs [--source <dir>] [--mobile-source <dir>] [--check]
+ *   node scripts/stage-client-bundle.mjs [--source <dir>] [--mobile-source <dir>]
+ *     [--attendance-source <dir>] [--check]
  */
 import { cp, mkdir, rm, readdir, stat, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -19,8 +20,10 @@ const argOf = (name, fallback) => {
 
 const source = path.resolve(argOf("source", path.join(serverRoot, "..", "client", "apps", "runtime", "dist")));
 const mobileSource = path.resolve(argOf("mobile-source", path.join(serverRoot, "..", "client", "apps", "kho", "dist-mobile")));
+const attendanceSource = path.resolve(argOf("attendance-source", path.join(serverRoot, "..", "client", "apps", "kho", "dist-attendance-mobile")));
 const target = path.join(serverRoot, "apps", "gateway-worker", "public");
 const mobileTarget = path.join(target, "mobile", "warehouse");
+const attendanceTarget = path.join(target, "mobile", "attendance");
 const checkOnly = args.includes("--check");
 const releaseSha = (process.env.VITE_FORGE_RELEASE_SHA ?? process.env.FORGE_RELEASE_SHA ?? "").trim();
 
@@ -54,7 +57,10 @@ if (checkOnly) {
   await requireFile(path.join(mobileTarget, "index.html"), `${mobileTarget} has no index.html — warehouse PWA is missing from the release`);
   await requireFile(path.join(mobileTarget, "manifest.webmanifest"), `${mobileTarget} has no manifest.webmanifest`);
   await requireFile(path.join(mobileTarget, "warehouse-sw.js"), `${mobileTarget} has no warehouse-sw.js`);
-  console.log(`STAGED_OK ${target} hash=${await hashTree(target)} mobile=/mobile/warehouse/`);
+  await requireFile(path.join(attendanceTarget, "index.html"), `${attendanceTarget} has no index.html — attendance PWA is missing from the release`);
+  await requireFile(path.join(attendanceTarget, "manifest.webmanifest"), `${attendanceTarget} has no manifest.webmanifest`);
+  await requireFile(path.join(attendanceTarget, "attendance-sw.js"), `${attendanceTarget} has no attendance-sw.js`);
+  console.log(`STAGED_OK ${target} hash=${await hashTree(target)} mobile=/mobile/warehouse/,/mobile/attendance/`);
   process.exit(0);
 }
 
@@ -64,10 +70,16 @@ if (!(await isDirectory(source))) {
 if (!(await isDirectory(mobileSource))) {
   fail(`no built warehouse PWA at ${mobileSource}\n  build it first: pnpm --filter kho run build   (in ../client)`);
 }
+if (!(await isDirectory(attendanceSource))) {
+  fail(`no built attendance PWA at ${attendanceSource}\n  build it first: pnpm --filter kho run build:attendance   (in ../client)`);
+}
 await requireFile(path.join(source, "index.html"), `${source} has no index.html — not a built runtime bundle`);
 await requireFile(path.join(mobileSource, "index.html"), `${mobileSource} has no index.html — not a built warehouse PWA`);
 await requireFile(path.join(mobileSource, "manifest.webmanifest"), `${mobileSource} has no manifest.webmanifest`);
 await requireFile(path.join(mobileSource, "warehouse-sw.js"), `${mobileSource} has no warehouse-sw.js`);
+await requireFile(path.join(attendanceSource, "index.html"), `${attendanceSource} has no index.html — not a built attendance PWA`);
+await requireFile(path.join(attendanceSource, "manifest.webmanifest"), `${attendanceSource} has no manifest.webmanifest`);
+await requireFile(path.join(attendanceSource, "attendance-sw.js"), `${attendanceSource} has no attendance-sw.js`);
 
 // Replace wholesale so stale hashed assets from previous releases cannot remain reachable.
 await rm(target, { recursive: true, force: true });
@@ -75,6 +87,8 @@ await mkdir(target, { recursive: true });
 await cp(source, target, { recursive: true });
 await mkdir(mobileTarget, { recursive: true });
 await cp(mobileSource, mobileTarget, { recursive: true });
+await mkdir(attendanceTarget, { recursive: true });
+await cp(attendanceSource, attendanceTarget, { recursive: true });
 
 // Hash the actual application bundle before adding the marker itself, so the hash never
 // depends on its own JSON. The marker is a public, non-secret production fact that lets
@@ -89,4 +103,4 @@ if (releaseSha) {
   }, null, 2)}\n`, "utf8");
 }
 
-console.log(`STAGE_PASS ${path.relative(serverRoot, target)} <- runtime + warehouse PWA hash=${bundleHash}${releaseSha ? ` release=${releaseSha}` : ""}`);
+console.log(`STAGE_PASS ${path.relative(serverRoot, target)} <- runtime + warehouse + attendance PWAs hash=${bundleHash}${releaseSha ? ` release=${releaseSha}` : ""}`);

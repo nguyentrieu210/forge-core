@@ -11,6 +11,11 @@ export interface ControllerContext<T extends JsonObject> {
 
 export interface DocumentController<T extends JsonObject = JsonObject> {
   readonly doctype: string;
+  /**
+   * Metadata-driven controllers can safely validate `allow_on_submit` field by
+   * field. Domain controllers stay draft-only unless they opt in explicitly.
+   */
+  readonly allowSubmittedSave?: boolean;
   buildPlan(context: ControllerContext<T>): Promise<MutationPlan<T>> | MutationPlan<T>;
 }
 

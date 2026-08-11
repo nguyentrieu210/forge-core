@@ -7,7 +7,7 @@
  * projection in the same kernel bundle.
  */
 import type { Actor, JsonObject, MutationCommand } from "../../../packages/contracts/src/index.js";
-import { commandPayloadHash, errors, sha256Hex } from "../../../packages/core/src/index.js";
+import { commandPayloadHash, errors, sha256Hex, timingSafeEqualString } from "../../../packages/core/src/index.js";
 import type { DocumentKernel, MutationStore } from "../../../packages/document-kernel/src/index.js";
 import {
   applySegmentScan,
@@ -23,20 +23,32 @@ import {
 } from "../../../apps-src/alumdoor-worker/src/attendance-core.js";
 
 const INTERNAL_SCAN_ROLE = "AlumDoor QR System";
+const INTERNAL_CORRECTION_ROLE = "AlumDoor Attendance System";
+const INTERNAL_PAYROLL_ROLE = "AlumDoor Payroll System";
 // Employee Checkin is a standard HRM transaction.  The trusted callback must use
 // its existing create permission without granting the browser or the employee
 // account a generic HR write role.  This role is added only to the synthetic,
 // server-side bundle actor after the QR callback has authenticated the employee.
 const CHECKIN_WRITE_ROLE = "HR User";
+const DEVICE_WRITE_ROLE = "AlumDoor Device System";
 const DAY_DOCTYPE = "AlumDoor Attendance Day";
 const CHECKIN_DOCTYPE = "Employee Checkin";
+const DEVICE_DOCTYPE = "AlumDoor Attendance Device";
 
 export interface AlumDoorAttendanceScanInput {
   tenantId: string;
   actor: Actor;
   station: string;
-  nonceHash: string;
-  deviceFingerprintHash?: string;
+  stationTokenHash: string;
+  requestId: string;
+  latitude: number;
+  longitude: number;
+  accuracy: number;
+  deviceId?: string;
+  credentialHash?: string;
+  employeeCode?: string;
+  newCredentialHash?: string;
+  deviceLabel?: string;
 }
 
 export interface AlumDoorAttendanceScanServices {
@@ -56,13 +68,12 @@ export async function commitAlumDoorAttendanceScan(
   services: AlumDoorAttendanceScanServices,
 ): Promise<JsonObject> {
   const stationName = requiredText(input.station, "QR station");
-  if (!/^[a-f0-9]{64}$/i.test(input.nonceHash)) {
-    throw errors.validation("Attendance QR nonce is invalid");
-  }
+  if (!/^[a-f0-9]{64}$/i.test(input.stationTokenHash)) throw errors.validation("Attendance station token hash is invalid");
+  const requestId = requiredText(input.requestId, "Attendance request id");
+  if (requestId.length > 128 || !/^[A-Za-z0-9._:-]{16,128}$/u.test(requestId)) throw errors.validation("Attendance request id is invalid");
   const now = (services.now?.() ?? new Date().toISOString());
   if (Number.isNaN(Date.parse(now))) throw errors.validation("Attendance scan time is invalid");
 
-  const employee = await resolveEmployeeForActor(services.store, input.tenantId, input.actor);
   const station = await requireRecord(services.store, input.tenantId, "AlumDoor QR Station", stationName);
   if (!truthy(station.is_active)) throw errors.reference(`QR station ${stationName} is inactive`);
 
@@ -83,6 +94,17 @@ export async function commitAlumDoorAttendanceScan(
   const currentSegment = segmentForServerTime(now, timezone, windows);
   assertPolicyEffective(policy, currentSegment.workDate);
 
+  const gps = validateStationGeofence(station, input.latitude, input.longitude, input.accuracy);
+  const identity = await resolveAttendanceIdentity(services.store, input.tenantId, input, policy, now);
+  if (!identity) {
+    return {
+      registration_required: true,
+      station: { name: stationName, station_name: text(station.station_name) || stationName },
+      location: { verification_method: "GPS", distance_m: gps.distanceM, allowed_radius_m: gps.allowedRadiusM },
+    };
+  }
+  const { employee, deviceDocument, deviceAction, deviceRegistered } = identity;
+
   const employeeState = await resolveEffectiveEmployeeState(
     services.store,
     input.tenantId,
@@ -94,6 +116,9 @@ export async function commitAlumDoorAttendanceScan(
   const branch = requiredText(employeeState.branch, "Employee branch");
   if (text(policy.company) !== company) {
     throw errors.reference(`Attendance policy ${policyName} belongs to another company`);
+  }
+  if (text(station.company) && text(station.company) !== company) {
+    throw errors.reference(`QR station ${stationName} belongs to another company`);
   }
   if (text(policy.branch) && text(policy.branch) !== branch) {
     throw errors.reference(`Attendance policy ${policyName} belongs to another branch`);
@@ -108,9 +133,7 @@ export async function commitAlumDoorAttendanceScan(
     tenant_id: input.tenantId,
     employee: employee.name,
     station: stationName,
-    nonce_hash: input.nonceHash.toLowerCase(),
-    segment_code: currentSegment.code,
-    work_date: currentSegment.workDate,
+    request_id: requestId,
   })}`.toUpperCase();
   const checkinName = `CHK-QR-${externalId.slice(3)}`;
   const commandPrefix = `attendance-scan:${externalId}`;
@@ -139,6 +162,30 @@ export async function commitAlumDoorAttendanceScan(
         ...(priorDay.result.regular_minutes !== undefined ? { regular_minutes: priorDay.result.regular_minutes } : {}),
         ...(priorDay.result.overtime_minutes !== undefined ? { overtime_minutes: priorDay.result.overtime_minutes } : {}),
       },
+      employee: { name: employee.name, employee_name: text(employee.data.employee_name) || employee.name },
+      station: { name: stationName, station_name: text(station.station_name) || stationName },
+      location: { verification_method: "GPS", distance_m: gps.distanceM, allowed_radius_m: gps.allowedRadiusM },
+    };
+  }
+
+  const duplicateWindowSeconds = boundedInteger(policy.duplicate_scan_window_seconds, 60, 5, 900, "duplicate scan window");
+  const duplicate = (await services.store.listDocumentsByDoctype<JsonObject>(input.tenantId, CHECKIN_DOCTYPE))
+    .filter((item) => item.docstatus === 1
+      && text(item.data.employee) === employee.name
+      && text(item.data.alu_station) === stationName
+      && text(item.data.alu_attendance_device) === requiredText(deviceDocument.device_id, "Attendance device id"))
+    .map((item) => ({ item, at: Date.parse(text(item.data.time)) }))
+    .filter((entry) => Number.isFinite(entry.at) && Date.parse(now) - entry.at >= 0 && Date.parse(now) - entry.at <= duplicateWindowSeconds * 1_000)
+    .sort((left, right) => right.at - left.at)[0];
+  if (duplicate) {
+    return {
+      replayed: true,
+      duplicate_suppressed: true,
+      checkin: { name: duplicate.item.name, log_type: text(duplicate.item.data.log_type), external_id: text(duplicate.item.data.external_id) },
+      day: { name: dayName, work_date: currentSegment.workDate, segment_code: currentSegment.code },
+      employee: { name: employee.name, employee_name: text(employee.data.employee_name) || employee.name },
+      station: { name: stationName, station_name: text(station.station_name) || stationName },
+      location: { verification_method: "GPS", distance_m: gps.distanceM, allowed_radius_m: gps.allowedRadiusM },
     };
   }
 
@@ -167,20 +214,40 @@ export async function commitAlumDoorAttendanceScan(
 
   const scanActor: Actor = {
     ...input.actor,
-    roles: [...new Set([...input.actor.roles, INTERNAL_SCAN_ROLE, CHECKIN_WRITE_ROLE])],
+    // Keep exactly one internal execution intent. Development/Administrator actors can
+    // legitimately hold every declared role; forwarding correction/payroll system roles
+    // made a first QR scan look like an illegal correction create.
+    roles: [...new Set([
+      ...input.actor.roles.filter((role) => role !== INTERNAL_CORRECTION_ROLE && role !== INTERNAL_PAYROLL_ROLE),
+      INTERNAL_SCAN_ROLE,
+      CHECKIN_WRITE_ROLE,
+      DEVICE_WRITE_ROLE,
+    ])],
   };
   const checkinDocument: JsonObject = {
     employee: employee.name,
     time: now,
     log_type: scan.logType,
     source: "Device",
+    company,
+    branch,
+    device_id: requiredText(deviceDocument.device_id, "Attendance device id"),
     external_id: externalId,
     alu_station: stationName,
     alu_work_date: currentSegment.workDate,
     alu_segment_code: currentSegment.code,
-    alu_token_nonce_hash: input.nonceHash.toLowerCase(),
+    alu_token_nonce_hash: input.stationTokenHash.toLowerCase(),
     alu_capture_source: "QR",
-    ...(input.deviceFingerprintHash ? { alu_device_fingerprint_hash: input.deviceFingerprintHash } : {}),
+    alu_attendance_device: requiredText(deviceDocument.device_id, "Attendance device id"),
+    latitude: input.latitude,
+    longitude: input.longitude,
+    accuracy_m: input.accuracy,
+    distance_from_geofence_m: gps.distanceM,
+    geofence_passed: 1,
+    alu_gps_accuracy_m: input.accuracy,
+    alu_distance_to_station_m: gps.distanceM,
+    alu_allowed_radius_m: gps.allowedRadiusM,
+    alu_verification_method: "GPS",
   };
   const dayDocument: JsonObject = {
     employee: employee.name,
@@ -194,6 +261,17 @@ export async function commitAlumDoorAttendanceScan(
   };
 
   const commands = await Promise.all([
+    command({
+      commandId: `${commandPrefix}:device`,
+      tenantId: input.tenantId,
+      actor: scanActor,
+      doctype: DEVICE_DOCTYPE,
+      name: requiredText(deviceDocument.device_id, "Attendance device id"),
+      action: deviceAction.action,
+      expectedVersion: deviceAction.expectedVersion,
+      document: deviceDocument,
+      submittedAt: now,
+    }),
     command({
       commandId: `${commandPrefix}:checkin-create`,
       tenantId: input.tenantId,
@@ -230,9 +308,10 @@ export async function commitAlumDoorAttendanceScan(
   ]);
 
   const receipts = await services.kernel.executeBundle({ commands });
-  const dayReceipt = receipts[2]!;
+  const dayReceipt = receipts[3]!;
   return {
     replayed: false,
+    device_registered: deviceRegistered,
     checkin: {
       name: checkinName,
       log_type: scan.logType,
@@ -245,22 +324,153 @@ export async function commitAlumDoorAttendanceScan(
       ...(dayReceipt.result.regular_minutes !== undefined ? { regular_minutes: dayReceipt.result.regular_minutes } : {}),
       ...(dayReceipt.result.overtime_minutes !== undefined ? { overtime_minutes: dayReceipt.result.overtime_minutes } : {}),
     },
+    employee: { name: employee.name, employee_name: text(employee.data.employee_name) || employee.name },
+    station: { name: stationName, station_name: text(station.station_name) || stationName },
+    location: {
+      verification_method: "GPS",
+      distance_m: gps.distanceM,
+      allowed_radius_m: gps.allowedRadiusM,
+      accuracy_m: input.accuracy,
+    },
+    server_timestamp: now,
   };
 }
 
-async function resolveEmployeeForActor(store: MutationStore, tenantId: string, actor: Actor): Promise<{ name: string; data: JsonObject }> {
+interface AttendanceIdentity {
+  employee: { name: string; data: JsonObject };
+  deviceDocument: JsonObject;
+  deviceAction: { action: "create" | "save"; expectedVersion: number | null };
+  deviceRegistered: boolean;
+}
+
+async function resolveAttendanceIdentity(
+  store: MutationStore,
+  tenantId: string,
+  input: AlumDoorAttendanceScanInput,
+  policy: JsonObject,
+  now: string,
+): Promise<AttendanceIdentity | null> {
+  if (input.credentialHash) {
+    const deviceId = requiredText(input.deviceId, "Attendance device id");
+    const credentialHash = requiredCredentialHash(input.credentialHash, "Attendance device credential");
+    const existing = await store.getDocument<JsonObject>(tenantId, DEVICE_DOCTYPE, deviceId);
+    if (!existing || existing.docstatus === 2 || text(existing.data.status) !== "Active") {
+      throw errors.permission("Thiết bị chưa được đăng ký hoặc đã bị thu hồi. Hãy liên hệ quản lý.");
+    }
+    const storedHash = requiredCredentialHash(existing.data.credential_hash, "Stored attendance device credential");
+    if (!timingSafeEqualString(storedHash, credentialHash)) {
+      throw errors.permission("Thiết bị chưa được đăng ký hoặc đã bị thu hồi. Hãy liên hệ quản lý.");
+    }
+    const employeeName = requiredText(existing.data.employee, "Attendance device employee");
+    const employeeData = await requireRecord(store, tenantId, "Employee", employeeName);
+    assertEmployeeActive(employeeName, employeeData);
+    return {
+      employee: { name: employeeName, data: employeeData },
+      deviceDocument: { ...existing.data, last_seen_at: now },
+      deviceAction: { action: "save", expectedVersion: existing.version },
+      deviceRegistered: false,
+    };
+  }
+
+  if (!input.employeeCode && !input.newCredentialHash) return null;
+  const employeeCode = requiredText(input.employeeCode, "Employee code");
+  const deviceId = requiredText(input.deviceId, "Attendance device id");
+  if (deviceId.length > 128 || !/^[A-Za-z0-9_-]{16,128}$/u.test(deviceId)) throw errors.validation("Attendance device id is invalid");
+  const credentialHash = requiredCredentialHash(input.newCredentialHash, "New attendance device credential");
   const matches = (await store.listMasterRecordData(tenantId, "Employee"))
-    .filter((employee) => text(employee.data.user_id) === actor.user_id);
-  if (matches.length !== 1) {
-    throw errors.permission(matches.length === 0
-      ? "Tài khoản chưa được liên kết với Nhân viên nên không thể chấm công."
-      : "Tài khoản liên kết nhiều Nhân viên; hãy nhờ quản trị viên xử lý trước khi chấm công.");
-  }
+    .filter((candidate) => text(candidate.data.employee_number).toLocaleLowerCase() === employeeCode.toLocaleLowerCase());
+  if (matches.length !== 1) throw errors.permission("Không thể đăng ký thiết bị với thông tin đã cung cấp.");
   const employee = matches[0]!;
-  if (truthy(employee.data.has_left) || ["Nghỉ việc", "Ngừng sử dụng"].includes(text(employee.data.employee_status))) {
-    throw errors.reference(`Employee ${employee.name} is not active`);
+  try { assertEmployeeActive(employee.name, employee.data); }
+  catch { throw errors.permission("Không thể đăng ký thiết bị với thông tin đã cung cấp."); }
+
+  if (await store.getDocument<JsonObject>(tenantId, DEVICE_DOCTYPE, deviceId)) {
+    throw errors.permission("Không thể đăng ký thiết bị với thông tin đã cung cấp.");
   }
-  return employee;
+  const maxDevices = boundedInteger(policy.max_devices_per_employee, 2, 1, 20, "max devices per employee");
+  const activeDevices = (await store.listDocumentsByDoctype<JsonObject>(tenantId, DEVICE_DOCTYPE))
+    .filter((item) => item.docstatus !== 2 && text(item.data.employee) === employee.name && text(item.data.status) === "Active");
+  if (activeDevices.length >= maxDevices) {
+    throw errors.permission("Nhân viên đã đạt giới hạn thiết bị. Hãy nhờ quản lý thu hồi thiết bị cũ.");
+  }
+  return {
+    employee,
+    deviceDocument: {
+      device_id: deviceId,
+      device_label: text(input.deviceLabel) || "Điện thoại chấm công",
+      employee: employee.name,
+      credential_hash: credentialHash,
+      status: "Active",
+      registered_at: now,
+      last_seen_at: now,
+      metadata_json: "{}",
+    },
+    deviceAction: { action: "create", expectedVersion: null },
+    deviceRegistered: true,
+  };
+}
+
+function assertEmployeeActive(employeeName: string, employee: JsonObject): void {
+  if (truthy(employee.has_left) || ["Nghỉ việc", "Ngừng sử dụng"].includes(text(employee.employee_status))) {
+    throw errors.reference(`Employee ${employeeName} is not active`);
+  }
+}
+
+function requiredCredentialHash(value: unknown, label: string): string {
+  const result = requiredText(value, label).toLowerCase();
+  if (!/^[a-f0-9]{64}$/u.test(result)) throw errors.validation(`${label} is invalid`);
+  return result;
+}
+
+function validateStationGeofence(station: JsonObject, latitudeValue: unknown, longitudeValue: unknown, accuracyValue: unknown): {
+  distanceM: number; allowedRadiusM: number;
+} {
+  const latitude = coordinate(latitudeValue, -90, 90, "Current latitude");
+  const longitude = coordinate(longitudeValue, -180, 180, "Current longitude");
+  const accuracy = positiveNumber(accuracyValue, "GPS accuracy");
+  const centerLatitude = coordinate(station.latitude, -90, 90, "Station latitude");
+  const centerLongitude = coordinate(station.longitude, -180, 180, "Station longitude");
+  const allowedRadiusM = positiveNumber(station.allowed_radius_m, "Station allowed radius");
+  const maxAccuracyM = positiveNumber(station.max_gps_accuracy_m, "Station max GPS accuracy");
+  if (accuracy > maxAccuracyM) {
+    throw errors.validation("Vị trí hiện tại chưa đủ chính xác. Hãy bật GPS hoặc di chuyển tới khu vực thoáng hơn và thử lại.", {
+      code: "GPS_ACCURACY_TOO_LOW", accuracy_m: accuracy, max_accuracy_m: maxAccuracyM,
+    });
+  }
+  const distanceM = Math.round(haversineMeters(latitude, longitude, centerLatitude, centerLongitude) * 100) / 100;
+  if (distanceM > allowedRadiusM) {
+    throw errors.validation(`Bạn đang ở ngoài khu vực của trạm. Khoảng cách hiện tại: ${Math.round(distanceM)} m; phạm vi cho phép: ${allowedRadiusM} m.`, {
+      code: "OUTSIDE_GEOFENCE", distance_m: distanceM, allowed_radius_m: allowedRadiusM,
+    });
+  }
+  return { distanceM, allowedRadiusM };
+}
+
+function coordinate(value: unknown, minimum: number, maximum: number, label: string): number {
+  const result = Number(value);
+  if (!Number.isFinite(result) || result < minimum || result > maximum) throw errors.validation(`${label} is invalid`);
+  return result;
+}
+
+function positiveNumber(value: unknown, label: string): number {
+  const result = Number(value);
+  if (!Number.isFinite(result) || result <= 0) throw errors.validation(`${label} must be positive`);
+  return result;
+}
+
+function boundedInteger(value: unknown, fallback: number, minimum: number, maximum: number, label: string): number {
+  const result = value === undefined || value === null || value === "" ? fallback : Number(value);
+  if (!Number.isSafeInteger(result) || result < minimum || result > maximum) throw errors.validation(`${label} is invalid`);
+  return result;
+}
+
+export function haversineMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const radians = (value: number) => value * Math.PI / 180;
+  const dLat = radians(lat2 - lat1);
+  const dLon = radians(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(radians(lat1)) * Math.cos(radians(lat2)) * Math.sin(dLon / 2) ** 2;
+  return 6_371_000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 async function requireRecord(store: MutationStore, tenantId: string, doctype: string, name: string): Promise<JsonObject> {

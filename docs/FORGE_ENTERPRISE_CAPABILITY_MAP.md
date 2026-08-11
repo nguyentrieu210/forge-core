@@ -595,6 +595,8 @@ Mỗi capability có ID ổn định để task/PR/test có thể tham chiếu. 
 - `H04-008` Shift Assignment/roster.
 - `H04-009` Employee Checkin.
 - `H04-010` Geofence/mobile checkin.
+  - Evidence AlumDoor 2026-08-11: QR trạm cố định có rotate/revoke; GPS accuracy + Haversine được xác minh server-side; credential thiết bị băm; lần đầu bind theo mã nhân viên, lần sau không cần login; log vẫn đi qua `Employee Checkin` và `AlumDoor Attendance Day`.
+  - Code: `server/apps-src/alumdoor-worker/src/attendance-qr.ts`, `server/apps/tenant-worker/src/attendance-scan-coordinator.ts`, `client/apps/attendance-mobile/src/main.tsx`.
 - `H04-011` Attendance.
 - `H04-012` Attendance adjustment.
 - `H04-013` Overtime request.
