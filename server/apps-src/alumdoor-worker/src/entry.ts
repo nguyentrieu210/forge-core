@@ -1,5 +1,8 @@
 import baseWorker from "./index.js";
-import { validateItemCatalogInvariants } from "./item-catalog-invariants.js";
+import {
+  validateCanonicalAluminumItem,
+  validateItemCatalogInvariants,
+} from "./item-catalog-invariants.js";
 import {
   handleTrackedPurchaseFifoRequest,
   validateAluminumPurchaseHook,
@@ -63,18 +66,27 @@ export default {
 
     const body = await request.clone().json().catch(() => null) as { doctype?: string } | null;
     if (body?.doctype === "Item") {
-      // Preserve the main-branch contract: catalog invariants own business-facing validation
-      // priority. The historical validator remains authoritative for Item Group/Profile/color/UOM
-      // checks after those invariants pass.
+      // 1) Preserve business-facing catalog invariant priority from main.
       const invariantResponse = await validateItemCatalogInvariants(request.clone(), env);
       if (!invariantResponse.ok) return invariantResponse;
-      const marker = await invariantResponse.clone().json().catch(() => ({})) as { aluminum_contract?: boolean };
+
+      // 2) Preserve historical Item Group / Measurement Profile / color / UOM validation.
       const baseResponse = await baseWorker.fetch(request.clone(), env, ctx);
-      if (baseResponse.ok) return invariantResponse;
-      if (baseResponse.status !== 422) return baseResponse;
-      const message = await responseMessage(baseResponse);
-      if (marker.aluminum_contract && /chưa có hệ số quy đổi/i.test(message)) return invariantResponse;
-      return baseResponse;
+      if (!baseResponse.ok) {
+        if (baseResponse.status !== 422) return baseResponse;
+        const message = await responseMessage(baseResponse);
+        if (!/chưa có hệ số quy đổi/i.test(message)) return baseResponse;
+
+        // 3) Only canonical aluminum is allowed to supersede the obsolete static Kg→piece
+        // conversion rule. Ordinary Items still receive the historical 422 unchanged.
+        const strict = await validateCanonicalAluminumItem(request.clone(), env);
+        return strict ?? baseResponse;
+      }
+
+      // Base validation passed. A dimensional aluminum Item must still satisfy the stricter
+      // one-ledger/catch-weight contract and may not keep a static Kg↔piece conversion table.
+      const strict = await validateCanonicalAluminumItem(request.clone(), env);
+      return strict ?? invariantResponse;
     }
 
     if (body?.doctype && PURCHASE_VALIDATION_DOCTYPES.has(body.doctype)) {
