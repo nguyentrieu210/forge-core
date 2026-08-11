@@ -80,7 +80,11 @@ export function applyAlumdoorChildPresentation(brief) {
     const listed = new Set(doctype.list ?? []);
     const declared = EXACT.get(doctype.name);
     const policy = declared
-      ? { quick: existing(declared.quick, fieldNames), full: existing(declared.full, fieldNames) }
+      ? (() => {
+          const full = existing(declared.full, fieldNames);
+          const visible = new Set(full);
+          return { quick: existing(declared.quick, fieldNames).filter((fieldname) => visible.has(fieldname)), full };
+        })()
       : genericPolicy(fields, listed);
 
     doctype.fields = fields.map((field) => ({
