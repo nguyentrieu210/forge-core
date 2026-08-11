@@ -69,6 +69,40 @@ extends WarehouseScopedController<DeliveryNoteData> {
 }
 
 /**
+ * Replaces only the physical/accounting reversal portion of a Purchase Receipt cancel plan.
+ * Procurement/allocation extensions produced by the rollout-aware delegate stay untouched.
+ */
+export async function exactPurchaseReceiptCancellationPlan(
+  context: ControllerContext<PurchaseReceiptData>,
+  plan: MutationPlan<PurchaseReceiptData>,
+): Promise<MutationPlan<PurchaseReceiptData>> {
+  if (!context.existing) throw errors.notFound();
+  const revision = context.existing.version;
+  const [stock, gl] = await Promise.all([
+    context.reader.getVoucherStockEntries(
+      context.command.tenant_id,
+      "Purchase Receipt",
+      context.command.aggregate.name,
+      revision,
+    ),
+    context.reader.getVoucherGlEntries(
+      context.command.tenant_id,
+      "Purchase Receipt",
+      context.command.aggregate.name,
+      revision,
+    ),
+  ]);
+  if (stock.length === 0) {
+    throw errors.reference(`Original stock posting for Purchase Receipt ${context.command.aggregate.name} was not found`);
+  }
+  return {
+    ...plan,
+    stock_entries: reverseStock(stock),
+    gl_entries: reverseGl(gl),
+  };
+}
+
+/**
  * Wraps the rollout-aware Purchase Receipt controller rather than bypassing it, so the
  * purchase-allocation rollout switch remains intact while warehouse posting is hardened.
  *
@@ -90,32 +124,8 @@ extends WarehouseScopedController<PurchaseReceiptData> {
       return this.delegate.buildPlan(context);
     }
     if (context.command.action !== "cancel") return this.delegate.buildPlan(context);
-    if (!context.existing) throw errors.notFound();
-
     const plan = await this.delegate.buildPlan(context);
-    const revision = context.existing.version;
-    const [stock, gl] = await Promise.all([
-      context.reader.getVoucherStockEntries(
-        context.command.tenant_id,
-        this.doctype,
-        context.command.aggregate.name,
-        revision,
-      ),
-      context.reader.getVoucherGlEntries(
-        context.command.tenant_id,
-        this.doctype,
-        context.command.aggregate.name,
-        revision,
-      ),
-    ]);
-    if (stock.length === 0) {
-      throw errors.reference(`Original stock posting for ${this.doctype} ${context.command.aggregate.name} was not found`);
-    }
-    return {
-      ...plan,
-      stock_entries: reverseStock(stock),
-      gl_entries: reverseGl(gl),
-    };
+    return exactPurchaseReceiptCancellationPlan(context, plan);
   }
 }
 
