@@ -9,12 +9,20 @@ function replace(before, after, label) {
   source = source.replace(before, after);
 }
 
-replace(
-`import { errors, sha256Hex } from "../../core/src/index.js";`,
-`import { errors, sha256Hex } from "../../core/src/index.js";\nimport { resolveCommercialLine, resolveSalesPackage } from "../../clouderp-selling/src/index.js";`, "pricing resolver import");
-replace(
-`import { resolveCommercialLine } from "../../clouderp-selling/src/index.js";`,
-`import { resolveCommercialLine, resolveSalesPackage } from "../../clouderp-selling/src/index.js";`, "package resolver import");
+if (!source.includes(`import { resolveCommercialLine, resolveSalesPackage } from "../../clouderp-selling/src/index.js";`)) {
+  if (source.includes(`import { resolveCommercialLine } from "../../clouderp-selling/src/index.js";`)) {
+    source = source.replace(
+      `import { resolveCommercialLine } from "../../clouderp-selling/src/index.js";`,
+      `import { resolveCommercialLine, resolveSalesPackage } from "../../clouderp-selling/src/index.js";`,
+    );
+  } else {
+    replace(
+      `import { errors, sha256Hex } from "../../core/src/index.js";`,
+      `import { errors, sha256Hex } from "../../core/src/index.js";\nimport { resolveCommercialLine, resolveSalesPackage } from "../../clouderp-selling/src/index.js";`,
+      "commercial resolver import",
+    );
+  }
+}
 
 replace(
 `    case "frappe.client.get_value":
@@ -93,9 +101,25 @@ async function previewSalesCommercialLine(args: FrappeArgs, context: FrappeRoute
   };
 }
 `;
-}
+} else {
+  replace(
+`  const resolved = await resolveCommercialLine({
+    command: fakeCommand,
+    existing: null,
+    now: context.now(),
+    nextVersion: 1,
+    reader: context.documents,
+  }, {`,
+`  const kernelContext = {
+    command: fakeCommand,
+    existing: null,
+    now: context.now(),
+    nextVersion: 1,
+    reader: context.documents,
+  };
+  const resolved = await resolveCommercialLine(kernelContext, {`, "shared preview context");
 
-replace(
+  replace(
 `  return { ...resolved, rate: resolved.selling_rate, amount: resolved.net_before_tax, net_amount: resolved.net_before_tax };`,
 `  const packageSnapshot = resolved.sales_package
     ? await resolveSalesPackage(kernelContext, {
@@ -112,23 +136,7 @@ replace(
     amount: resolved.net_before_tax,
     net_amount: resolved.net_before_tax,
   };`, "package snapshot preview result");
-
-replace(
-`  const resolved = await resolveCommercialLine({
-    command: fakeCommand,
-    existing: null,
-    now: context.now(),
-    nextVersion: 1,
-    reader: context.documents,
-  }, {`,
-`  const kernelContext = {
-    command: fakeCommand,
-    existing: null,
-    now: context.now(),
-    nextVersion: 1,
-    reader: context.documents,
-  };
-  const resolved = await resolveCommercialLine(kernelContext, {`, "shared preview context");
+}
 
 fs.writeFileSync(target, source);
 console.log("canonical sales commercial preview API applied");
