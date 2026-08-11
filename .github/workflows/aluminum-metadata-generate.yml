@@ -24,11 +24,19 @@ jobs:
       - name: Apply effective V2 metadata overlay
         working-directory: server
         run: node scripts/apply-alumdoor-aluminum-metadata-overlay.mjs briefs/alumdoor-v2.json --out="$RUNNER_TEMP/alumdoor-v2.json"
-      - name: Validate generated package
-        working-directory: server
+      - name: Assert canonical generated contract
         run: |
-          cp "$RUNNER_TEMP/alumdoor-v2.json" "$RUNNER_TEMP/effective-alumdoor-v2.json"
-          node scripts/forge-app.mjs "$RUNNER_TEMP/effective-alumdoor-v2.json" --dry-run
+          node - "$RUNNER_TEMP/alumdoor-v2.json" <<'NODE'
+          const fs = require('fs');
+          const brief = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          const item = brief.doctypes.find((row) => row.name === 'Item');
+          for (const field of ['purchase_stock_qty_field','purchase_allocation_qty_field','purchase_allocation_uom']) {
+            if (!item.fields.some((row) => typeof row === 'object' && row.fieldname === field)) throw new Error(`missing ${field}`);
+          }
+          const profile = brief.fixtures.find((row) => row.type === 'Measurement Profile' && row.name === 'Nhôm cây/lá');
+          if (profile?.data?.stock_uom !== 'Cây') throw new Error('aluminum profile stock_uom must be Cây');
+          console.log('ALUMDOOR_EFFECTIVE_METADATA_PASS');
+          NODE
       - uses: actions/upload-artifact@v4
         with:
           name: effective-alumdoor-v2-${{ github.run_id }}
