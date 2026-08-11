@@ -18,6 +18,8 @@ const FROZEN_IDENTITY_FIELDS = [
   "reserved_at",
 ] as const;
 
+const TERMINAL_RESERVATION_STATES = new Set(["Đã dùng", "Đã nhả", "Hết hạn"]);
+
 function text(value: unknown): string {
   return String(value ?? "").normalize("NFC").trim();
 }
@@ -37,6 +39,12 @@ function timestamp(value: unknown, field: string): number | null {
   const parsed = Date.parse(raw);
   if (!Number.isFinite(parsed)) throw errors.validation(`${field} không phải thời điểm hợp lệ`);
   return parsed;
+}
+
+function assertReservationOpen(previous: ReservationData): void {
+  if (TERMINAL_RESERVATION_STATES.has(stateOf(previous.state))) {
+    throw errors.lifecycle("Phiếu giữ chỗ đã kết thúc và không thể sửa");
+  }
 }
 
 function assertReservationIdentityImmutable(current: ReservationData, previous: ReservationData): void {
@@ -204,6 +212,7 @@ export class StockReservationIntegrityController extends StockReservationControl
       return withSnapshot;
     }
 
+    assertReservationOpen(previous);
     assertReservationIdentityImmutable(input, previous);
     assertActiveReservationNotZombie(context, previous, desiredState);
     assertConsumptionIsNotClientDeclared(input, previous, desiredState);
