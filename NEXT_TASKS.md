@@ -1,142 +1,104 @@
 # NEXT TASKS
 
-Ngày cập nhật: **2026-08-04**.
+Ngày cập nhật: **2026-08-11**.
 
-Đây là **active queue** của Forge. Lịch sử đã hoàn thành nằm trong Git/PR/convergence evidence, không lặp lại ở đây.
+Đây là **active queue** của Forge. Lịch sử đã hoàn thành nằm trong Git/PR/convergence evidence, không lặp lại thành live queue.
 
 ## 0. Current state
 
-- RC4: DONE.
-- R5: **DONE / merged via PR #638**.
-- R5 merge commit: `7940331c589d4e5699cf00e2ec843c5a7b8c50ac`.
-- Active program: **R6 Production Certification**.
-- Next milestone after R6: **Alumdoor Controlled Pilot**.
+- 2026-08-11 Inventory + Attendance/Payroll + Sales source convergence: **DONE**.
+- Final convergence PR: `#822` — merged to `main@37880fc828bfcab5f9fca19341ee64e4caee3103`.
+- Exact pre-merge combined candidate: `dba25942311fd94064f95d7906b5c044347cc440`.
+- R6 Pass Convergence run `31465006532`: **SUCCESS** on that exact combined candidate.
+- Production promotion/cutover: **NOT PERFORMED by this wave**.
 
-Do not reopen R5 merely because production evidence is missing; that evidence belongs to R6.
+Do not reopen the superseded Sales/UI/runner/control PR chain. New work starts from exact current `main`.
 
-## 1. R6-00 — Release Lock + Evidence Contract
+## 1. Release/pilot lane — only when explicitly authorized
 
-Open first and alone.
+If the next goal is to promote the converged product to AlumDoor production/pilot:
 
-Required output:
+1. resolve exact current `main` and choose one immutable release SHA;
+2. lock package/app/profile identity and expected migration inventory for that SHA;
+3. rerun exact-SHA release evidence required by current release policy if the release SHA differs from the already validated `dba2594...` candidate;
+4. verify desired-vs-observed provider state read-only first;
+5. prepare production migration/deploy/cutover actions as separately gated operations;
+6. require explicit authorization before deploy/redeploy/rollback, production migration, restore/PITR, tenant apply, DNS/route/secret/provider mutation or customer-data write/cutover;
+7. after authorized promotion, reconcile Stock/AR/AP/payment/revenue/COGS/manufacturing/GL and record exact deployed release marker/bundle hash.
 
-- exact current `main`;
-- initial R6 candidate SHA;
-- package/app/profile identity;
-- expected migration inventory/checksum digest;
-- target environment identity without secrets;
-- evidence index;
-- read-only vs mutation-gated action matrix;
-- dependency order;
-- `R6-00-LOCKED`.
+Do not treat `main` merge as proof of production deployment.
 
-Canonical plan: `docs/agents/r6/R6_PRODUCTION_CERTIFICATION_PLAN.md`.
+## 2. Open PR rebaseline lane
 
-## 2. R6 worker wave — open after R6-00-LOCKED
+Exactly three independent PRs remain open after convergence cleanup:
 
-Open in parallel:
+### `#665` — Repository / North Star hygiene
 
-### R6-01 Provider + Exact Release
+- Re-audit against exact current `main`.
+- Salvage only still-needed brand/docs/security-hygiene changes.
+- Do not merge the stale 40-commit history wholesale if current main already supersedes parts of it.
+- Any credential rotation/history rewrite remains a separate security/destructive decision.
 
-- Cloudflare source governance;
-- desired-vs-observed provider inventory;
-- exact health/auth boundary;
-- exact release SHA + bundle hash;
-- observability evidence.
+### `#672` — Provisioning doctrine + Skill Matrix
 
-### R6-02 Data Safety + Migration + Cutover
+- Reconcile the doctrine against current Skill/North Star/App Factory state.
+- Prefer a small docs-only replacement PR from current main if the content remains valid.
+- Do not inherit stale status statements from its old baseline.
 
-- expected/applied migration inventory;
-- fresh backup verification;
-- isolated replay;
-- disposable restore drill;
-- PITR/rollback decision evidence;
-- production-like cutover/opening reconciliation rehearsal.
+### `#675` — Omnichannel Marketplace ERP
 
-### R6-03 Security + Performance + Recovery
+- Treat as an independent product workstream, not part of AlumDoor convergence.
+- Rebase/reconcile from exact current main before claiming compatibility.
+- Re-run current Sales/ATP/Stock/Finance authority tests because main now contains newer Sales fulfillment and aluminum reservation contracts.
+- Real marketplace OAuth/secrets/webhooks/provider certification and production promotion remain explicit external/live boundaries.
 
-- IAM/session/admin/tenant isolation;
-- secret/config hygiene;
-- queue retry/DLQ safety;
-- truthful Worker/app recovery semantics;
-- bounded representative p50/p95/p99/error/RPS;
-- logs/traces/cost-pressure evidence.
+## 3. Post-convergence product audit
 
-### R6-04 Alumdoor Exact-Release Golden Flow
+Before opening another broad implementation wave:
 
-- exact Alumdoor package/profile identity;
-- authenticated canonical Golden Flow;
-- Stock/Payment/GL readback;
-- duplicate/idempotent retry;
-- fail-closed invalid/insufficient action;
-- correction/settlement path;
-- warranty linked to exact delivery source.
+- audit current `main` rather than branch snapshots;
+- verify no duplicate Pricing/Stock/Payroll authority remains active;
+- verify Sales Package fulfillment consumes shared reservation/stock lifecycle;
+- verify aluminum purchase/stock metadata remains counted-stock + catch-weight canonical;
+- verify Attendance correction/payroll approval and locking remain canonical after future shared-runtime changes;
+- identify only evidence-backed residual P0/P1 gaps.
 
-No subjective visual/pixel QA gate is required. Functional browser smoke is used only if necessary to prove an authenticated real user path.
+If gaps span independent authority hotspots, open a new PROGRAM from exact current main. Do not reuse the closed 2026-08-11 control branches as live baselines.
 
-## 3. R6-05 — Independent Final Certification
+## 4. Capability maturity discipline
 
-Open only after R6-01 through R6-04 have final evidence or explicit blocker disposition.
+- Canonical capability denominator remains 956 until a new evidence-backed audit materializes a new distribution.
+- Do not raise maturity from source presence or test count alone.
+- Promote capability maturity only with source + runtime + permission + correction/reconciliation/evidence appropriate to the risk class.
+- Do not implement all Missing capabilities merely to improve a score; prioritize customer/release-critical and shared-safety gaps.
 
-R6-05 must:
+## 5. Source-fix rule after convergence
 
-- independently resolve exact candidate identity;
-- reject stale-SHA evidence;
-- verify R6 evidence IDs `R6-E01..R6-E23`;
-- verify no unauthorized production mutation;
-- verify no unresolved P0/P1 in pilot scope;
-- emit exact certified SHA and `PILOT-GO` or `PILOT-NO-GO`.
+If a new source defect is found:
 
-R6-05 is an auditor, not another implementation worker.
+1. start from exact current main;
+2. record failed invariant/capability;
+3. make the smallest owner-correct fix;
+4. verify affected domain + shared authority boundaries;
+5. merge through normal risk boundary;
+6. issue a new release candidate SHA if the change affects a pending release;
+7. rerun affected exact-SHA evidence.
 
-## 4. Source-fix rule during R6
+Never reuse evidence from an older source SHA after a source-changing fix.
 
-If R6 finds a pilot-blocking source defect:
+## 6. Standing authorization boundaries
 
-1. record failed invariant;
-2. make smallest owner-correct fix;
-3. merge through normal boundary;
-4. issue new candidate SHA;
-5. rerun every affected evidence lane;
-6. never treat old-SHA evidence as proof of new candidate.
-
-Do not create separate release candidates per R6 lane.
-
-## 5. Explicit authorization boundaries
-
-Opening R6 agents does **not** authorize:
+The completed `#822` approval covered source convergence/merge. It did **not** authorize:
 
 - production deploy/redeploy/rollback;
 - production migration;
 - production restore/PITR;
+- tenant metadata/profile apply to live customers;
 - customer production data import/write/cutover;
 - DNS/route/secret/provider mutation;
-- destructive queue replay.
+- destructive queue replay;
+- merge/deploy of future non-UI workstreams not included in `#822`.
 
-Agents should exhaust read-only/local/disposable work and record the exact remaining live operation instead of stopping the whole program early.
+## 7. Documentation discipline
 
-## 6. After PILOT-GO
-
-Move to Alumdoor Controlled Pilot:
-
-1. freeze Alumdoor Production Profile;
-2. map/import real master + opening data under explicit authorization;
-3. dry run representative transactions;
-4. parallel run against current operational source;
-5. daily Stock/AR/AP/payment/revenue/COGS/manufacturing/GL reconciliation;
-6. cutover;
-7. hypercare;
-8. Pilot Exit Gate -> Accepted Production Reference -> GA.
-
-## 7. Standing boundaries
-
-- Global capability score is not a reason to reopen a blanket feature wave.
-- Vertical apps consume shared authorities; no copied HRM/CRM/Finance/Stock implementation inside Alumdoor.
-- Capability disable != package uninstall/data purge.
-- Production/provider evidence must be observed directly; source presence is insufficient.
-- Worker rollback != data rollback.
-- R5 browser/visual QA waiver is not a reason to fabricate a browser PASS; it simply is not a release blocker.
-
-## 8. Documentation discipline
-
-Use `docs/README.md` as the documentation map and `docs/agents/r6/README.md` as the active R6 entrypoint. After R6 converges, remove temporary agent prompts/order from `main` and retain the final certification/evidence record.
+Use `CURRENT_STATUS.md` for live verified state and this file for the active queue. Old R6/RC/agent boards, prompts and handoffs are provenance unless current GitHub state explicitly makes them active again. Keep final convergence/certification evidence; remove temporary coordination artifacts when they no longer carry audit value.

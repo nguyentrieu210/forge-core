@@ -1,6 +1,6 @@
 # CURRENT STATUS
 
-Ngày cập nhật: **2026-08-04**.
+Ngày cập nhật: **2026-08-11**.
 
 GitHub là nguồn sự thật cho exact `main`, branch, PR, workflow run, merge và production evidence. File này chỉ giữ **live verified state**, không giữ lịch sử dài.
 
@@ -8,18 +8,41 @@ GitHub là nguồn sự thật cho exact `main`, branch, PR, workflow run, merge
 
 - Repository: `nguyentrieu210/forge`.
 - Default branch: `main`.
-- Product baseline: **Forge 0.2.0 — Enterprise Parallel Baseline**.
-- RC4 integrated closure: DONE.
-- R5 integrated hardening/productization: **DONE / R5-GO**.
-- R5 merge commit: `main@7940331c589d4e5699cf00e2ec843c5a7b8c50ac` via PR `#638`.
-- R5 final verdict used an explicit project-owner waiver for the remaining browser/visual QA gate; non-visual engineering/package/runtime/domain/migration/reconciliation gates were green before merge.
-- No production deploy, production migration, DNS/secret/provider mutation or customer-data cutover is implied by R5 closure.
+- Exact source baseline sau convergence: `main@37880fc828bfcab5f9fca19341ee64e4caee3103`.
+- Final convergence PR: `#822` — **MERGED**.
+- Exact combined candidate trước merge: `dba25942311fd94064f95d7906b5c044347cc440`.
+- R6 Pass Convergence run `31465006532` trên exact combined candidate: **SUCCESS**.
+- Read-only pilot/provider/package-profile lane trong cùng R6 run: **SUCCESS**.
+- Không có production deploy, production migration, tenant apply, DNS/route/secret/provider mutation hay customer-data cutover trong wave merge này.
 
-## 2. Capability truth
+## 2. 2026-08-11 convergence closure
 
-Canonical denominator remains exactly **956 capabilities** unless a later convergence record explicitly materializes a new maturity distribution.
+Một combined candidate duy nhất đã hội tụ theo authority/dependency order:
 
-Latest accepted materialized distribution remains:
+1. **AlumDoor Inventory / aluminum ATP authority** từ PR `#807`;
+2. **Attendance -> Payroll authority** từ `feature/attendance-payroll`, hội tụ qua PR `#818`;
+3. **Sales commercial authority** từ canonical Sales end-state, gồm Pricing Rule authority, Item Price variant, Sales Option, Sales Package/source-line fulfillment và server-authoritative commercial money.
+
+Các shared hotspot Sales/Inventory/Payroll đã được reconcile trên cùng tree thay vì merge độc lập rồi giả định tương thích.
+
+Combined convergence verification trước final PR gồm:
+
+- server build: PASS;
+- 53/53 targeted critical regressions: PASS;
+- aluminum purchase/supply-demand + ATP/reservation: PASS;
+- Attendance/Payroll integration + coordinator: PASS;
+- commercial line authority + Sales Option + O2C: PASS;
+- R6 production-equivalent CloudForge + MetaForge build: PASS;
+- migration/restore/PITR safety: PASS;
+- Workerd ERP lifecycle, auth/CSRF/tenant isolation, provisioning: PASS;
+- R6 Golden Flow: PASS;
+- release safety, observability, queue safety, AlumDoor package composition và diff hygiene: PASS.
+
+## 3. Capability truth
+
+Canonical denominator vẫn là **956 capabilities** cho tới khi một convergence/audit sau này materialize distribution mới có evidence đầy đủ.
+
+Latest accepted materialized distribution chưa được wave 2026-08-11 thay đổi hàng loạt:
 
 | Maturity | Count |
 |---|---:|
@@ -30,80 +53,50 @@ Latest accepted materialized distribution remains:
 | Missing | 157 |
 | **Total** | **956** |
 
-R5 focused on integration/productization and did not justify reopening a blanket capability-promotion wave.
+Không suy maturity mới chỉ từ việc merge thêm source hoặc tăng test count.
 
-## 3. R5 closure state
-
-R5 converged the implementation needed before production certification, including:
-
-- package dependency/version hardening;
-- canonical capability-profile persistence and activation semantics;
-- System Manager/session/CSRF guarded capability profile snapshot/preview/apply;
-- hosted capability-profile authoring surface;
-- capability-aware hook fanout and retry suppression;
-- canonical Workplace scheduled notification wiring;
-- Finance/HCM reconciliation;
-- commercial/supply-chain quantity authority cleanup;
-- Manufacturing/QMS/Service integrated regression;
-- package lifecycle, migration governance, cross-ledger and runtime build evidence.
-
-The historical R5 browser/visual QA waiver does not reopen R5. R6 may still use bounded functional browser evidence when required to prove an authenticated exact-release path or Alumdoor Golden Flow.
-
-## 4. Current production/provider truth
-
-Forge is **not yet production-certified for the new R5 candidate**.
-
-Still to prove in R6:
-
-- exact candidate/release/package/profile identity lock;
-- Cloudflare desired-vs-observed state for pilot-used resources;
-- exact deployed release marker and bundle hash;
-- applied migration inventory on the target context;
-- backup replay + disposable restore/cutover rehearsal;
-- truthful PITR/rollback/recovery boundaries;
-- representative bounded performance/observability evidence;
-- auth/tenant/security acceptance on the candidate;
-- authenticated exact-release Alumdoor Golden Flow with correction/readback evidence.
-
-Historical ALU production releases are operational history, not proof that `7940331c...` or any future R6 candidate is deployed.
-
-## 5. Current architecture authorities
+## 4. Current architecture authorities
 
 - Document/business writes: canonical Document Kernel / Durable Object path.
-- Tenant/query store: D1 under repository migration governance.
-- Money authority: canonical GL + Payment Ledger contracts; no shadow finance ledger.
-- Stock authority: canonical Stock Ledger/valuation contracts; no vertical stock ledger fork.
+- Tenant/query store: D1 dưới repository migration governance.
+- Money authority: canonical GL + Payment Ledger; commercial Sales money được resolve server-side, không lấy client total làm authority.
+- Sales pricing: `Item Price` là base price; `Pricing Rule` là conditional commercial adjustment authority; `Sales Option` là operator-facing choice; `Sales Package` là fulfillment composition; BOM vẫn là manufacturing consumption authority.
+- Stock authority: canonical Stock Ledger/valuation; không có vertical shadow stock ledger.
+- AlumDoor aluminum: physical stock dùng counted Cây/Lá + Batch; Kg là purchase/pricing catch weight; không dùng static Kg<->Cây conversion làm authoritative quantity.
+- Reservation/ATP: shared stock/reservation authority được Sales fulfillment và Manufacturing demand tiêu thụ, không fork trong vertical.
+- HCM/Payroll: Attendance Day/Pay Profile/Payroll coordination được nối vào canonical payroll path; correction/approval/locking giữ server authority.
 - Permission: server-side tenant/role/DocPerm/owner/share/user-permission enforcement.
 - App lifecycle: App Registry / App Factory install/upgrade contracts.
-- Capability activation: versioned server-authoritative profile; disable != uninstall/data purge.
-- Frontend: shared metadata-driven MetaForge runtime; verticals do not fork shared runtime.
-- Alumdoor: reference vertical consuming generic Finance/CRM/Procurement/Stock/Manufacturing/HCM/Service authorities.
+- Frontend: shared metadata-driven runtime; vertical logic chỉ giữ ở layer ngành khi thực sự đặc thù.
 
-## 6. Active program
+## 5. Production/provider truth
 
-The active program is now:
+Wave `#822` là **source convergence**, không phải production promotion.
 
-`R5 COMPLETE -> R6 production certification -> Alumdoor controlled pilot -> GA`
+- R6 evidence đã chứng minh exact combined candidate `dba2594...` có production-equivalent build/source-safety và read-only pilot evidence xanh.
+- Merge commit hiện tại là `37880fc...`; không được suy rằng SHA này đã deploy chỉ vì source đã merge.
+- Nếu `37880fc...` hoặc một SHA main mới hơn được chọn làm release target, release lock phải dùng exact target SHA và rerun mọi exact-SHA evidence mà release policy yêu cầu trước mutation live.
+- Production deploy/redeploy/rollback, migration, restore/PITR, tenant apply, DNS/route/secret/provider mutation và customer-data cutover vẫn là explicit authorization boundaries.
 
-Canonical R6 planning on the active planning branch:
+## 6. Open workstreams
 
-- `docs/agents/r6/README.md`
-- `docs/agents/r6/R6_PRODUCTION_CERTIFICATION_PLAN.md`
-- `docs/agents/r6/OPEN_ORDER.md`
-- `docs/agents/r6/AGENT_PROMPTS.md`
-- `docs/agents/r6/EVIDENCE_MATRIX.md`
+Sau cleanup convergence, chỉ còn ba PR mở và chúng **không thuộc wave #822**:
 
-R6 starts from R5 merge commit `7940331c...`, but R6-00 must resolve exact current `main` before locking the certification candidate.
+- `#665` — repo/North Star brand + hygiene rebaseline;
+- `#672` — provisioning doctrine + Skill Matrix;
+- `#675` — Omnichannel Marketplace ERP.
+
+Cả ba được tạo từ baseline cũ. Trước khi merge phải re-audit/rebase/reconcile từ exact current `main`; không dùng evidence cũ để suy compatibility với `37880fc...`.
 
 ## 7. Standing boundaries
 
-- Do not implement all 157 Missing capabilities to raise a score; only pilot-critical/shared-safety gaps can become bounded R6 fixes.
-- Source/config presence does not equal observed provider state.
-- Exact release evidence is invalid after a source-changing fix unless affected lanes rerun on the new SHA.
-- Production deploy/migration/restore/PITR, DNS/route/secret/provider mutation and customer-data write/cutover remain explicit authorization boundaries.
-- Worker rollback does not imply D1/KV/R2/external-state rollback.
-- R5's subjective browser/visual QA waiver stands; R6 does not re-open visual polish as a release program.
+- Không reopen các PR Sales/UI/control cũ đã superseded chỉ vì branch còn tồn tại.
+- Không tạo parallel Finance/Stock/Payroll/Pricing authority trong vertical.
+- Source/config presence không bằng observed provider/live state.
+- Worker rollback không đồng nghĩa data rollback.
+- Exact release evidence phải gắn đúng release SHA; source-changing fix phải phát hành candidate mới và rerun affected lanes.
+- Không chạy production mutation khi chưa có explicit authorization riêng.
 
 ## 8. Documentation authority
 
-Start at `docs/README.md`, then `docs/agents/r6/README.md` for the active certification program. Old agent boards/prompts/handoffs from closed programs are provenance, not live authority.
+Bắt đầu tại `docs/README.md`, sau đó đọc `skills/forge-enterprise-completion/SKILL.md`, `NEXT_TASKS.md`, North Star và capability map. R6 handoff/agent artifacts cũ là provenance/evidence, không được dùng thay exact current GitHub state.
