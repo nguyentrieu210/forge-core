@@ -15,7 +15,7 @@
     { "fieldname": "company", "label": "Công ty", "fieldtype": "Link", "options": "Company", "required": true, "in_list_view": true, "in_standard_filter": true },
     { "fieldname": "branch", "label": "Chi nhánh / Địa điểm", "fieldtype": "Link", "options": "Branch", "required": true, "in_list_view": true, "in_standard_filter": true },
     { "fieldname": "policy", "label": "Chính sách ca", "fieldtype": "Link", "options": "AlumDoor Attendance Policy", "required": true, "in_list_view": true, "in_standard_filter": true },
-    { "fieldname": "latitude", "label": "Vĩ độ", "fieldtype": "Float", "required": true, "description": "Tọa độ tâm vùng chấm công của trạm." },
+    { "fieldname": "latitude", "label": "Vĩ độ", "fieldtype": "Float", "required": true, "precision": 7, "ui_control": "coordinate_pair", "options": "longitude", "description": "Tọa độ tâm vùng chấm công của trạm." },
     { "fieldname": "longitude", "label": "Kinh độ", "fieldtype": "Float", "required": true, "description": "Tọa độ tâm vùng chấm công của trạm." },
     { "fieldname": "allowed_radius_m", "label": "Bán kính cho phép (m)", "fieldtype": "Float", "required": true, "default": 50, "non_negative": true, "allow_on_submit": true },
     { "fieldname": "max_gps_accuracy_m", "label": "Sai số GPS tối đa (m)", "fieldtype": "Float", "required": true, "default": 50, "non_negative": true, "allow_on_submit": true },

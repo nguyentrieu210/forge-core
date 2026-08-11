@@ -68,6 +68,8 @@ export interface FieldControlProps<T = unknown> {
   field: DocField;
   value: T;
   onChange: (v: T) => void;
+  /** Update a sibling field for compound metadata controls such as a coordinate pair. */
+  setFieldValue?: (fieldname: string, value: unknown) => void;
   /** trạng thái field (schema/displayed/value-readable/editable/masked/locked). */
   readOnly?: boolean;
   masked?: boolean;

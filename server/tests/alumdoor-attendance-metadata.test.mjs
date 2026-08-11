@@ -89,6 +89,8 @@ test("AlumDoor QR station stores a version reference, never signing material", a
   assert.equal(field(station, "secret_version")?.hidden, true);
   assert.equal(field(station, "secret_version")?.serverEnforced, true);
   assert.equal(field(station, "policy")?.options, "AlumDoor Attendance Policy");
+  assert.equal(field(station, "latitude")?.ui_control, "coordinate_pair");
+  assert.equal(field(station, "latitude")?.options, "longitude");
   for (const required of ["company", "branch", "latitude", "longitude", "allowed_radius_m", "max_gps_accuracy_m"]) {
     assert.equal(field(station, required)?.required, true, `station.${required} must be required`);
   }
@@ -115,6 +117,9 @@ test("Attendance policy and pay profile use explicit approval workflows", async 
   assert.equal(field(policy, "qr_ttl_seconds"), undefined);
   assert.equal(field(policy, "duplicate_scan_window_seconds")?.default, 60);
   assert.equal(field(policy, "max_devices_per_employee")?.default, 2);
+  assert.ok(policy?.viewPolicy?.form?.fields?.includes("duplicate_scan_window_seconds"));
+  assert.ok(policy?.viewPolicy?.form?.fields?.includes("max_devices_per_employee"));
+  assert.equal(policy?.viewPolicy?.form?.fields?.includes("qr_ttl_seconds"), false);
 
   const profile = manifest.doctypes.find((meta) => meta.name === "AlumDoor Pay Profile");
   const profileWorkflow = manifest.workflows.find((entry) => entry.document_type === "AlumDoor Pay Profile");

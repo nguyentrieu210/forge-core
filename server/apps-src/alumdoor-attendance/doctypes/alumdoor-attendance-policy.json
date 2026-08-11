@@ -34,7 +34,7 @@
     },
     "form": {
       "enabled": true,
-      "fields": ["policy_name", "company", "timezone", "shift1_start_minute", "shift1_end_minute", "shift2_start_minute", "shift2_end_minute", "shift3_start_minute", "shift3_latest_out_minute", "regular_daily_cap_minutes", "qr_ttl_seconds", "effective_from", "effective_to", "policy_status"]
+      "fields": ["policy_name", "company", "timezone", "shift1_start_minute", "shift1_end_minute", "shift2_start_minute", "shift2_end_minute", "shift3_start_minute", "shift3_latest_out_minute", "regular_daily_cap_minutes", "duplicate_scan_window_seconds", "max_devices_per_employee", "effective_from", "effective_to", "policy_status"]
     },
     "quickEntry": {
       "enabled": false,

@@ -266,6 +266,12 @@ const DICT: Record<string, { vi: string; en: string }> = {
   "control.geo_empty": { vi: "Chưa có vị trí", en: "No location yet" },
   "control.geo_locate": { vi: "Lấy vị trí hiện tại", en: "Get current location" },
   "control.geo_open_map": { vi: "Xem trên bản đồ", en: "View on map" },
+  "control.geo_locating": { vi: "Đang lấy vị trí…", en: "Getting location…" },
+  "control.geo_pair_success": { vi: "Đã điền tọa độ (sai số khoảng {accuracy} m).", en: "Coordinates filled (about {accuracy} m accuracy)." },
+  "control.geo_pair_misconfigured": { vi: "Trường tọa độ chưa được cấu hình đúng.", en: "Coordinate fields are not configured correctly." },
+  "control.geo_permission_denied": { vi: "Bạn chưa cho phép trình duyệt truy cập vị trí.", en: "Location permission was not granted." },
+  "control.geo_unavailable": { vi: "Không lấy được vị trí hiện tại. Hãy kiểm tra GPS và thử lại.", en: "Current location is unavailable. Check GPS and try again." },
+  "control.geo_timeout": { vi: "Lấy vị trí quá lâu. Hãy thử lại ở nơi có tín hiệu GPS tốt hơn.", en: "Location request timed out. Try again with a better GPS signal." },
 
   "context.tab_history": { vi: "Lịch sử", en: "History" },
   "context.tab_context": { vi: "Ngữ cảnh", en: "Context" },

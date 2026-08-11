@@ -1,13 +1,18 @@
 import type { CanonicalDocument, JsonObject, MutationAction } from "../../contracts/src/index.js";
 import { errors } from "../../core/src/index.js";
 
-export function assertLifecycleTransition(existing: CanonicalDocument<JsonObject> | null, action: MutationAction): void {
+export function assertLifecycleTransition(
+  existing: CanonicalDocument<JsonObject> | null,
+  action: MutationAction,
+  options: { allowSubmittedSave?: boolean } = {},
+): void {
   if (action === "create") {
     if (existing) throw errors.exists();
     return;
   }
   if (!existing) throw errors.notFound();
-  if (action === "save" && existing.docstatus !== 0) {
+  if (action === "save" && existing.docstatus !== 0
+    && !(existing.docstatus === 1 && options.allowSubmittedSave)) {
     throw errors.lifecycle("Only draft documents can be saved", { current_docstatus: existing.docstatus, action });
   }
   if (action === "submit" && existing.docstatus !== 0) {

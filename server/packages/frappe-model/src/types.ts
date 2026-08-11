@@ -96,7 +96,7 @@ export interface DocFieldMeta extends JsonObject {
   form_region?: "main" | "aside" | "full";
   form_control_width?: "compact";
   /** Presentation-only control for integer minute values; storage remains numeric minutes. */
-  ui_control?: "time_of_day_minutes" | "duration_minutes";
+  ui_control?: "time_of_day_minutes" | "duration_minutes" | "coordinate_pair";
   /** Immutable after the first save — enforced by the generic controller. */
   set_only_once?: boolean;
   /** Refuses a negative value. */

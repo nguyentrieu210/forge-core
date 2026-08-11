@@ -2,6 +2,7 @@
 
 ## Unreleased — Alumdoor UI
 
+- Trạm QR có nút “Lấy vị trí hiện tại” để xin quyền GPS và tự điền đồng thời vĩ độ, kinh độ; hiển thị sai số hoặc lỗi rõ ràng và vẫn cho phép chỉnh tay.
 - Hồ sơ Chính sách ca đã duyệt cho phép quản lý sửa trực tiếp và có thao tác Xoá kèm xác nhận; server vẫn chặn xoá khi chính sách đang được dữ liệu khác sử dụng.
 - Chính sách ca không còn bắt người dùng quy đổi giờ sang phút: sáu mốc ca dùng định dạng 24 giờ `HH:mm`, còn giới hạn công thường nhập theo giờ và phút.
 - Màn Tính công thức cửa chỉ giữ dữ liệu bán hàng; bỏ toàn bộ trường/kết quả sản xuất và mua hàng. Rộng PB ray và Rộng PB nhựa là hai ô riêng, tự ẩn/hiện theo nhóm khách. Kết quả giữ cố định diện tích, đơn giá và thành tiền khi sửa giá.

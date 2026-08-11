@@ -178,11 +178,14 @@ function parseField(value: unknown, index: number): DocFieldMeta {
     throw errors.validation(`fields[${index}].form_control_width must be compact`);
   }
   const uiControl = input.ui_control === undefined ? undefined : text(input.ui_control, `fields[${index}].ui_control`, 40);
-  if (uiControl !== undefined && uiControl !== "time_of_day_minutes" && uiControl !== "duration_minutes") {
+  if (uiControl !== undefined && !["time_of_day_minutes", "duration_minutes", "coordinate_pair"].includes(uiControl)) {
     throw errors.validation(`fields[${index}].ui_control is not recognised: ${uiControl}`);
   }
-  if (uiControl !== undefined && fieldtype !== "Int") {
+  if ((uiControl === "time_of_day_minutes" || uiControl === "duration_minutes") && fieldtype !== "Int") {
     throw errors.validation(`fields[${index}].ui_control requires fieldtype Int`);
+  }
+  if (uiControl === "coordinate_pair" && (fieldtype !== "Float" || typeof input.options !== "string" || !input.options.trim())) {
+    throw errors.validation(`fields[${index}].ui_control coordinate_pair requires fieldtype Float and options naming the longitude field`);
   }
   const valueSource = input.valueSource === undefined ? undefined : text(input.valueSource, `fields[${index}].valueSource`, 24);
   const editMode = input.editMode === undefined ? undefined : text(input.editMode, `fields[${index}].editMode`, 32);

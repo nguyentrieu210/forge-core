@@ -761,9 +761,12 @@ export class D1MutationStore implements MutationStore {
     const statements: D1PreparedStatement[] = [];
     statements.push(database.prepare(
       `INSERT INTO mutation_guard
-       (tenant_id, command_id, doc_key, expected_version, action, payload_hash, created_at)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`,
-    ).bind(command.tenant_id, command.command_id, key, command.expected_version, command.action, command.payload_hash, plan.document.modified_at));
+       (tenant_id, command_id, doc_key, expected_version, action, payload_hash, created_at, allow_submitted_save)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)`,
+    ).bind(
+      command.tenant_id, command.command_id, key, command.expected_version, command.action,
+      command.payload_hash, plan.document.modified_at, plan.allow_submitted_save ? 1 : 0,
+    ));
 
     if (command.expected_version === null) {
       statements.push(database.prepare(

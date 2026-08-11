@@ -5,7 +5,7 @@
   "is_active": true,
   "states": [
     { "state": "draft", "docstatus": 0 },
-    { "state": "approved", "docstatus": 1 },
+    { "state": "approved", "docstatus": 1, "allow_edit": "AlumDoor Attendance Manager" },
     { "state": "retired", "docstatus": 2 }
   ],
   "transitions": [

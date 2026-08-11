@@ -288,6 +288,8 @@ export interface DomainEvent<T extends JsonObject = JsonObject> {
 export interface MutationPlan<T extends JsonObject = JsonObject> {
   command: MutationCommand<T>;
   document: CanonicalDocument<T>;
+  /** Internal kernel decision; never accepted from an API mutation command. */
+  allow_submitted_save?: boolean;
   gl_entries: GeneralLedgerEntry[];
   stock_entries: StockLedgerEntry[];
   payment_entries: PaymentLedgerEntry[];

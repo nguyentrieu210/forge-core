@@ -106,12 +106,15 @@ export class DocumentKernel {
     if (command.action !== "create" && command.expected_version === null) {
       throw errors.validation(`${command.action} command requires expected_version`);
     }
-    assertLifecycleTransition(existing, command.action);
+    const controller = this.controllers.get(command.aggregate.doctype);
+    assertLifecycleTransition(existing, command.action, {
+      allowSubmittedSave: controller.allowSubmittedSave === true,
+    });
     if (existing && command.expected_version !== existing.version) throw errors.version(existing.version);
 
     const nextVersion = (existing?.version ?? 0) + 1;
-    const controller = this.controllers.get(command.aggregate.doctype);
     const plan = await controller.buildPlan({ command, existing, now: this.clock(), nextVersion, reader });
+    plan.allow_submitted_save = controller.allowSubmittedSave === true;
 
     if (plan.document.version !== nextVersion) throw errors.validation("Controller returned invalid aggregate version");
     if (plan.document.tenant_id !== command.tenant_id) throw errors.validation("Controller changed tenant boundary");

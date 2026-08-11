@@ -5,7 +5,7 @@
  * xử lý thống nhất. Link dùng services.searchLink (combobox popover). Giữ MASK để selfcheck logic ổn.
  */
 import { type ChangeEvent, type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from "react";
-import { Check, ChevronsUpDown, Loader2, Plus, TriangleAlert } from "lucide-react";
+import { Check, ChevronsUpDown, Loader2, MapPin, Plus, TriangleAlert } from "lucide-react";
 import { buildLinkFilters, formatDuration, getNumberFormatInfo, linkDisplay } from "@metaforge/core";
 import {
   cn, Input, Textarea, Checkbox,
@@ -81,6 +81,7 @@ export function NumberControl(p: FieldControlProps) {
   if (p.masked) return <Masked />;
   if (p.field.ui_control === "time_of_day_minutes") return <MinuteOfDayControl {...p} />;
   if (p.field.ui_control === "duration_minutes") return <MinuteDurationControl {...p} />;
+  if (p.field.ui_control === "coordinate_pair") return <CoordinatePairControl {...p} />;
   const step = p.field.fieldtype === "Int" ? "1" : "any";
   const suffix = p.field.fieldtype === "Percent" ? "%" : undefined;
   // Bảng bán hàng dùng VNĐ: giá và thành tiền luôn là số nguyên. Chuẩn hoá ngay
@@ -140,6 +141,73 @@ export function NumberControl(p: FieldControlProps) {
         onChange={(e: ChangeEvent<HTMLInputElement>) => p.onChange(e.target.value === "" ? null : Number(e.target.value))}
       />
       {suffix ? <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">{suffix}</span> : null}
+    </div>
+  );
+}
+
+/**
+ * Latitude input with an explicit browser-geolocation autofill action.
+ * `field.options` names the longitude sibling; storage remains two ordinary Floats.
+ */
+export function CoordinatePairControl(p: FieldControlProps) {
+  const t = useT();
+  const [locating, setLocating] = useState(false);
+  const [message, setMessage] = useState("");
+  const longitudeField = String(p.field.options ?? "").trim();
+
+  const locate = () => {
+    setMessage("");
+    if (!navigator.geolocation) {
+      setMessage(t("control.geo_unsupported"));
+      return;
+    }
+    if (!longitudeField || !p.setFieldValue) {
+      setMessage(t("control.geo_pair_misconfigured"));
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const latitude = Number(position.coords.latitude.toFixed(7));
+        const longitude = Number(position.coords.longitude.toFixed(7));
+        p.onChange(latitude);
+        p.setFieldValue?.(longitudeField, longitude);
+        setMessage(t("control.geo_pair_success").replace("{accuracy}", String(Math.round(position.coords.accuracy))));
+        setLocating(false);
+      },
+      (error) => {
+        const key = error.code === 1 ? "control.geo_permission_denied"
+          : error.code === 3 ? "control.geo_timeout"
+          : "control.geo_unavailable";
+        setMessage(t(key));
+        setLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 15_000, maximumAge: 0 },
+    );
+  };
+
+  if (p.masked) return <Masked />;
+  return (
+    <div className="space-y-2">
+      <Input
+        id={labelId(p)}
+        className="mf-control text-right tabular-nums"
+        type="number"
+        inputMode="decimal"
+        step="any"
+        value={p.value === null || p.value === undefined ? "" : (p.value as number)}
+        readOnly={p.readOnly}
+        aria-invalid={p.error ? true : undefined}
+        {...a11y(p)}
+        onChange={(event: ChangeEvent<HTMLInputElement>) => p.onChange(event.target.value === "" ? null : Number(event.target.value))}
+      />
+      {!p.readOnly ? (
+        <Button type="button" variant="outline" className="min-h-11 w-full gap-2 sm:w-auto" disabled={locating} onClick={locate}>
+          {locating ? <Loader2 className="size-4 animate-spin" /> : <MapPin className="size-4" />}
+          {locating ? t("control.geo_locating") : t("control.geo_locate")}
+        </Button>
+      ) : null}
+      {message ? <p className="text-xs text-muted-foreground" aria-live="polite">{message}</p> : null}
     </div>
   );
 }
