@@ -180,7 +180,7 @@ export function salesOrderFulfillmentEntries(
       item_code: item.item_code,
       qty_micros: reverse ? -quantity : quantity,
       ...(rowKey ? { sales_order_line_key: rowKey } : {}),
-      ...(componentKey ? { package_component_key: componentKey } : {}),
+      ...(componentKey ? { package_component_key: componentKey, skip_legacy_projection: kind === "Delivery" } : {}),
       posting_at: postingAt,
     };
   });

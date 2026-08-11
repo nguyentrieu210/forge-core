@@ -23,6 +23,7 @@ import type {
 import { errors } from "../../core/src/index.js";
 import { fromScaledInt, toScaledInt } from "../../money/src/index.js";
 import { deriveDeliveryNoteStatus, deriveO2CStatus } from "./status.js";
+import { deriveSalesOrderProgress } from "./sales-order-progress.js";
 import type { MutationStore, SubmittedQuantityQuery, TrackedStockPosition, TrackedStockState } from "./store.js";
 
 class KeyedMutex {
@@ -52,6 +53,7 @@ interface BundleCheckpoint {
   voucherStockEntriesLength: number;
   paymentEntriesLength: number;
   fulfillmentEntriesLength: number;
+  lineFulfillmentEntriesLength: number;
   procurementEntriesLength: number;
   stockBundleUsagesLength: number;
   returnEntriesLength: number;
@@ -85,6 +87,7 @@ export class InMemoryMutationStore implements MutationStore {
   }> = [];
   private readonly paymentEntries: PaymentLedgerEntry[] = [];
   private readonly fulfillmentEntries: FulfillmentEntry[] = [];
+  private readonly lineFulfillmentEntries: FulfillmentEntry[] = [];
   private readonly procurementEntries: ProcurementEntry[] = [];
   private readonly stockBundleUsages: StockBundleUsageEntry[] = [];
   private readonly returnEntries: ReturnEntry[] = [];
@@ -342,7 +345,7 @@ export class InMemoryMutationStore implements MutationStore {
     salesOrderLineKey: string,
     packageComponentKey?: string,
   ): Promise<number> {
-    return this.fulfillmentEntries
+    return this.lineFulfillmentEntries
       .filter((line) => line.sales_order === salesOrder
         && line.kind === kind
         && line.sales_order_line_key === salesOrderLineKey
@@ -548,7 +551,9 @@ export class InMemoryMutationStore implements MutationStore {
       line: structuredClone(line),
     })));
     this.paymentEntries.push(...structuredClone(plan.payment_entries));
-    this.fulfillmentEntries.push(...structuredClone(plan.fulfillment_entries));
+    const fulfillment = structuredClone(plan.fulfillment_entries);
+    this.lineFulfillmentEntries.push(...fulfillment.filter((line) => Boolean(line.sales_order_line_key)));
+    this.fulfillmentEntries.push(...fulfillment.filter((line) => !line.skip_legacy_projection));
     this.procurementEntries.push(...structuredClone(plan.procurement_entries ?? []));
     this.stockBundleUsages.push(...structuredClone(plan.stock_bundle_usages ?? []));
     this.returnEntries.push(...structuredClone(plan.return_entries ?? []));
@@ -583,6 +588,7 @@ export class InMemoryMutationStore implements MutationStore {
       voucherStockEntriesLength: this.voucherStockEntries.length,
       paymentEntriesLength: this.paymentEntries.length,
       fulfillmentEntriesLength: this.fulfillmentEntries.length,
+      lineFulfillmentEntriesLength: this.lineFulfillmentEntries.length,
       procurementEntriesLength: this.procurementEntries.length,
       stockBundleUsagesLength: this.stockBundleUsages.length,
       returnEntriesLength: this.returnEntries.length,
@@ -607,6 +613,7 @@ export class InMemoryMutationStore implements MutationStore {
     this.voucherStockEntries.splice(checkpoint.voucherStockEntriesLength);
     this.paymentEntries.splice(checkpoint.paymentEntriesLength);
     this.fulfillmentEntries.splice(checkpoint.fulfillmentEntriesLength);
+    this.lineFulfillmentEntries.splice(checkpoint.lineFulfillmentEntriesLength);
     this.procurementEntries.splice(checkpoint.procurementEntriesLength);
     this.stockBundleUsages.splice(checkpoint.stockBundleUsagesLength);
     this.returnEntries.splice(checkpoint.returnEntriesLength);
@@ -732,28 +739,23 @@ export class InMemoryMutationStore implements MutationStore {
     }
     if (document.doctype === "Sales Order") {
       const items = Array.isArray(document.data.items) ? document.data.items : [];
-      const ordered = items.reduce<number>((sum, value) => {
-        if (!value || typeof value !== "object" || Array.isArray(value)) return sum;
-        const row = value as JsonObject;
-        return sum + (typeof row.qty_micros === "number" ? row.qty_micros : toScaledInt(String(row.qty ?? 0), 6));
-      }, 0);
-      if (ordered > 0) {
-        let delivered = 0;
-        let billed = 0;
-        for (const value of items) {
-          if (!value || typeof value !== "object" || Array.isArray(value)) continue;
-          const row = value as JsonObject;
-          const itemCode = String(row.item_code ?? "");
-          delivered += await this.getFulfilledQuantityMicros(document.tenant_id, document.name, "Delivery", itemCode);
-          billed += await this.getFulfilledQuantityMicros(document.tenant_id, document.name, "Billing", itemCode);
-        }
+      const progress = await deriveSalesOrderProgress(items, {
+        getLine: (kind, rowKey, componentKey) => this.getFulfilledLineQuantityMicros(
+          document.tenant_id, document.name, kind, rowKey, componentKey,
+        ),
+        getLegacy: (kind, itemCode) => this.getFulfilledQuantityMicros(
+          document.tenant_id, document.name, kind, itemCode,
+        ),
+      });
+      if (progress.ordered_micros > 0) {
         const data = document.data as JsonObject;
-        const deliveredPercentage = (delivered * 100) / ordered;
-        const billedPercentage = (billed * 100) / ordered;
-        data.delivered_percentage = deliveredPercentage.toFixed(2);
-        data.billed_percentage = billedPercentage.toFixed(2);
+        data.delivered_percentage = progress.delivered_percentage.toFixed(2);
+        data.billed_percentage = progress.billed_percentage.toFixed(2);
         if (document.docstatus === 1) {
-          document.status = deriveO2CStatus("Sales Order", document.docstatus, { deliveredPercentage, billedPercentage });
+          document.status = deriveO2CStatus("Sales Order", document.docstatus, {
+            deliveredPercentage: progress.delivered_percentage,
+            billedPercentage: progress.billed_percentage,
+          });
         }
       }
     }
@@ -807,6 +809,7 @@ export class InMemoryMutationStore implements MutationStore {
   private assertFulfillmentInvariants<T extends JsonObject>(plan: MutationPlan<T>): void {
     const pending = new Map<string, number>();
     for (const line of plan.fulfillment_entries) {
+      if (line.skip_legacy_projection) continue;
       const source = this.documents.get(this.docKey(plan.command.tenant_id, "Sales Order", line.sales_order));
       if (!source || source.docstatus !== 1) throw errors.reference(`Submitted Sales Order ${line.sales_order} is required`);
       const ordered = source.children

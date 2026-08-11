@@ -10,6 +10,7 @@ import type {
 import { asCloudForgeError, documentKey, errors } from "../../core/src/index.js";
 import { fromScaledInt, toScaledInt } from "../../money/src/index.js";
 import { deriveDeliveryNoteStatus, deriveO2CStatus } from "./status.js";
+import { deriveSalesOrderProgress } from "./sales-order-progress.js";
 import type { MutationStore, SubmittedQuantityQuery, TrackedStockPosition, TrackedStockState } from "./store.js";
 
 interface DocumentRow {
@@ -865,14 +866,16 @@ export class D1MutationStore implements MutationStore {
       ));
     }
     for (const line of plan.fulfillment_entries) {
-      statements.push(database.prepare(
-        `INSERT INTO sales_order_fulfillment_entries
-         (tenant_id,voucher_type,voucher_no,voucher_revision,line_key,sales_order,kind,item_code,qty_micros,posting_at)
-         VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)`,
-      ).bind(
-        command.tenant_id, command.aggregate.doctype, command.aggregate.name, plan.document.version,
-        line.line_key, line.sales_order, line.kind, line.item_code, line.qty_micros, line.posting_at,
-      ));
+      if (!line.skip_legacy_projection) {
+        statements.push(database.prepare(
+          `INSERT INTO sales_order_fulfillment_entries
+           (tenant_id,voucher_type,voucher_no,voucher_revision,line_key,sales_order,kind,item_code,qty_micros,posting_at)
+           VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)`,
+        ).bind(
+          command.tenant_id, command.aggregate.doctype, command.aggregate.name, plan.document.version,
+          line.line_key, line.sales_order, line.kind, line.item_code, line.qty_micros, line.posting_at,
+        ));
+      }
       if (line.sales_order_line_key) {
         statements.push(database.prepare(
           `INSERT INTO sales_line_fulfillment_entries
@@ -1123,25 +1126,23 @@ export class D1MutationStore implements MutationStore {
     }
     if (document.doctype === "Sales Order") {
       const items = Array.isArray(document.data.items) ? document.data.items : [];
-      let ordered = 0;
-      let delivered = 0;
-      let billed = 0;
-      for (const value of items) {
-        if (!value || typeof value !== "object" || Array.isArray(value)) continue;
-        const item = value as JsonObject;
-        const itemCode = String(item.item_code ?? "");
-        ordered += typeof item.qty_micros === "number" ? item.qty_micros : toScaledInt(String(item.qty ?? 0), 6);
-        delivered += await this.getFulfilledQuantityMicros(document.tenant_id, document.name, "Delivery", itemCode);
-        billed += await this.getFulfilledQuantityMicros(document.tenant_id, document.name, "Billing", itemCode);
-      }
-      if (ordered > 0) {
+      const progress = await deriveSalesOrderProgress(items, {
+        getLine: (kind, rowKey, componentKey) => this.getFulfilledLineQuantityMicros(
+          document.tenant_id, document.name, kind, rowKey, componentKey,
+        ),
+        getLegacy: (kind, itemCode) => this.getFulfilledQuantityMicros(
+          document.tenant_id, document.name, kind, itemCode,
+        ),
+      });
+      if (progress.ordered_micros > 0) {
         const data = document.data as JsonObject;
-        const deliveredPercentage = (delivered * 100) / ordered;
-        const billedPercentage = (billed * 100) / ordered;
-        data.delivered_percentage = deliveredPercentage.toFixed(2);
-        data.billed_percentage = billedPercentage.toFixed(2);
+        data.delivered_percentage = progress.delivered_percentage.toFixed(2);
+        data.billed_percentage = progress.billed_percentage.toFixed(2);
         if (document.docstatus === 1) {
-          document.status = deriveO2CStatus("Sales Order", document.docstatus, { deliveredPercentage, billedPercentage });
+          document.status = deriveO2CStatus("Sales Order", document.docstatus, {
+            deliveredPercentage: progress.delivered_percentage,
+            billedPercentage: progress.billed_percentage,
+          });
         }
       }
     }

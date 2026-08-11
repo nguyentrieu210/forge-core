@@ -34,4 +34,5 @@ export {
 export * from "./purchase-supplier-debt-report.js";
 export * from "./reconciliation.js";
 export * from "./status.js";
+export * from "./sales-order-progress.js";
 export * from "./store.js";
