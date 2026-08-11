@@ -58,7 +58,6 @@ CREATE TABLE IF NOT EXISTS mutation_guard (
   action TEXT NOT NULL CHECK (action IN ('create','save','submit','cancel')),
   payload_hash TEXT NOT NULL CHECK (length(payload_hash)=64),
   created_at TEXT NOT NULL,
-  allow_submitted_save INTEGER NOT NULL DEFAULT 0 CHECK (allow_submitted_save IN (0,1)),
   PRIMARY KEY (tenant_id, command_id)
 );
 
@@ -71,14 +70,7 @@ BEGIN
       THEN RAISE(ABORT, 'DOCUMENT_NOT_FOUND')
     WHEN (SELECT version FROM documents WHERE tenant_id=NEW.tenant_id AND doc_key=NEW.doc_key) != NEW.expected_version
       THEN RAISE(ABORT, 'VERSION_CONFLICT')
-    WHEN NEW.action='submit' AND (SELECT docstatus FROM documents WHERE tenant_id=NEW.tenant_id AND doc_key=NEW.doc_key) != 0
-      THEN RAISE(ABORT, 'INVALID_LIFECYCLE_TRANSITION')
-    WHEN NEW.action='save'
-      AND (SELECT docstatus FROM documents WHERE tenant_id=NEW.tenant_id AND doc_key=NEW.doc_key) != 0
-      AND NOT (
-        NEW.allow_submitted_save=1
-        AND (SELECT docstatus FROM documents WHERE tenant_id=NEW.tenant_id AND doc_key=NEW.doc_key)=1
-      )
+    WHEN NEW.action IN ('save','submit') AND (SELECT docstatus FROM documents WHERE tenant_id=NEW.tenant_id AND doc_key=NEW.doc_key) != 0
       THEN RAISE(ABORT, 'INVALID_LIFECYCLE_TRANSITION')
     WHEN NEW.action='cancel' AND (SELECT docstatus FROM documents WHERE tenant_id=NEW.tenant_id AND doc_key=NEW.doc_key) != 1
       THEN RAISE(ABORT, 'INVALID_LIFECYCLE_TRANSITION')
