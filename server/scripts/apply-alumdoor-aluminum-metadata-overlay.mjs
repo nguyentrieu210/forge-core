@@ -20,12 +20,10 @@ const technicalFields = [
   { fieldname: "purchase_allocation_uom", fieldtype: "Link", options: "UOM", label: "ĐVT phân bổ mua", hidden: true, read_only: true },
 ];
 for (const field of technicalFields) {
-  if (!item.fields.some((existing) => typeof existing === "object" && existing?.fieldname === field.fieldname)) {
-    item.fields.push(field);
-  }
+  if (!item.fields.some((existing) => typeof existing === "object" && existing?.fieldname === field.fieldname)) item.fields.push(field);
 }
 
-const profile = brief.fixtures?.find((fixture) => fixture?.doctype === "Measurement Profile" && fixture?.name === "Nhôm cây/lá");
+const profile = brief.fixtures?.find((fixture) => fixture?.type === "Measurement Profile" && fixture?.name === "Nhôm cây/lá");
 if (!profile?.data) throw new Error("Measurement Profile Nhôm cây/lá fixture not found");
 profile.data.stock_uom = "Cây";
 profile.data.track_dimension_lot = true;
@@ -33,7 +31,7 @@ profile.data.require_piece_qty = true;
 profile.data._desc = "Tồn nhôm theo số cây/lá có Batch và chiều dài; Kg là catch weight/đơn vị mua-định giá, không phải số lượng tồn.";
 
 for (const fixture of brief.fixtures ?? []) {
-  if (fixture?.doctype !== "Item" || fixture?.data?.inventory_mode !== "Nhôm cây/lá") continue;
+  if (fixture?.type !== "Item" || fixture?.data?.inventory_mode !== "Nhôm cây/lá") continue;
   fixture.data.stock_uom = "Cây";
   fixture.data.default_purchase_uom = "Kg";
   fixture.data.has_batch_no = 1;
@@ -43,8 +41,6 @@ for (const fixture of brief.fixtures ?? []) {
   fixture.data.purchase_allocation_qty_field = "qty_bar";
   fixture.data.purchase_allocation_uom = "Cây";
   fixture.data.allow_negative_stock = 0;
-  // Existing conversion rows were defined relative to the historical Kg stock UOM and cannot
-  // be reinterpreted as Cây conversion factors. Dynamic sales quantities must be supplied per line.
   fixture.data.uom_conversions = [];
 }
 
