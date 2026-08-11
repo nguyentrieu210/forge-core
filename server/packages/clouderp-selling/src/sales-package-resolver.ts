@@ -147,8 +147,8 @@ function parseComponent(row: JsonObject): SalesPackageComponentSnapshot {
   const itemCode = text(row.item_code);
   const uom = text(row.uom);
   const basis = quantityBasisOf(row.qty_basis);
-  const factorMicros = integer(row.factor_micros) || toScaledInt(row.factor ?? "1", 6, "Sales Package component factor");
-  const qtyMicros = integer(row.qty_micros) || toScaledInt(row.qty ?? "0", 6, "Sales Package component qty");
+  const factorMicros = integer(row.factor_micros) || toScaledInt(String(row.factor ?? "1"), 6, "Sales Package component factor");
+  const qtyMicros = integer(row.qty_micros) || toScaledInt(String(row.qty ?? "0"), 6, "Sales Package component qty");
   if (!componentKey || !itemCode || !uom || qtyMicros <= 0) throw errors.validation("Sales Package component snapshot is incomplete");
   return {
     component_key: componentKey,

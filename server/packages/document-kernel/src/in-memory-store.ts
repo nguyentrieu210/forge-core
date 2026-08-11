@@ -335,6 +335,21 @@ export class InMemoryMutationStore implements MutationStore {
       .reduce((total, line) => total + line.qty_micros, 0);
   }
 
+  async getFulfilledLineQuantityMicros(
+    tenantId: string,
+    salesOrder: string,
+    kind: "Delivery" | "Billing",
+    salesOrderLineKey: string,
+    packageComponentKey?: string,
+  ): Promise<number> {
+    return this.fulfillmentEntries
+      .filter((line) => line.sales_order === salesOrder
+        && line.kind === kind
+        && line.sales_order_line_key === salesOrderLineKey
+        && (packageComponentKey === undefined || (line.package_component_key ?? "") === packageComponentKey))
+      .reduce((total, line) => total + line.qty_micros, 0);
+  }
+
   async getProcuredQuantityMicros(
     tenantId: string,
     purchaseOrder: string,

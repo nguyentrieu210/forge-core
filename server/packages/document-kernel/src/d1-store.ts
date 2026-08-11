@@ -415,6 +415,25 @@ export class D1MutationStore implements MutationStore {
     return Number(row?.total ?? 0);
   }
 
+  async getFulfilledLineQuantityMicros(
+    tenantId: string,
+    salesOrder: string,
+    kind: "Delivery" | "Billing",
+    salesOrderLineKey: string,
+    packageComponentKey?: string,
+  ): Promise<number> {
+    const conditions = ["tenant_id=?1", "sales_order=?2", "kind=?3", "sales_order_line_key=?4"];
+    const values: unknown[] = [tenantId, salesOrder, kind, salesOrderLineKey];
+    if (packageComponentKey !== undefined) {
+      conditions.push(`package_component_key=?${values.length + 1}`);
+      values.push(packageComponentKey);
+    }
+    const row = await this.writer.prepare(
+      `SELECT COALESCE(SUM(qty_micros),0) AS total FROM sales_line_fulfillment_entries WHERE ${conditions.join(" AND ")}`,
+    ).bind(...values).first<{ total: number }>();
+    return Number(row?.total ?? 0);
+  }
+
   async getProcuredQuantityMicros(
     tenantId: string,
     purchaseOrder: string,
@@ -854,6 +873,16 @@ export class D1MutationStore implements MutationStore {
         command.tenant_id, command.aggregate.doctype, command.aggregate.name, plan.document.version,
         line.line_key, line.sales_order, line.kind, line.item_code, line.qty_micros, line.posting_at,
       ));
+      if (line.sales_order_line_key) {
+        statements.push(database.prepare(
+          `INSERT INTO sales_line_fulfillment_entries
+           (tenant_id,line_key,sales_order,sales_order_line_key,kind,package_component_key,item_code,qty_micros,posting_at)
+           VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9)`,
+        ).bind(
+          command.tenant_id, line.line_key, line.sales_order, line.sales_order_line_key, line.kind,
+          line.package_component_key ?? "", line.item_code, line.qty_micros, line.posting_at,
+        ));
+      }
     }
     for (const line of plan.procurement_entries ?? []) {
       statements.push(database.prepare(
