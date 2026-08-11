@@ -1,11 +1,28 @@
 import type { ControllerContext } from "../../document-kernel/src/index.js";
 import { SalarySlipController } from "./enterprise-controllers.js";
 import type { SalarySlipData } from "./enterprise-types.js";
+import { buildAlumDoorSalarySlipInputs } from "./alumdoor-payroll.js";
 import { buildHrmSalarySlipInputs } from "./hrm-payroll.js";
 
 export class HrmSalarySlipController extends SalarySlipController {
   async normalize(context: ControllerContext<SalarySlipData>): Promise<SalarySlipData> {
     const input = context.command.document;
+    const alumdoorProfile = typeof input.alu_pay_profile === "string" ? input.alu_pay_profile.trim() : "";
+
+    // AlumDoor's three-segment attendance projection is authoritative for its payroll.
+    // Never fall through to standard Attendance for a slip that carries an AlumDoor profile.
+    if (alumdoorProfile) {
+      const sourceDocument = { ...input, earnings: [], deductions: [] } as SalarySlipData;
+      const sourceContext: ControllerContext<SalarySlipData> = {
+        ...context,
+        command: { ...context.command, document: sourceDocument },
+      };
+      const generated = await buildAlumDoorSalarySlipInputs(sourceContext, sourceDocument);
+      if (!generated) return super.normalize(context);
+      const document = { ...sourceDocument, ...generated } as SalarySlipData;
+      return super.normalize({ ...context, command: { ...context.command, document } });
+    }
+
     const assignment = typeof input.salary_structure_assignment === "string"
       ? input.salary_structure_assignment.trim()
       : "";
