@@ -68,6 +68,7 @@ import {
 import { HrmSalarySlipController } from "./hrm-salary-slip.js";
 import { CutOrderController } from "./alumdoor-inventory.js";
 import { AlumDoorAttendanceDayController } from "./alumdoor-attendance.js";
+import { AlumDoorPayProfileController } from "./alumdoor-payroll.js";
 import { StockReservationIntegrityController } from "./stock-reservation-integrity.js";
 import { StockReconciliationIntegrityController } from "./stock-reconciliation-integrity.js";
 import { StockReturnIntegrityController } from "./stock-return-integrity.js";
@@ -189,6 +190,7 @@ export function registerErpNextCoreControllers(registry: ControllerRegistry): Co
     .register(new WarehouseCashVoucherController())
     .register(new WarehouseCashTransferController())
     .register(new WarehouseCashCountController())
+    .register(new AlumDoorPayProfileController())
     .register(new AlumDoorAttendanceDayController())
     .register(new CutOrderController())
     .register(new StockReservationIntegrityController())
