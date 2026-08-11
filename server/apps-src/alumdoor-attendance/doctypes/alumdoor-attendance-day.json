@@ -17,6 +17,8 @@
     { "fieldname": "work_date", "label": "Ngày công", "fieldtype": "Date", "required": true, "set_only_once": true, "in_list_view": true, "in_standard_filter": true },
     { "fieldname": "policy", "label": "Chính sách ca", "fieldtype": "Link", "options": "AlumDoor Attendance Policy", "required": true, "set_only_once": true, "in_standard_filter": true },
     { "fieldname": "state", "label": "Trạng thái", "fieldtype": "Select", "options": "open\ncomplete\nexception\napproved\nlocked", "required": true, "default": "open", "read_only": true, "in_list_view": true, "in_standard_filter": true },
+    { "fieldname": "locked_by_payroll", "label": "Khóa bởi kỳ lương", "fieldtype": "Link", "options": "Payroll Entry", "read_only": true, "in_list_view": true, "in_standard_filter": true },
+    { "fieldname": "locked_at", "label": "Khóa lúc", "fieldtype": "Datetime", "read_only": true },
     { "fieldname": "regular_minutes", "label": "Phút công thường", "fieldtype": "Int", "required": true, "default": 0, "non_negative": true, "read_only": true, "in_list_view": true },
     { "fieldname": "overtime_minutes", "label": "Phút tăng ca", "fieldtype": "Int", "required": true, "default": 0, "non_negative": true, "read_only": true, "in_list_view": true },
     { "fieldname": "payable_work_fraction_bp", "label": "Tỷ lệ công phải trả (bp)", "fieldtype": "Int", "required": true, "default": 0, "non_negative": true, "read_only": true, "in_list_view": true },
@@ -25,10 +27,13 @@
   ],
   "permissions": [
     { "role": "AlumDoor QR System", "read": true, "write": true, "create": true },
+    { "role": "AlumDoor Payroll System", "read": true, "write": true },
     { "role": "AlumDoor Attendance Viewer", "read": true, "report": true },
     { "role": "AlumDoor Attendance Manager", "read": true, "report": true, "export": true },
+    { "role": "AlumDoor Payroll User", "read": true, "report": true, "export": true },
+    { "role": "AlumDoor Payroll Approver", "read": true, "report": true, "export": true },
     { "role": "HR Manager", "read": true, "report": true, "export": true },
     { "role": "System Manager", "read": true, "report": true, "export": true }
   ],
-  "revision": 1
+  "revision": 2
 }
