@@ -2745,7 +2745,9 @@
           "fieldtype": "Data",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "inventory_mode",
@@ -2753,7 +2755,9 @@
           "fieldtype": "Data",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "measurement_profile",
@@ -2762,7 +2766,9 @@
           "options": "Measurement Profile",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "stock_uom",
@@ -2771,7 +2777,9 @@
           "options": "UOM",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "min_area_sqm",
@@ -2779,7 +2787,9 @@
           "fieldtype": "Float",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Màu / mã sơn",
@@ -2818,7 +2828,10 @@
           "options": "Trọn bộ\nTách món",
           "default": "Trọn bộ",
           "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
-          "surface": "internal"
+          "surface": "internal",
+          "hidden": true,
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Có bản bướm",
@@ -2832,7 +2845,10 @@
           "fieldname": "mesh_height_m",
           "fieldtype": "Float",
           "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
-          "surface": "internal"
+          "surface": "internal",
+          "hidden": true,
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "formula_policy",
@@ -2841,7 +2857,9 @@
           "options": "Cutting Policy",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "width_basis",
@@ -2849,7 +2867,9 @@
           "fieldtype": "Data",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "cut_width_m",
@@ -2857,7 +2877,9 @@
           "fieldtype": "Float",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "billable_area_sqm",
@@ -2865,7 +2887,9 @@
           "fieldtype": "Float",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Loại cửa",
@@ -2874,7 +2898,10 @@
           "options": "Cửa Đức\nCửa Úc\nCửa Lưới\nCửa Đài Loan\nCửa Siêu Trường\nCửa tấm liền Úc",
           "read_only": true,
           "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
-          "surface": "internal"
+          "surface": "internal",
+          "hidden": true,
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Biến thể chia lá",
@@ -2890,7 +2917,10 @@
           "fieldtype": "Float",
           "read_only": true,
           "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
-          "surface": "internal"
+          "surface": "internal",
+          "hidden": true,
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Ước số chia lá (m)",
@@ -2898,7 +2928,10 @@
           "fieldtype": "Float",
           "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
           "description": "Mặc định lấy từ Item hoặc Công thức cửa; chỉ nhập khi bộ cửa dùng bản lá riêng.",
-          "surface": "internal"
+          "surface": "internal",
+          "hidden": true,
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Cách làm tròn lá",
@@ -2906,7 +2939,10 @@
           "fieldtype": "Data",
           "read_only": true,
           "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
-          "surface": "internal"
+          "surface": "internal",
+          "hidden": true,
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Tổng số lá",
@@ -2914,7 +2950,10 @@
           "fieldtype": "Float",
           "read_only": true,
           "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
-          "surface": "internal"
+          "surface": "internal",
+          "hidden": true,
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Lá một lớp",
@@ -2937,7 +2976,10 @@
           "fieldtype": "Float",
           "read_only": true,
           "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
-          "surface": "internal"
+          "surface": "internal",
+          "hidden": true,
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Phút sản xuất",
@@ -2945,7 +2987,10 @@
           "fieldtype": "Float",
           "read_only": true,
           "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
-          "surface": "internal"
+          "surface": "internal",
+          "hidden": true,
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Phiên bản công thức",
@@ -2953,7 +2998,9 @@
           "fieldtype": "Data",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Giải thích công thức",
@@ -2961,7 +3008,10 @@
           "fieldtype": "Small Text",
           "read_only": true,
           "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
-          "surface": "internal"
+          "surface": "internal",
+          "hidden": true,
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Dự kiến cần sơn",
@@ -2970,7 +3020,10 @@
           "read_only": true,
           "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
           "description": "Kết luận cuối chỉ có sau khi chọn lô cắt; lô THÔ sẽ tự sinh việc sơn.",
-          "surface": "internal"
+          "surface": "internal",
+          "hidden": true,
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Dài một cây/đoạn (m)",
@@ -3013,7 +3066,9 @@
           "fieldtype": "Float",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "stock_qty",
@@ -3021,7 +3076,9 @@
           "fieldtype": "Float",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "available_qty",
@@ -3029,7 +3086,9 @@
           "fieldtype": "Float",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "available_stock_qty",
@@ -3037,7 +3096,9 @@
           "fieldtype": "Float",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "available_stock_uom",
@@ -3046,7 +3107,9 @@
           "options": "UOM",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "availability_status",
@@ -3054,7 +3117,9 @@
           "fieldtype": "Data",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "rate",
@@ -3095,20 +3160,29 @@
           "label": "Thành tiền",
           "fieldtype": "Currency",
           "read_only": true,
-          "surface": "internal"
+          "surface": "internal",
+          "hidden": true,
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "motor_model",
           "label": "Mô tơ kèm theo",
           "fieldtype": "Link",
           "options": "Item",
-          "surface": "internal"
+          "surface": "internal",
+          "hidden": true,
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "accessories",
           "label": "Phụ kiện kèm theo",
           "fieldtype": "Small Text",
-          "surface": "internal"
+          "surface": "internal",
+          "hidden": true,
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "note",
@@ -3350,7 +3424,9 @@
           "fieldtype": "Data",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "inventory_mode",
@@ -3358,7 +3434,9 @@
           "fieldtype": "Data",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "measurement_profile",
@@ -3367,7 +3445,9 @@
           "options": "Measurement Profile",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "stock_uom",
@@ -3376,7 +3456,9 @@
           "options": "UOM",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "min_area_sqm",
@@ -3384,7 +3466,9 @@
           "fieldtype": "Float",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Màu / mã sơn",
@@ -3423,7 +3507,10 @@
           "options": "Trọn bộ\nTách món",
           "default": "Trọn bộ",
           "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
-          "surface": "internal"
+          "surface": "internal",
+          "hidden": true,
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Có bản bướm",
@@ -3437,7 +3524,10 @@
           "fieldname": "mesh_height_m",
           "fieldtype": "Float",
           "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
-          "surface": "internal"
+          "surface": "internal",
+          "hidden": true,
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "formula_policy",
@@ -3446,7 +3536,9 @@
           "options": "Cutting Policy",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "width_basis",
@@ -3454,7 +3546,9 @@
           "fieldtype": "Data",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "cut_width_m",
@@ -3462,7 +3556,9 @@
           "fieldtype": "Float",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "billable_area_sqm",
@@ -3470,7 +3566,9 @@
           "fieldtype": "Float",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Loại cửa",
@@ -3479,7 +3577,10 @@
           "options": "Cửa Đức\nCửa Úc\nCửa Lưới\nCửa Đài Loan\nCửa Siêu Trường\nCửa tấm liền Úc",
           "read_only": true,
           "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
-          "surface": "internal"
+          "surface": "internal",
+          "hidden": true,
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Biến thể chia lá",
@@ -3495,7 +3596,10 @@
           "fieldtype": "Float",
           "read_only": true,
           "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
-          "surface": "internal"
+          "surface": "internal",
+          "hidden": true,
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Ước số chia lá (m)",
@@ -3503,7 +3607,10 @@
           "fieldtype": "Float",
           "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
           "description": "Mặc định lấy từ Item hoặc Công thức cửa; chỉ nhập khi bộ cửa dùng bản lá riêng.",
-          "surface": "internal"
+          "surface": "internal",
+          "hidden": true,
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Cách làm tròn lá",
@@ -3511,7 +3618,10 @@
           "fieldtype": "Data",
           "read_only": true,
           "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
-          "surface": "internal"
+          "surface": "internal",
+          "hidden": true,
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Tổng số lá",
@@ -3519,7 +3629,10 @@
           "fieldtype": "Float",
           "read_only": true,
           "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
-          "surface": "internal"
+          "surface": "internal",
+          "hidden": true,
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Lá một lớp",
@@ -3542,7 +3655,10 @@
           "fieldtype": "Float",
           "read_only": true,
           "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
-          "surface": "internal"
+          "surface": "internal",
+          "hidden": true,
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Phút sản xuất",
@@ -3550,7 +3666,10 @@
           "fieldtype": "Float",
           "read_only": true,
           "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
-          "surface": "internal"
+          "surface": "internal",
+          "hidden": true,
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Phiên bản công thức",
@@ -3558,7 +3677,9 @@
           "fieldtype": "Data",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Giải thích công thức",
@@ -3566,7 +3687,10 @@
           "fieldtype": "Small Text",
           "read_only": true,
           "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
-          "surface": "internal"
+          "surface": "internal",
+          "hidden": true,
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Dự kiến cần sơn",
@@ -3575,7 +3699,10 @@
           "read_only": true,
           "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
           "description": "Kết luận cuối chỉ có sau khi chọn lô cắt; lô THÔ sẽ tự sinh việc sơn.",
-          "surface": "internal"
+          "surface": "internal",
+          "hidden": true,
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Dài một cây/đoạn (m)",
@@ -3618,7 +3745,9 @@
           "fieldtype": "Float",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "stock_qty",
@@ -3626,7 +3755,9 @@
           "fieldtype": "Float",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "available_qty",
@@ -3634,7 +3765,9 @@
           "fieldtype": "Float",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "available_stock_qty",
@@ -3642,7 +3775,9 @@
           "fieldtype": "Float",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "available_stock_uom",
@@ -3651,7 +3786,9 @@
           "options": "UOM",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "availability_status",
@@ -3659,7 +3796,9 @@
           "fieldtype": "Data",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "rate",
@@ -3700,40 +3839,58 @@
           "label": "Thành tiền",
           "fieldtype": "Currency",
           "read_only": true,
-          "surface": "internal"
+          "surface": "internal",
+          "hidden": true,
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "motor_model",
           "label": "Mô tơ kèm theo",
           "fieldtype": "Link",
           "options": "Item",
-          "surface": "internal"
+          "surface": "internal",
+          "hidden": true,
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "accessories",
           "label": "Phụ kiện kèm theo",
           "fieldtype": "Small Text",
-          "surface": "internal"
+          "surface": "internal",
+          "hidden": true,
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "install_note",
           "label": "Ghi chú lắp đặt",
           "fieldtype": "Small Text",
-          "surface": "internal"
+          "surface": "internal",
+          "hidden": true,
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "warehouse",
           "label": "Kho xuất",
           "fieldtype": "Link",
           "options": "Warehouse",
-          "surface": "internal"
+          "surface": "internal",
+          "hidden": true,
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "delivered_qty",
           "label": "Đã giao",
           "fieldtype": "Float",
           "read_only": true,
-          "surface": "internal"
+          "surface": "internal",
+          "hidden": true,
+          "editMode": "hidden",
+          "serverEnforced": true
         }
       ],
       "permissions": {
@@ -4072,7 +4229,9 @@
           "fieldtype": "Data",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Dòng đơn hàng nguồn",
@@ -4081,7 +4240,9 @@
           "read_only": true,
           "hidden": true,
           "description": "Khóa giao hàng theo đúng dòng, không cộng nhầm hai dòng cùng mã nhưng khác màu/kích thước.",
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "inventory_mode",
@@ -4089,7 +4250,9 @@
           "fieldtype": "Data",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "measurement_profile",
@@ -4098,7 +4261,9 @@
           "options": "Measurement Profile",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "stock_uom",
@@ -4107,7 +4272,9 @@
           "options": "UOM",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "min_area_sqm",
@@ -4115,7 +4282,9 @@
           "fieldtype": "Float",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Màu / mã sơn",
@@ -4157,7 +4326,10 @@
           "options": "Trọn bộ\nTách món",
           "default": "Trọn bộ",
           "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
-          "surface": "internal"
+          "surface": "internal",
+          "hidden": true,
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Có bản bướm",
@@ -4180,7 +4352,9 @@
           "options": "Cutting Policy",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "width_basis",
@@ -4188,7 +4362,9 @@
           "fieldtype": "Data",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "cut_width_m",
@@ -4196,7 +4372,9 @@
           "fieldtype": "Float",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "billable_area_sqm",
@@ -4204,7 +4382,9 @@
           "fieldtype": "Float",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Dài một cây (m)",
@@ -4242,7 +4422,9 @@
           "fieldtype": "Float",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "stock_qty",
@@ -4250,7 +4432,9 @@
           "fieldtype": "Float",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "warehouse",
@@ -4621,7 +4805,9 @@
           "fieldtype": "Data",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "inventory_mode",
@@ -4629,7 +4815,9 @@
           "fieldtype": "Data",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "measurement_profile",
@@ -4638,7 +4826,9 @@
           "options": "Measurement Profile",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "stock_uom",
@@ -4647,7 +4837,9 @@
           "options": "UOM",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "min_area_sqm",
@@ -4655,7 +4847,9 @@
           "fieldtype": "Float",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "color",
@@ -4689,7 +4883,10 @@
           "fieldtype": "Select",
           "options": "Trọn bộ\nTách món",
           "default": "Trọn bộ",
-          "surface": "internal"
+          "surface": "internal",
+          "hidden": true,
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "has_butterfly_bracket",
@@ -4710,7 +4907,9 @@
           "options": "Cutting Policy",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "width_basis",
@@ -4718,7 +4917,9 @@
           "fieldtype": "Data",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "cut_width_m",
@@ -4726,7 +4927,9 @@
           "fieldtype": "Float",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "billable_area_sqm",
@@ -4734,7 +4937,9 @@
           "fieldtype": "Float",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "uom",
@@ -4757,7 +4962,9 @@
           "fieldtype": "Float",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "stock_qty",
@@ -4765,7 +4972,9 @@
           "fieldtype": "Float",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "rate",
@@ -4974,7 +5183,9 @@
           "fieldtype": "Data",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "source_warehouse",
@@ -5350,7 +5561,9 @@
           "fieldtype": "Data",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Kiểu quản lý tồn",
@@ -5358,7 +5571,9 @@
           "fieldtype": "Data",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Bộ quy cách",
@@ -5367,7 +5582,9 @@
           "options": "Measurement Profile",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "stock_uom",
@@ -5376,7 +5593,9 @@
           "options": "UOM",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "min_area_sqm",
@@ -5384,7 +5603,9 @@
           "fieldtype": "Float",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Màu",
@@ -5473,7 +5694,9 @@
           "fieldtype": "Float",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "stock_qty",
@@ -5481,7 +5704,9 @@
           "fieldtype": "Float",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "rate",
@@ -5650,7 +5875,9 @@
           "fieldtype": "Data",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Kiểu quản lý tồn",
@@ -5658,7 +5885,9 @@
           "fieldtype": "Data",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Bộ quy cách",
@@ -5667,7 +5896,9 @@
           "options": "Measurement Profile",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "stock_uom",
@@ -5676,7 +5907,9 @@
           "options": "UOM",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "min_area_sqm",
@@ -5684,7 +5917,9 @@
           "fieldtype": "Float",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Màu",
@@ -5710,7 +5945,9 @@
           "options": "UOM",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Số lượng",
@@ -5767,7 +6004,10 @@
           "fieldtype": "Float",
           "read_only": true,
           "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'",
-          "surface": "internal"
+          "surface": "internal",
+          "hidden": true,
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Quy cách định mức",
@@ -5776,7 +6016,9 @@
           "options": "Material Specification",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Trọng lượng định mức (kg/m)",
@@ -5850,7 +6092,9 @@
           "fieldtype": "Float",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "stock_qty",
@@ -5858,7 +6102,9 @@
           "fieldtype": "Float",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         }
       ],
       "permissions": {
@@ -6010,7 +6256,9 @@
           "fieldtype": "Data",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Kiểu quản lý tồn",
@@ -6018,7 +6266,9 @@
           "fieldtype": "Data",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Bộ quy cách",
@@ -6027,7 +6277,9 @@
           "options": "Measurement Profile",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "stock_uom",
@@ -6036,7 +6288,9 @@
           "options": "UOM",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "min_area_sqm",
@@ -6044,7 +6298,9 @@
           "fieldtype": "Float",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Màu",
@@ -6126,7 +6382,10 @@
           "fieldtype": "Float",
           "read_only": true,
           "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'",
-          "surface": "internal"
+          "surface": "internal",
+          "hidden": true,
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Tổng kg thực cân",
@@ -6210,7 +6469,10 @@
           "fieldname": "serial_and_batch_bundle",
           "fieldtype": "Link",
           "options": "Serial and Batch Bundle",
-          "surface": "internal"
+          "surface": "internal",
+          "hidden": true,
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Tình trạng",
@@ -6264,7 +6526,9 @@
           "fieldtype": "Float",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "stock_qty",
@@ -6272,14 +6536,18 @@
           "fieldtype": "Float",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "valuation_rate",
           "label": "Giá vốn nhập kho",
           "fieldtype": "Currency",
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         }
       ],
       "permissions": {
@@ -6473,7 +6741,9 @@
           "fieldtype": "Data",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "inventory_mode",
@@ -6481,7 +6751,9 @@
           "fieldtype": "Data",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "measurement_profile",
@@ -6490,7 +6762,9 @@
           "options": "Measurement Profile",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "stock_uom",
@@ -6499,7 +6773,9 @@
           "options": "UOM",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "min_area_sqm",
@@ -6507,7 +6783,9 @@
           "fieldtype": "Float",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "color",
@@ -6555,7 +6833,9 @@
           "fieldtype": "Float",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "stock_qty",
@@ -6563,7 +6843,9 @@
           "fieldtype": "Float",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "rate",
@@ -6587,7 +6869,9 @@
           "required": true,
           "hidden": true,
           "default": "Hàng tồn kho",
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "warehouse",
@@ -7180,7 +7464,9 @@
           "label": "Dòng nguồn",
           "fieldtype": "Int",
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         }
       ],
       "permissions": {
@@ -7700,7 +7986,9 @@
           "fieldtype": "Long Text",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "accessories",
@@ -8244,7 +8532,9 @@
           "fieldtype": "Float",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "kg_consumed",
@@ -8264,7 +8554,9 @@
           "fieldtype": "Float",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "scrap_m",
@@ -8278,7 +8570,9 @@
           "fieldtype": "Int",
           "hidden": true,
           "read_only": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Giá trị đầu thừa (minor)",
@@ -8286,7 +8580,9 @@
           "fieldtype": "Int",
           "hidden": true,
           "read_only": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Giá trị phần đã cắt (minor)",
@@ -8294,7 +8590,9 @@
           "fieldtype": "Int",
           "hidden": true,
           "read_only": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Kg tiêu hao (micros)",
@@ -8302,7 +8600,9 @@
           "fieldtype": "Int",
           "hidden": true,
           "read_only": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Kg đầu thừa (micros)",
@@ -8310,7 +8610,9 @@
           "fieldtype": "Int",
           "hidden": true,
           "read_only": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Kg phần đã cắt (micros)",
@@ -8318,7 +8620,9 @@
           "fieldtype": "Int",
           "hidden": true,
           "read_only": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "note",
@@ -8483,7 +8787,9 @@
           "fieldtype": "Float",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "book_weight_kg",
@@ -8491,7 +8797,9 @@
           "fieldtype": "Float",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "counted_qty",
@@ -8512,7 +8820,9 @@
           "fieldtype": "Float",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "variance_weight_kg",
@@ -8520,7 +8830,9 @@
           "fieldtype": "Float",
           "read_only": true,
           "hidden": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Số sổ (micros)",
@@ -8528,7 +8840,9 @@
           "fieldtype": "Int",
           "hidden": true,
           "read_only": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Kg sổ (micros)",
@@ -8536,7 +8850,9 @@
           "fieldtype": "Int",
           "hidden": true,
           "read_only": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Giá trị sổ (minor)",
@@ -8544,7 +8860,9 @@
           "fieldtype": "Int",
           "hidden": true,
           "read_only": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Chênh SL (micros)",
@@ -8552,7 +8870,9 @@
           "fieldtype": "Int",
           "hidden": true,
           "read_only": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "label": "Chênh kg (micros)",
@@ -8560,7 +8880,9 @@
           "fieldtype": "Int",
           "hidden": true,
           "read_only": true,
-          "surface": "internal"
+          "surface": "internal",
+          "editMode": "hidden",
+          "serverEnforced": true
         },
         {
           "fieldname": "valuation_rate",
