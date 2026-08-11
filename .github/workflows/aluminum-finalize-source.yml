@@ -1,16 +1,15 @@
 name: Alumdoor Aluminum Source Finalizer
 
 on:
-  push:
-    branches:
-      - feat/alumdoor-aluminum-inventory-closure
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: write
 
 jobs:
   finalize:
-    if: github.actor != 'github-actions[bot]'
+    if: github.head_ref == 'feat/alumdoor-aluminum-inventory-closure'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
