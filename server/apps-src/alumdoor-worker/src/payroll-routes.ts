@@ -42,13 +42,7 @@ async function getDoc(call: PayrollPlatformCall, doctype: string, name: string):
   return asObject(await method(call, "frappe.client.get", { doctype, name }), `${doctype} ${name}`);
 }
 async function listDocs(call: PayrollPlatformCall, doctype: string, filters: Json, fields: string[] = ["*"]): Promise<Json[]> {
-  return asArray(await method(call, "frappe.client.get_list", {
-    doctype,
-    fields,
-    filters,
-    order_by: "modified desc",
-    limit_page_length: 1000,
-  }));
+  return asArray(await method(call, "frappe.client.get_list", { doctype, fields, filters, order_by: "modified desc", limit_page_length: 1000 }));
 }
 async function insertDoc(call: PayrollPlatformCall, doc: Json): Promise<Json> {
   return asObject(await method(call, "frappe.client.insert", { doc }), "Bản ghi mới");
@@ -66,15 +60,9 @@ export async function payrollCreatePeriod(input: { call: PayrollPlatformCall; ar
     const branch = text(input.args.branch);
     const standard = integer(input.args.standard_work_days_bp, "Ngày công chuẩn", 260_000, 1, 310_000);
     const created = await insertDoc(input.call, {
-      doctype: "Payroll Entry",
-      company,
-      ...(branch ? { branch } : {}),
-      posting_at: (input.now ?? new Date()).toISOString(),
-      start_date: startDate,
-      end_date: endDate,
-      salary_slips: [],
-      alu_standard_work_days_bp: standard,
-      alu_state: "draft",
+      doctype: "Payroll Entry", company, ...(branch ? { branch } : {}),
+      posting_at: (input.now ?? new Date()).toISOString(), start_date: startDate, end_date: endDate,
+      salary_slips: [], alu_standard_work_days_bp: standard, alu_state: "draft",
     });
     return json(created);
   } catch (error) { return fail("PAYROLL_CREATE_FAILED", error instanceof Error ? error.message : "Không tạo được kỳ lương."); }
@@ -85,11 +73,12 @@ export async function payrollCalculatePeriod(input: { call: PayrollPlatformCall;
     const periodName = requiredText(input.args.period, "Kỳ lương");
     const period = await getDoc(input.call, "Payroll Entry", periodName);
     const currentState = text(period.alu_state) || "draft";
-    if (["approved", "paid", "cancelled"].includes(currentState)) throw new Error("Kỳ lương đã khóa, không thể tính lại.");
+    if (!["draft", "calculated", "invalidated"].includes(currentState)) throw new Error("Kỳ lương không ở trạng thái cho phép tính hoặc tính lại.");
     const company = requiredText(period.company, "Công ty kỳ lương");
     const branch = text(period.branch);
     const startDate = date(period.start_date, "Ngày bắt đầu kỳ");
     const endDate = date(period.end_date, "Ngày kết thúc kỳ");
+    const standardWorkDaysBp = integer(period.alu_standard_work_days_bp, "Ngày công chuẩn", undefined, 1, 310_000);
     const profiles = (await listDocs(input.call, "AlumDoor Pay Profile", { company, ...(branch ? { branch } : {}), status: "approved" }))
       .filter((profile) => text(profile.effective_from) <= endDate && (!text(profile.effective_to) || text(profile.effective_to) >= startDate));
     if (!profiles.length) throw new Error("Không có hồ sơ lương đã duyệt trong kỳ.");
@@ -100,17 +89,11 @@ export async function payrollCalculatePeriod(input: { call: PayrollPlatformCall;
       const existing = (await listDocs(input.call, "Salary Slip", { alu_payroll_entry: periodName, employee }))[0];
       if (existing && Number(existing.docstatus ?? 0) !== 0) throw new Error(`Phiếu lương ${text(existing.name)} đã submit, không thể tính lại.`);
       const base: Json = {
-        ...(existing ?? {}),
-        doctype: "Salary Slip",
-        employee,
-        company,
-        posting_at: (input.now ?? new Date()).toISOString(),
-        start_date: startDate,
-        end_date: endDate,
-        earnings: [],
-        deductions: [],
-        alu_payroll_entry: periodName,
+        ...(existing ?? {}), doctype: "Salary Slip", employee, company,
+        posting_at: (input.now ?? new Date()).toISOString(), start_date: startDate, end_date: endDate,
+        earnings: [], deductions: [], alu_payroll_entry: periodName,
         alu_pay_profile: requiredText(profile.name, "Hồ sơ lương"),
+        alu_standard_work_days_bp: standardWorkDaysBp,
         alu_state: "draft",
         alu_calculation_version: integer(existing?.alu_calculation_version, "Phiên bản tính", 0, 0, 1_000_000) + 1,
       };
@@ -143,8 +126,7 @@ export async function payrollSubmitPeriod(input: { call: PayrollPlatformCall; ar
 export async function payrollApprovePeriod(input: { call: PayrollPlatformCall; args: Json }): Promise<Response> {
   try {
     const period = requiredText(input.args.period, "Kỳ lương");
-    const result = await method(input.call, "metaforge.api.approve_alumdoor_payroll", { payroll_entry: period });
-    return json(result);
+    return json(await method(input.call, "metaforge.api.approve_alumdoor_payroll", { payroll_entry: period }));
   } catch (error) { return fail("PAYROLL_APPROVAL_FAILED", error instanceof Error ? error.message : "Không duyệt được kỳ lương."); }
 }
 
@@ -153,8 +135,7 @@ export async function payrollMarkPaid(input: { call: PayrollPlatformCall; args: 
     const periodName = requiredText(input.args.period, "Kỳ lương");
     const period = await getDoc(input.call, "Payroll Entry", periodName);
     if (Number(period.docstatus ?? 0) !== 1 || text(period.alu_state) !== "approved") throw new Error("Chỉ kỳ lương đã duyệt mới được xác nhận đã trả.");
-    const saved = await saveDoc(input.call, { ...period, alu_state: "paid", alu_paid_at: (input.now ?? new Date()).toISOString() });
-    return json(saved);
+    return json(await saveDoc(input.call, { ...period, alu_state: "paid", alu_paid_at: (input.now ?? new Date()).toISOString() }));
   } catch (error) { return fail("PAYROLL_MARK_PAID_FAILED", error instanceof Error ? error.message : "Không thể xác nhận trả lương."); }
 }
 
