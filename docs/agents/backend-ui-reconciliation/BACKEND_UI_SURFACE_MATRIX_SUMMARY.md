@@ -92,33 +92,33 @@ Covered drift classes:
 
 ### DR-UIREC01-001
 
-Dependency Request  
-Owner: UI-REC-02 NAV  
-Need: expose `Sales Option` and `Sales Package` as role-aware AlumDoor operator masters in declarative navigation/catalog.  
-Why: both masters are installed backend metadata and ordinary Sales Manager configuration; UI-REC-01 does not own sidebar/catalog declarations.  
-Blocked scope: discoverable commercial configuration.  
-Can continue independently: yes  
-Next independent work: UI-REC-01 complete; consume this request in NAV convergence.  
+Dependency Request
+Owner: UI-REC-02 NAV
+Need: expose `Sales Option` and `Sales Package` as role-aware AlumDoor operator masters in declarative navigation/catalog.
+Why: both masters are installed backend metadata and ordinary Sales Manager configuration; UI-REC-01 does not own sidebar/catalog declarations.
+Blocked scope: discoverable commercial configuration.
+Can continue independently: yes
+Next independent work: UI-REC-01 complete; consume this request in NAV convergence.
 
 ### DR-UIREC01-002
 
-Dependency Request  
-Owner: UI-REC-03 FORMS + Grid program  
-Need: project `Sales Order Item.sales_option` from the canonical 0118 backend metadata into AlumDoor child metadata; Grid owner validates interaction/runtime parity.  
-Why: 0118 marks the field operator-facing `surface=quick`, but the current AlumDoor V2 Sales Order Item projection omits it.  
-Blocked scope: operator choice of canonical Sales Option on Sales Order rows.  
-Can continue independently: yes  
-Next independent work: UI-REC-01 complete; consume this request in Forms/Grid convergence.  
+Dependency Request
+Owner: UI-REC-03 FORMS + Grid program
+Need: project `Sales Order Item.sales_option` from the canonical 0118 backend metadata into AlumDoor child metadata; Grid owner validates interaction/runtime parity.
+Why: 0118 marks the field operator-facing `surface=quick`, but the current AlumDoor V2 Sales Order Item projection omits it.
+Blocked scope: operator choice of canonical Sales Option on Sales Order rows.
+Can continue independently: yes
+Next independent work: UI-REC-01 complete; consume this request in Forms/Grid convergence.
 
 ### DR-UIREC01-003
 
-Dependency Request  
-Owner: Sales/domain authority  
-Need: decide and implement an append-only correction if `Sales Option.sales_package` is intended to be a `Link(Sales Package)` as stated by migration 0118.  
-Why: 0119 creates Sales Package but does not perform the promised type/target upgrade; changing an applied schema contract is outside UI-REC-01 ownership.  
-Blocked scope: strict Link-target parity for Sales Option package configuration.  
-Can continue independently: yes  
-Next independent work: UI-REC-01 complete; domain owner resolves before final convergence gate if the intended Link contract is confirmed.  
+Dependency Request
+Owner: Sales/domain authority
+Need: decide and implement an append-only correction if `Sales Option.sales_package` is intended to be a `Link(Sales Package)` as stated by migration 0118.
+Why: 0119 creates Sales Package but does not perform the promised type/target upgrade; changing an applied schema contract is outside UI-REC-01 ownership.
+Blocked scope: strict Link-target parity for Sales Option package configuration.
+Can continue independently: yes
+Next independent work: UI-REC-01 complete; domain owner resolves before final convergence gate if the intended Link contract is confirmed.
 
 ## Gate semantics
 
