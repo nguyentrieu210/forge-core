@@ -16,6 +16,19 @@ function reservationDoc(name, sourceName) {
   };
 }
 
+function productionReservation(name, minLength, qty) {
+  return {
+    tenant_id: "tenant-a", doctype: "Stock Reservation", name,
+    owner: "planner@example.test", docstatus: 0, status: "Đang giữ", version: 1,
+    created_at: "2026-08-11T00:00:00.000Z", modified_at: "2026-08-11T00:00:00.000Z",
+    data: {
+      item_code: "AL548", source_doctype: "Production Order", source_name: "LSX-1",
+      warehouse: "KHO-1", color: "Ghi", condition: "Đã sơn",
+      min_length_m: minLength, qty_reserved: qty, state: "Đang giữ",
+    }, children: [],
+  };
+}
+
 function baseReader({ missing = false } = {}) {
   const reservations = [reservationDoc("RSV-ACTIVE", "SO-ACTIVE"), reservationDoc("RSV-CANCEL", "SO-CANCEL")];
   return {
@@ -24,6 +37,46 @@ function baseReader({ missing = false } = {}) {
       if (doctype !== "Sales Order") return null;
       if (missing && name === "SO-CANCEL") return null;
       return { tenant_id: "tenant-a", doctype, name, owner: "x", docstatus: name === "SO-CANCEL" ? 2 : 1, status: "", version: 1, created_at: "x", modified_at: "x", data: { company: "COMP-A" }, children: [] };
+    },
+  };
+}
+
+function consumptionReader({ reservations, cutQtyMicros, batchLength = "5" }) {
+  const cut = {
+    tenant_id: "tenant-a", doctype: "Cut Order", name: "CN-1",
+    owner: "cutter@example.test", docstatus: 1, status: "Đã cắt", version: 3,
+    created_at: "2026-08-11T00:00:00.000Z", modified_at: "2026-08-11T00:05:00.000Z",
+    data: { production_order: "LSX-1" }, children: [],
+  };
+  return {
+    async listDocumentsByDoctype(_tenant, doctype) {
+      if (doctype === "Stock Reservation") return reservations;
+      if (doctype === "Cut Order") return [cut];
+      return [];
+    },
+    async getDocument(_tenant, doctype, name) {
+      if (doctype === "Production Order" && name === "LSX-1") {
+        return { tenant_id: "tenant-a", doctype, name, owner: "x", docstatus: 1, status: "Released", version: 1, created_at: "x", modified_at: "x", data: { company: "COMP-A" }, children: [] };
+      }
+      return null;
+    },
+    async getVoucherStockEntries(_tenant, doctype, name, revision) {
+      assert.equal(doctype, "Cut Order");
+      assert.equal(name, "CN-1");
+      assert.equal(revision, 3);
+      return [{
+        line_key: "CUT-BATCH-1", item_code: "AL548", warehouse: "KHO-1",
+        actual_qty_micros: -cutQtyMicros, valuation_rate_minor: 100,
+        stock_value_difference_minor: -100, qty_scale: 6, currency_scale: 2,
+        currency: "VND", posting_at: "2026-08-11T00:05:00.000Z",
+        batch_no: "BATCH-5M", allow_negative_stock: false,
+      }];
+    },
+    async getMasterRecordData(_tenant, type, name) {
+      if (type === "Batch" && name === "BATCH-5M") {
+        return { item_code: "AL548", length_m: batchLength, color: "Ghi", condition: "Đã sơn" };
+      }
+      return null;
     },
   };
 }
@@ -47,6 +100,40 @@ test("non-reservation document scans pass through unchanged", async () => {
     async listDocumentsByDoctype(_tenant, doctype) { return doctype === "Sales Order" ? source : []; },
   }, "tenant-a");
   assert.equal(await reader.listDocumentsByDoctype("tenant-a", "Sales Order"), source);
+});
+
+test("submitted Cut Order ledger reduces effective reservation quantity but keeps partial promise active", async () => {
+  const raw = productionReservation("RSV-51", "4.5", "51");
+  const reader = reservationLifecycleReader(consumptionReader({ reservations: [raw], cutQtyMicros: 30_000_000 }), "tenant-a");
+  const [projected] = await reader.listDocumentsByDoctype("tenant-a", "Stock Reservation");
+  assert.equal(projected.data.qty_reserved, "21.000000");
+  assert.equal(projected.data.qty_reserved_micros, 21_000_000);
+  assert.equal(projected.data.consumed_qty_micros, 30_000_000);
+  assert.equal(projected.data.state, "Đang giữ");
+  assert.equal(projected.data.consumption_source, "Cut Order Stock Ledger");
+});
+
+test("full Cut Order consumption derives terminal Đã dùng without client state mutation", async () => {
+  const raw = productionReservation("RSV-51", "4.5", "51");
+  const reader = reservationLifecycleReader(consumptionReader({ reservations: [raw], cutQtyMicros: 51_000_000 }), "tenant-a");
+  const [projected] = await reader.listDocumentsByDoctype("tenant-a", "Stock Reservation");
+  assert.equal(projected.data.qty_reserved, "0.000000");
+  assert.equal(projected.data.consumed_qty_micros, 51_000_000);
+  assert.equal(projected.data.state, "Đã dùng");
+  assert.equal(projected.status, "Đã dùng");
+});
+
+test("consumption allocation is longest-minimum-first for the same Production Order", async () => {
+  const long = productionReservation("RSV-LONG", "4.5", "1");
+  const short = productionReservation("RSV-SHORT", "3", "1");
+  const reader = reservationLifecycleReader(consumptionReader({ reservations: [short, long], cutQtyMicros: 1_000_000 }), "tenant-a");
+  const docs = await reader.listDocumentsByDoctype("tenant-a", "Stock Reservation");
+  const projectedLong = docs.find((doc) => doc.name === "RSV-LONG");
+  const projectedShort = docs.find((doc) => doc.name === "RSV-SHORT");
+  assert.equal(projectedLong.data.state, "Đã dùng");
+  assert.equal(projectedLong.data.qty_reserved, "0.000000");
+  assert.equal(projectedShort.data.state, "Đang giữ");
+  assert.equal(projectedShort.data.qty_reserved, "1");
 });
 
 test("reservation cannot be created against a cancelled source", async () => {
