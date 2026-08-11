@@ -94,8 +94,16 @@ export async function validateCanonicalAluminumItem(request: Request, env: Valid
     const code = String(doc.item_code ?? subject.name ?? "").trim() || "Item";
     const contract = aluminumItemContract(doc);
     if (!contract.ok) return refuse(`${code}: cấu hình tồn nhôm chưa hội tụ — ${contract.issues.join("; ")}.`);
-    if (Array.isArray(doc.uom_conversions) && doc.uom_conversions.length > 0) {
-      return refuse(`${code}: nhôm catch-weight không được khai hệ số quy đổi Kg↔Cây tĩnh; số cây và kg thực là hai quan sát độc lập.`);
+
+    const staticWeightConversion = Array.isArray(doc.uom_conversions)
+      ? doc.uom_conversions.some((row) => {
+          if (!row || typeof row !== "object" || Array.isArray(row)) return false;
+          const uom = String((row as Record<string, unknown>).uom ?? "").normalize("NFC").trim().toLocaleLowerCase("vi");
+          return uom === "kg";
+        })
+      : false;
+    if (staticWeightConversion) {
+      return refuse(`${code}: nhôm catch-weight không được khai hệ số quy đổi Kg↔${contract.stock_uom} tĩnh; số cây/lá và kg thực là hai quan sát độc lập.`);
     }
     if (!checked(doc.is_stock_item)) return refuse(`${code}: nhôm cây/lá phải bật Quản lý tồn kho.`);
     return Response.json({ ok: true, aluminum_contract: true, stock_uom: contract.stock_uom });
