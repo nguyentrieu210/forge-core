@@ -7,7 +7,7 @@ export const SALES_OPTION_DOCTYPE = "Sales Option";
 
 export interface ResolveSalesOptionInput {
   itemCode: string;
-  itemMaster: JsonObject;
+  itemMaster: Record<string, unknown>;
   facts: Record<string, unknown>;
   requestedOption?: string;
   legacySalesMode?: string;
