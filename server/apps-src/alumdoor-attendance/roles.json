@@ -3,5 +3,6 @@
   { "role": "AlumDoor Attendance Manager", "desk_access": true },
   { "role": "AlumDoor Payroll User", "desk_access": true },
   { "role": "AlumDoor Payroll Approver", "desk_access": true },
-  { "role": "AlumDoor QR System", "desk_access": false }
+  { "role": "AlumDoor QR System", "desk_access": false },
+  { "role": "AlumDoor Payroll System", "desk_access": false }
 ]
