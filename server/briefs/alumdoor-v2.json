@@ -1483,8 +1483,20 @@
     "note"
    ],
    "fields": [
-    "color:Link(Item Color)! Mã màu",
-    "note:Data Ghi chú áp dụng"
+    {
+     "fieldname": "color",
+     "label": "Mã màu",
+     "fieldtype": "Link",
+     "options": "Item Color",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "note",
+     "label": "Ghi chú áp dụng",
+     "fieldtype": "Data",
+     "surface": "quick"
+    }
    ],
    "permissions": {
     "Chủ xưởng": "rwc",
@@ -1492,6 +1504,18 @@
     "Kế toán": "r",
     "Sản xuất": "r",
     "Kinh doanh": "r"
+   },
+   "form": {
+    "fields": [
+     "color",
+     "note"
+    ]
+   },
+   "quickEntry": {
+    "fields": [
+     "color",
+     "note"
+    ]
    }
   },
   {
@@ -1582,16 +1606,52 @@
     "disabled"
    ],
    "fields": [
-    "attribute_value:Data! Giá trị",
-    "abbr:Data Viết tắt",
-    "numeric_value:Float Giá trị số",
-    "disabled:Check Ngừng dùng"
+    {
+     "fieldname": "attribute_value",
+     "label": "Giá trị",
+     "fieldtype": "Data",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "abbr",
+     "label": "Viết tắt",
+     "fieldtype": "Data",
+     "surface": "quick"
+    },
+    {
+     "fieldname": "numeric_value",
+     "label": "Giá trị số",
+     "fieldtype": "Float",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "disabled",
+     "label": "Ngừng dùng",
+     "fieldtype": "Check",
+     "surface": "quick"
+    }
    ],
    "permissions": {
     "Chủ xưởng": "rwc",
     "Thủ kho": "r",
     "Sản xuất": "r",
     "Kinh doanh": "r"
+   },
+   "form": {
+    "fields": [
+     "attribute_value",
+     "abbr",
+     "numeric_value",
+     "disabled"
+    ]
+   },
+   "quickEntry": {
+    "fields": [
+     "attribute_value",
+     "abbr",
+     "disabled"
+    ]
    }
   },
   {
@@ -1637,14 +1697,39 @@
     "attribute_value"
    ],
    "fields": [
-    "attribute:Link(Item Attribute)! Thuộc tính",
-    "attribute_value:Data! Giá trị"
+    {
+     "fieldname": "attribute",
+     "label": "Thuộc tính",
+     "fieldtype": "Link",
+     "options": "Item Attribute",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "attribute_value",
+     "label": "Giá trị",
+     "fieldtype": "Data",
+     "required": true,
+     "surface": "quick"
+    }
    ],
    "permissions": {
     "Chủ xưởng": "rwc",
     "Thủ kho": "rwc",
     "Sản xuất": "rwc",
     "Kinh doanh": "r"
+   },
+   "form": {
+    "fields": [
+     "attribute",
+     "attribute_value"
+    ]
+   },
+   "quickEntry": {
+    "fields": [
+     "attribute",
+     "attribute_value"
+    ]
    }
   },
   {
@@ -1660,15 +1745,48 @@
     "uom"
    ],
    "fields": [
-    "barcode:Data*! Mã vạch",
-    "barcode_type:Select(EAN-13,EAN-8,UPC-A,Code 128,QR,Khác) Loại mã",
-    "uom:Link(UOM) Đơn vị áp dụng"
+    {
+     "fieldname": "barcode",
+     "label": "Mã vạch",
+     "fieldtype": "Data",
+     "required": true,
+     "unique": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "barcode_type",
+     "label": "Loại mã",
+     "fieldtype": "Select",
+     "options": "EAN-13\nEAN-8\nUPC-A\nCode 128\nQR\nKhác",
+     "surface": "quick"
+    },
+    {
+     "fieldname": "uom",
+     "label": "Đơn vị áp dụng",
+     "fieldtype": "Link",
+     "options": "UOM",
+     "surface": "quick"
+    }
    ],
    "permissions": {
     "Chủ xưởng": "rwc",
     "Thủ kho": "rwc",
     "Kế toán": "r",
     "Kinh doanh": "r"
+   },
+   "form": {
+    "fields": [
+     "barcode",
+     "barcode_type",
+     "uom"
+    ]
+   },
+   "quickEntry": {
+    "fields": [
+     "barcode",
+     "barcode_type",
+     "uom"
+    ]
    }
   },
   {
@@ -1686,17 +1804,66 @@
     "expense_account"
    ],
    "fields": [
-    "company:Link(Company)! Công ty",
-    "default_warehouse:Link(Warehouse) Kho mặc định",
-    "inventory_account:Link(Account) Tài khoản tồn kho",
-    "income_account:Link(Account) Tài khoản doanh thu",
-    "expense_account:Link(Account) Tài khoản chi phí / giá vốn"
+    {
+     "fieldname": "company",
+     "label": "Công ty",
+     "fieldtype": "Link",
+     "options": "Company",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "default_warehouse",
+     "label": "Kho mặc định",
+     "fieldtype": "Link",
+     "options": "Warehouse",
+     "surface": "quick"
+    },
+    {
+     "fieldname": "inventory_account",
+     "label": "Tài khoản tồn kho",
+     "fieldtype": "Link",
+     "options": "Account",
+     "surface": "quick"
+    },
+    {
+     "fieldname": "income_account",
+     "label": "Tài khoản doanh thu",
+     "fieldtype": "Link",
+     "options": "Account",
+     "surface": "quick"
+    },
+    {
+     "fieldname": "expense_account",
+     "label": "Tài khoản chi phí / giá vốn",
+     "fieldtype": "Link",
+     "options": "Account",
+     "surface": "quick"
+    }
    ],
    "permissions": {
     "Chủ xưởng": "rwc",
     "Kế toán": "rwc",
     "Thủ kho": "r",
     "Kinh doanh": "r"
+   },
+   "form": {
+    "fields": [
+     "company",
+     "default_warehouse",
+     "inventory_account",
+     "income_account",
+     "expense_account"
+    ]
+   },
+   "quickEntry": {
+    "fields": [
+     "company",
+     "default_warehouse",
+     "inventory_account",
+     "income_account",
+     "expense_account"
+    ]
    }
   },
   {
@@ -1714,17 +1881,62 @@
     "lead_time_days"
    ],
    "fields": [
-    "warehouse:Link(Warehouse)! Kho",
-    "safety_stock:Float Tồn an toàn",
-    "reorder_level:Float Điểm đặt hàng",
-    "reorder_qty:Float Số lượng đặt đề xuất",
-    "lead_time_days:Int Thời gian cung ứng (ngày)"
+    {
+     "fieldname": "warehouse",
+     "label": "Kho",
+     "fieldtype": "Link",
+     "options": "Warehouse",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "safety_stock",
+     "label": "Tồn an toàn",
+     "fieldtype": "Float",
+     "surface": "quick"
+    },
+    {
+     "fieldname": "reorder_level",
+     "label": "Điểm đặt hàng",
+     "fieldtype": "Float",
+     "surface": "quick"
+    },
+    {
+     "fieldname": "reorder_qty",
+     "label": "Số lượng đặt đề xuất",
+     "fieldtype": "Float",
+     "surface": "quick"
+    },
+    {
+     "fieldname": "lead_time_days",
+     "label": "Thời gian cung ứng (ngày)",
+     "fieldtype": "Int",
+     "surface": "quick"
+    }
    ],
    "permissions": {
     "Chủ xưởng": "rwc",
     "Thủ kho": "rwc",
     "Kế toán": "r",
     "Sản xuất": "r"
+   },
+   "form": {
+    "fields": [
+     "warehouse",
+     "safety_stock",
+     "reorder_level",
+     "reorder_qty",
+     "lead_time_days"
+    ]
+   },
+   "quickEntry": {
+    "fields": [
+     "warehouse",
+     "safety_stock",
+     "reorder_level",
+     "reorder_qty",
+     "lead_time_days"
+    ]
    }
   },
   {
@@ -2089,15 +2301,28 @@
     "conversion_factor"
    ],
    "fields": [
-    "uom:Link(UOM)! Đơn vị giao dịch",
     {
+     "fieldname": "uom",
+     "label": "Đơn vị giao dịch",
+     "fieldtype": "Link",
+     "options": "UOM",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "label": "Hệ số về ĐVT tồn",
      "fieldname": "conversion_factor",
      "fieldtype": "Float",
-     "label": "Hệ số về ĐVT tồn",
      "required": true,
-     "description": "Ví dụ 1 Cây = 5,85 Mét thì nhập 5,85."
+     "description": "Ví dụ 1 Cây = 5,85 Mét thì nhập 5,85.",
+     "surface": "quick"
     },
-    "note:Data Ghi chú"
+    {
+     "fieldname": "note",
+     "label": "Ghi chú",
+     "fieldtype": "Data",
+     "surface": "expanded"
+    }
    ],
    "permissions": {
     "Chủ xưởng": "rwc",
@@ -2105,6 +2330,19 @@
     "Kế toán": "r",
     "Kinh doanh": "r",
     "Sản xuất": "r"
+   },
+   "form": {
+    "fields": [
+     "uom",
+     "conversion_factor",
+     "note"
+    ]
+   },
+   "quickEntry": {
+    "fields": [
+     "uom",
+     "conversion_factor"
+    ]
    }
   },
   {
@@ -2460,202 +2698,410 @@
    ],
    "fields": [
     {
+     "label": "Mã hàng",
      "//": "Ô chọn chỉ hiện mặt hàng ĐƯỢC bán. Danh mục có gần 300 mã gồm cả dịch vụ, phụ thu và thành phẩm tự sản xuất; đưa hết vào ô chọn của phiếu bán thì người nhập phải tự nhớ mã nào hợp lệ, và chọn nhầm chỉ lộ ra ở bước ghi sổ.",
      "fieldname": "item_code",
      "fieldtype": "Link",
      "options": "Item",
-     "label": "Mã hàng",
      "required": true,
-     "link_filters": "{\"is_sales_item\":1,\"disabled\":0}"
+     "link_filters": "{\"is_sales_item\":1,\"disabled\":0}",
+     "surface": "quick"
     },
-    "item_name:Data~- Tên hàng",
-    "inventory_mode:Data~- Kiểu tính",
-    "measurement_profile:Link(Measurement Profile)~- Bộ quy cách",
-    "stock_uom:Link(UOM)~- ĐVT tồn",
-    "min_area_sqm:Float~- Diện tích tính tối thiểu",
     {
+     "fieldname": "item_name",
+     "label": "Tên hàng",
+     "fieldtype": "Data",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "inventory_mode",
+     "label": "Kiểu tính",
+     "fieldtype": "Data",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "measurement_profile",
+     "label": "Bộ quy cách",
+     "fieldtype": "Link",
+     "options": "Measurement Profile",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "stock_uom",
+     "label": "ĐVT tồn",
+     "fieldtype": "Link",
+     "options": "UOM",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "min_area_sqm",
+     "label": "Diện tích tính tối thiểu",
+     "fieldtype": "Float",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "label": "Màu / mã sơn",
      "fieldname": "color",
      "fieldtype": "Link",
      "options": "Item Color",
-     "label": "Màu / mã sơn",
-     "depends_on": "eval:doc.inventory_mode != 'Hàng thường'"
+     "depends_on": "eval:doc.inventory_mode != 'Hàng thường'",
+     "surface": "quick"
     },
     {
+     "label": "Rộng (m)",
      "fieldname": "width_m",
      "fieldtype": "Float",
-     "label": "Rộng (m)",
-     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2' || doc.inventory_mode == 'Tấm/Kính'"
+     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2' || doc.inventory_mode == 'Tấm/Kính'",
+     "surface": "quick"
     },
     {
+     "label": "Cao (m)",
      "fieldname": "height_m",
      "fieldtype": "Float",
-     "label": "Cao (m)",
-     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2' || doc.inventory_mode == 'Tấm/Kính'"
+     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2' || doc.inventory_mode == 'Tấm/Kính'",
+     "surface": "quick"
     },
     {
+     "label": "Số bộ",
      "fieldname": "set_count",
      "fieldtype": "Int",
-     "label": "Số bộ",
      "default": 1,
-     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'"
+     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
+     "surface": "quick"
     },
     {
+     "label": "Cách bán",
      "fieldname": "sales_mode",
      "fieldtype": "Select",
      "options": "Trọn bộ\nTách món",
-     "label": "Cách bán",
      "default": "Trọn bộ",
-     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'"
+     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
+     "surface": "quick"
     },
     {
+     "label": "Có bản bướm",
      "fieldname": "has_butterfly_bracket",
      "fieldtype": "Check",
-     "label": "Có bản bướm",
-     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'"
+     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
+     "surface": "internal"
     },
     {
+     "label": "Cao lưới (m)",
      "fieldname": "mesh_height_m",
      "fieldtype": "Float",
-     "label": "Cao lưới (m)",
-     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'"
+     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
+     "surface": "internal"
     },
-    "formula_policy:Link(Cutting Policy)~- Công thức đã áp",
-    "width_basis:Data~- Cơ sở rộng",
-    "cut_width_m:Float~- Rộng cắt lá (m)",
-    "billable_area_sqm:Float~- Diện tích tính tiền (m2)",
     {
+     "fieldname": "formula_policy",
+     "label": "Công thức đã áp",
+     "fieldtype": "Link",
+     "options": "Cutting Policy",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "width_basis",
+     "label": "Cơ sở rộng",
+     "fieldtype": "Data",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "cut_width_m",
+     "label": "Rộng cắt lá (m)",
+     "fieldtype": "Float",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "billable_area_sqm",
+     "label": "Diện tích tính tiền (m2)",
+     "fieldtype": "Float",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "label": "Loại cửa",
      "fieldname": "door_type",
      "fieldtype": "Select",
      "options": "Cửa Đức\nCửa Úc\nCửa Lưới\nCửa Đài Loan\nCửa Siêu Trường\nCửa tấm liền Úc",
-     "label": "Loại cửa",
      "read_only": true,
-     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'"
+     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
+     "surface": "internal"
     },
     {
+     "label": "Biến thể chia lá",
      "fieldname": "leaf_variant",
      "fieldtype": "Select",
      "options": "motor trong\nkéo tay\nmotor ngoài\nmotor ngoài tự dừng",
-     "label": "Biến thể chia lá",
-     "depends_on": "eval:doc.door_type == 'Cửa Úc'"
+     "depends_on": "eval:doc.door_type == 'Cửa Úc'",
+     "surface": "expanded"
     },
     {
+     "label": "Trừ cao chia lá (m)",
      "fieldname": "leaf_height_deduction_m",
      "fieldtype": "Float",
-     "label": "Trừ cao chia lá (m)",
      "read_only": true,
-     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'"
+     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
+     "surface": "internal"
     },
     {
+     "label": "Ước số chia lá (m)",
      "fieldname": "leaf_divisor_m",
      "fieldtype": "Float",
-     "label": "Ước số chia lá (m)",
      "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
-     "description": "Mặc định lấy từ Item hoặc Công thức cửa; chỉ nhập khi bộ cửa dùng bản lá riêng."
+     "description": "Mặc định lấy từ Item hoặc Công thức cửa; chỉ nhập khi bộ cửa dùng bản lá riêng.",
+     "surface": "internal"
     },
     {
+     "label": "Cách làm tròn lá",
      "fieldname": "leaf_rounding",
      "fieldtype": "Data",
-     "label": "Cách làm tròn lá",
-     "read_only": true,
-     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'"
-    },
-    {
-     "fieldname": "leaf_count",
-     "fieldtype": "Float",
-     "label": "Tổng số lá",
-     "read_only": true,
-     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'"
-    },
-    {
-     "fieldname": "single_layer_leaf_count",
-     "fieldtype": "Float",
-     "label": "Lá một lớp",
-     "depends_on": "eval:doc.door_type == 'Cửa tấm liền Úc'"
-    },
-    {
-     "fieldname": "double_layer_leaf_count",
-     "fieldtype": "Float",
-     "label": "Lá hai lớp",
-     "read_only": true,
-     "depends_on": "eval:doc.door_type == 'Cửa tấm liền Úc'"
-    },
-    {
-     "fieldname": "estimated_weight_kg",
-     "fieldtype": "Float",
-     "label": "Kg dự toán",
-     "read_only": true,
-     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'"
-    },
-    {
-     "fieldname": "estimated_minutes",
-     "fieldtype": "Float",
-     "label": "Phút sản xuất",
-     "read_only": true,
-     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'"
-    },
-    {
-     "fieldname": "formula_version",
-     "fieldtype": "Data",
-     "label": "Phiên bản công thức",
-     "read_only": true,
-     "hidden": true
-    },
-    {
-     "fieldname": "formula_explanation",
-     "fieldtype": "Small Text",
-     "label": "Giải thích công thức",
-     "read_only": true,
-     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'"
-    },
-    {
-     "fieldname": "paint_required",
-     "fieldtype": "Check",
-     "label": "Dự kiến cần sơn",
      "read_only": true,
      "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
-     "description": "Kết luận cuối chỉ có sau khi chọn lô cắt; lô THÔ sẽ tự sinh việc sơn."
+     "surface": "internal"
     },
     {
+     "label": "Tổng số lá",
+     "fieldname": "leaf_count",
+     "fieldtype": "Float",
+     "read_only": true,
+     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
+     "surface": "internal"
+    },
+    {
+     "label": "Lá một lớp",
+     "fieldname": "single_layer_leaf_count",
+     "fieldtype": "Float",
+     "depends_on": "eval:doc.door_type == 'Cửa tấm liền Úc'",
+     "surface": "expanded"
+    },
+    {
+     "label": "Lá hai lớp",
+     "fieldname": "double_layer_leaf_count",
+     "fieldtype": "Float",
+     "read_only": true,
+     "depends_on": "eval:doc.door_type == 'Cửa tấm liền Úc'",
+     "surface": "expanded"
+    },
+    {
+     "label": "Kg dự toán",
+     "fieldname": "estimated_weight_kg",
+     "fieldtype": "Float",
+     "read_only": true,
+     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
+     "surface": "internal"
+    },
+    {
+     "label": "Phút sản xuất",
+     "fieldname": "estimated_minutes",
+     "fieldtype": "Float",
+     "read_only": true,
+     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
+     "surface": "internal"
+    },
+    {
+     "label": "Phiên bản công thức",
+     "fieldname": "formula_version",
+     "fieldtype": "Data",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "label": "Giải thích công thức",
+     "fieldname": "formula_explanation",
+     "fieldtype": "Small Text",
+     "read_only": true,
+     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
+     "surface": "internal"
+    },
+    {
+     "label": "Dự kiến cần sơn",
+     "fieldname": "paint_required",
+     "fieldtype": "Check",
+     "read_only": true,
+     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
+     "description": "Kết luận cuối chỉ có sau khi chọn lô cắt; lô THÔ sẽ tự sinh việc sơn.",
+     "surface": "internal"
+    },
+    {
+     "label": "Dài một cây/đoạn (m)",
      "fieldname": "length_m",
      "fieldtype": "Float",
-     "label": "Dài một cây/đoạn (m)",
      "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá' && (doc.uom == 'Mét' || doc.uom == 'M' || doc.uom == 'm' || doc.uom == 'met' || doc.uom == 'meter' || doc.uom == 'metre')",
      "mandatory_depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá' && (doc.uom == 'Mét' || doc.uom == 'M' || doc.uom == 'm' || doc.uom == 'met' || doc.uom == 'meter' || doc.uom == 'metre')",
-     "description": "Chiều dài của một cây/đoạn, không phải tổng số mét."
+     "description": "Chiều dài của một cây/đoạn, không phải tổng số mét.",
+     "surface": "quick"
     },
     {
+     "label": "Số cây/đoạn",
      "fieldname": "qty_bar",
      "fieldtype": "Float",
-     "label": "Số cây/đoạn",
      "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá' && (doc.uom == 'Mét' || doc.uom == 'M' || doc.uom == 'm' || doc.uom == 'met' || doc.uom == 'meter' || doc.uom == 'metre' || doc.uom == 'Cây' || doc.uom == 'cay' || doc.uom == 'Lá' || doc.uom == 'la' || doc.uom == 'Đoạn' || doc.uom == 'doan')",
      "mandatory_depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá' && (doc.uom == 'Mét' || doc.uom == 'M' || doc.uom == 'm' || doc.uom == 'met' || doc.uom == 'meter' || doc.uom == 'metre' || doc.uom == 'Cây' || doc.uom == 'cay' || doc.uom == 'Lá' || doc.uom == 'la' || doc.uom == 'Đoạn' || doc.uom == 'doan')",
-     "description": "Bán theo Mét: hệ thống lấy chiều dài × số cây. Bán theo Cây/Lá: hệ thống lấy chính số này."
+     "description": "Bán theo Mét: hệ thống lấy chiều dài × số cây. Bán theo Cây/Lá: hệ thống lấy chính số này.",
+     "surface": "quick"
     },
-    "uom:Link(UOM)! ĐVT bán",
     {
+     "fieldname": "uom",
+     "label": "ĐVT bán",
+     "fieldtype": "Link",
+     "options": "UOM",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "label": "SL tính tiền",
      "fieldname": "qty",
      "fieldtype": "Float",
-     "label": "SL tính tiền",
      "required": true,
      "read_only_depends_on": "eval:(doc.inventory_mode == 'Thành phẩm theo m2' && (doc.uom == 'm2' || doc.uom == 'M2' || doc.uom == 'm²' || doc.uom == 'Bộ')) || (doc.inventory_mode == 'Nhôm cây/lá' && (doc.uom == 'Mét' || doc.uom == 'M' || doc.uom == 'Cây' || doc.uom == 'Lá'))",
-     "description": "Ô máy tính theo quy cách của dòng: cửa = m² đã chốt × số bộ; ray/trục = dài × số cây; phụ kiện = số lượng theo ĐVT bán."
+     "description": "Ô máy tính theo quy cách của dòng: cửa = m² đã chốt × số bộ; ray/trục = dài × số cây; phụ kiện = số lượng theo ĐVT bán.",
+     "surface": "quick"
     },
-    "conversion_factor:Float~- Hệ số về ĐVT tồn",
-    "stock_qty:Float~- SL quy đổi tồn",
-    "available_qty:Float~- Còn theo ĐVT bán",
-    "available_stock_qty:Float~- Còn theo ĐVT tồn",
-    "available_stock_uom:Link(UOM)~- ĐVT tồn khả dụng",
-    "availability_status:Data~- Tồn và giá",
-    "rate:Currency! Đơn giá",
-    "amount:Currency~ Thành tiền",
-    "motor_model:Link(Item) Mô tơ kèm theo",
-    "accessories:Small Text Phụ kiện kèm theo",
-    "note:Small Text Ghi chú dòng"
+    {
+     "fieldname": "conversion_factor",
+     "label": "Hệ số về ĐVT tồn",
+     "fieldtype": "Float",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "stock_qty",
+     "label": "SL quy đổi tồn",
+     "fieldtype": "Float",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "available_qty",
+     "label": "Còn theo ĐVT bán",
+     "fieldtype": "Float",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "available_stock_qty",
+     "label": "Còn theo ĐVT tồn",
+     "fieldtype": "Float",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "available_stock_uom",
+     "label": "ĐVT tồn khả dụng",
+     "fieldtype": "Link",
+     "options": "UOM",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "availability_status",
+     "label": "Tồn và giá",
+     "fieldtype": "Data",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "rate",
+     "label": "Đơn giá",
+     "fieldtype": "Currency",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "amount",
+     "label": "Thành tiền",
+     "fieldtype": "Currency",
+     "read_only": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "motor_model",
+     "label": "Mô tơ kèm theo",
+     "fieldtype": "Link",
+     "options": "Item",
+     "surface": "internal"
+    },
+    {
+     "fieldname": "accessories",
+     "label": "Phụ kiện kèm theo",
+     "fieldtype": "Small Text",
+     "surface": "internal"
+    },
+    {
+     "fieldname": "note",
+     "label": "Ghi chú dòng",
+     "fieldtype": "Small Text",
+     "surface": "expanded"
+    }
    ],
    "permissions": {
     "Chủ xưởng": "rwc",
     "Kinh doanh": "rwc",
     "Kế toán": "r"
+   },
+   "form": {
+    "fields": [
+     "item_code",
+     "color",
+     "sales_mode",
+     "height_m",
+     "width_m",
+     "set_count",
+     "leaf_variant",
+     "single_layer_leaf_count",
+     "double_layer_leaf_count",
+     "cut_width_m",
+     "billable_area_sqm",
+     "formula_policy",
+     "formula_version",
+     "length_m",
+     "qty_bar",
+     "uom",
+     "qty",
+     "rate",
+     "amount",
+     "note"
+    ]
+   },
+   "quickEntry": {
+    "fields": [
+     "item_code",
+     "color",
+     "sales_mode",
+     "height_m",
+     "width_m",
+     "set_count",
+     "length_m",
+     "qty_bar",
+     "uom",
+     "qty",
+     "rate",
+     "amount"
+    ]
    }
   },
   {
@@ -2801,205 +3247,424 @@
    ],
    "fields": [
     {
+     "label": "Mã hàng",
      "//": "Ô chọn chỉ hiện mặt hàng ĐƯỢC bán. Danh mục có gần 300 mã gồm cả dịch vụ, phụ thu và thành phẩm tự sản xuất; đưa hết vào ô chọn của phiếu bán thì người nhập phải tự nhớ mã nào hợp lệ, và chọn nhầm chỉ lộ ra ở bước ghi sổ.",
      "fieldname": "item_code",
      "fieldtype": "Link",
      "options": "Item",
-     "label": "Mã hàng",
      "required": true,
-     "link_filters": "{\"is_sales_item\":1,\"disabled\":0}"
+     "link_filters": "{\"is_sales_item\":1,\"disabled\":0}",
+     "surface": "quick"
     },
-    "item_name:Data~- Tên hàng",
-    "inventory_mode:Data~- Kiểu tính",
-    "measurement_profile:Link(Measurement Profile)~- Bộ quy cách",
-    "stock_uom:Link(UOM)~- ĐVT tồn",
-    "min_area_sqm:Float~- Diện tích tính tối thiểu",
     {
+     "fieldname": "item_name",
+     "label": "Tên hàng",
+     "fieldtype": "Data",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "inventory_mode",
+     "label": "Kiểu tính",
+     "fieldtype": "Data",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "measurement_profile",
+     "label": "Bộ quy cách",
+     "fieldtype": "Link",
+     "options": "Measurement Profile",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "stock_uom",
+     "label": "ĐVT tồn",
+     "fieldtype": "Link",
+     "options": "UOM",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "min_area_sqm",
+     "label": "Diện tích tính tối thiểu",
+     "fieldtype": "Float",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "label": "Màu / mã sơn",
      "fieldname": "color",
      "fieldtype": "Link",
      "options": "Item Color",
-     "label": "Màu / mã sơn",
-     "depends_on": "eval:doc.inventory_mode != 'Hàng thường'"
+     "depends_on": "eval:doc.inventory_mode != 'Hàng thường'",
+     "surface": "quick"
     },
     {
+     "label": "Rộng (m)",
      "fieldname": "width_m",
      "fieldtype": "Float",
-     "label": "Rộng (m)",
-     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2' || doc.inventory_mode == 'Tấm/Kính'"
+     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2' || doc.inventory_mode == 'Tấm/Kính'",
+     "surface": "quick"
     },
     {
+     "label": "Cao (m)",
      "fieldname": "height_m",
      "fieldtype": "Float",
-     "label": "Cao (m)",
-     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2' || doc.inventory_mode == 'Tấm/Kính'"
+     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2' || doc.inventory_mode == 'Tấm/Kính'",
+     "surface": "quick"
     },
     {
+     "label": "Số bộ",
      "fieldname": "set_count",
      "fieldtype": "Int",
-     "label": "Số bộ",
      "default": 1,
-     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'"
+     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
+     "surface": "quick"
     },
     {
+     "label": "Cách bán",
      "fieldname": "sales_mode",
      "fieldtype": "Select",
      "options": "Trọn bộ\nTách món",
-     "label": "Cách bán",
      "default": "Trọn bộ",
-     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'"
+     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
+     "surface": "quick"
     },
     {
+     "label": "Có bản bướm",
      "fieldname": "has_butterfly_bracket",
      "fieldtype": "Check",
-     "label": "Có bản bướm",
-     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'"
+     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
+     "surface": "internal"
     },
     {
+     "label": "Cao lưới (m)",
      "fieldname": "mesh_height_m",
      "fieldtype": "Float",
-     "label": "Cao lưới (m)",
-     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'"
+     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
+     "surface": "internal"
     },
-    "formula_policy:Link(Cutting Policy)~- Công thức đã áp",
-    "width_basis:Data~- Cơ sở rộng",
-    "cut_width_m:Float~- Rộng cắt lá (m)",
-    "billable_area_sqm:Float~- Diện tích tính tiền (m2)",
     {
+     "fieldname": "formula_policy",
+     "label": "Công thức đã áp",
+     "fieldtype": "Link",
+     "options": "Cutting Policy",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "width_basis",
+     "label": "Cơ sở rộng",
+     "fieldtype": "Data",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "cut_width_m",
+     "label": "Rộng cắt lá (m)",
+     "fieldtype": "Float",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "billable_area_sqm",
+     "label": "Diện tích tính tiền (m2)",
+     "fieldtype": "Float",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "label": "Loại cửa",
      "fieldname": "door_type",
      "fieldtype": "Select",
      "options": "Cửa Đức\nCửa Úc\nCửa Lưới\nCửa Đài Loan\nCửa Siêu Trường\nCửa tấm liền Úc",
-     "label": "Loại cửa",
      "read_only": true,
-     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'"
+     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
+     "surface": "internal"
     },
     {
+     "label": "Biến thể chia lá",
      "fieldname": "leaf_variant",
      "fieldtype": "Select",
      "options": "motor trong\nkéo tay\nmotor ngoài\nmotor ngoài tự dừng",
-     "label": "Biến thể chia lá",
-     "depends_on": "eval:doc.door_type == 'Cửa Úc'"
+     "depends_on": "eval:doc.door_type == 'Cửa Úc'",
+     "surface": "expanded"
     },
     {
+     "label": "Trừ cao chia lá (m)",
      "fieldname": "leaf_height_deduction_m",
      "fieldtype": "Float",
-     "label": "Trừ cao chia lá (m)",
      "read_only": true,
-     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'"
+     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
+     "surface": "internal"
     },
     {
+     "label": "Ước số chia lá (m)",
      "fieldname": "leaf_divisor_m",
      "fieldtype": "Float",
-     "label": "Ước số chia lá (m)",
      "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
-     "description": "Mặc định lấy từ Item hoặc Công thức cửa; chỉ nhập khi bộ cửa dùng bản lá riêng."
+     "description": "Mặc định lấy từ Item hoặc Công thức cửa; chỉ nhập khi bộ cửa dùng bản lá riêng.",
+     "surface": "internal"
     },
     {
+     "label": "Cách làm tròn lá",
      "fieldname": "leaf_rounding",
      "fieldtype": "Data",
-     "label": "Cách làm tròn lá",
-     "read_only": true,
-     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'"
-    },
-    {
-     "fieldname": "leaf_count",
-     "fieldtype": "Float",
-     "label": "Tổng số lá",
-     "read_only": true,
-     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'"
-    },
-    {
-     "fieldname": "single_layer_leaf_count",
-     "fieldtype": "Float",
-     "label": "Lá một lớp",
-     "depends_on": "eval:doc.door_type == 'Cửa tấm liền Úc'"
-    },
-    {
-     "fieldname": "double_layer_leaf_count",
-     "fieldtype": "Float",
-     "label": "Lá hai lớp",
-     "read_only": true,
-     "depends_on": "eval:doc.door_type == 'Cửa tấm liền Úc'"
-    },
-    {
-     "fieldname": "estimated_weight_kg",
-     "fieldtype": "Float",
-     "label": "Kg dự toán",
-     "read_only": true,
-     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'"
-    },
-    {
-     "fieldname": "estimated_minutes",
-     "fieldtype": "Float",
-     "label": "Phút sản xuất",
-     "read_only": true,
-     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'"
-    },
-    {
-     "fieldname": "formula_version",
-     "fieldtype": "Data",
-     "label": "Phiên bản công thức",
-     "read_only": true,
-     "hidden": true
-    },
-    {
-     "fieldname": "formula_explanation",
-     "fieldtype": "Small Text",
-     "label": "Giải thích công thức",
-     "read_only": true,
-     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'"
-    },
-    {
-     "fieldname": "paint_required",
-     "fieldtype": "Check",
-     "label": "Dự kiến cần sơn",
      "read_only": true,
      "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
-     "description": "Kết luận cuối chỉ có sau khi chọn lô cắt; lô THÔ sẽ tự sinh việc sơn."
+     "surface": "internal"
     },
     {
+     "label": "Tổng số lá",
+     "fieldname": "leaf_count",
+     "fieldtype": "Float",
+     "read_only": true,
+     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
+     "surface": "internal"
+    },
+    {
+     "label": "Lá một lớp",
+     "fieldname": "single_layer_leaf_count",
+     "fieldtype": "Float",
+     "depends_on": "eval:doc.door_type == 'Cửa tấm liền Úc'",
+     "surface": "expanded"
+    },
+    {
+     "label": "Lá hai lớp",
+     "fieldname": "double_layer_leaf_count",
+     "fieldtype": "Float",
+     "read_only": true,
+     "depends_on": "eval:doc.door_type == 'Cửa tấm liền Úc'",
+     "surface": "expanded"
+    },
+    {
+     "label": "Kg dự toán",
+     "fieldname": "estimated_weight_kg",
+     "fieldtype": "Float",
+     "read_only": true,
+     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
+     "surface": "internal"
+    },
+    {
+     "label": "Phút sản xuất",
+     "fieldname": "estimated_minutes",
+     "fieldtype": "Float",
+     "read_only": true,
+     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
+     "surface": "internal"
+    },
+    {
+     "label": "Phiên bản công thức",
+     "fieldname": "formula_version",
+     "fieldtype": "Data",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "label": "Giải thích công thức",
+     "fieldname": "formula_explanation",
+     "fieldtype": "Small Text",
+     "read_only": true,
+     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
+     "surface": "internal"
+    },
+    {
+     "label": "Dự kiến cần sơn",
+     "fieldname": "paint_required",
+     "fieldtype": "Check",
+     "read_only": true,
+     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
+     "description": "Kết luận cuối chỉ có sau khi chọn lô cắt; lô THÔ sẽ tự sinh việc sơn.",
+     "surface": "internal"
+    },
+    {
+     "label": "Dài một cây/đoạn (m)",
      "fieldname": "length_m",
      "fieldtype": "Float",
-     "label": "Dài một cây/đoạn (m)",
      "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá' && (doc.uom == 'Mét' || doc.uom == 'M' || doc.uom == 'm' || doc.uom == 'met' || doc.uom == 'meter' || doc.uom == 'metre')",
      "mandatory_depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá' && (doc.uom == 'Mét' || doc.uom == 'M' || doc.uom == 'm' || doc.uom == 'met' || doc.uom == 'meter' || doc.uom == 'metre')",
-     "description": "Chiều dài của một cây/đoạn, không phải tổng số mét."
+     "description": "Chiều dài của một cây/đoạn, không phải tổng số mét.",
+     "surface": "quick"
     },
     {
+     "label": "Số cây/đoạn",
      "fieldname": "qty_bar",
      "fieldtype": "Float",
-     "label": "Số cây/đoạn",
      "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá' && (doc.uom == 'Mét' || doc.uom == 'M' || doc.uom == 'm' || doc.uom == 'met' || doc.uom == 'meter' || doc.uom == 'metre' || doc.uom == 'Cây' || doc.uom == 'cay' || doc.uom == 'Lá' || doc.uom == 'la' || doc.uom == 'Đoạn' || doc.uom == 'doan')",
      "mandatory_depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá' && (doc.uom == 'Mét' || doc.uom == 'M' || doc.uom == 'm' || doc.uom == 'met' || doc.uom == 'meter' || doc.uom == 'metre' || doc.uom == 'Cây' || doc.uom == 'cay' || doc.uom == 'Lá' || doc.uom == 'la' || doc.uom == 'Đoạn' || doc.uom == 'doan')",
-     "description": "Bán theo Mét: hệ thống lấy chiều dài × số cây. Bán theo Cây/Lá: hệ thống lấy chính số này."
+     "description": "Bán theo Mét: hệ thống lấy chiều dài × số cây. Bán theo Cây/Lá: hệ thống lấy chính số này.",
+     "surface": "quick"
     },
-    "uom:Link(UOM)! ĐVT bán",
     {
+     "fieldname": "uom",
+     "label": "ĐVT bán",
+     "fieldtype": "Link",
+     "options": "UOM",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "label": "SL tính tiền",
      "fieldname": "qty",
      "fieldtype": "Float",
-     "label": "SL tính tiền",
      "required": true,
      "read_only_depends_on": "eval:(doc.inventory_mode == 'Thành phẩm theo m2' && (doc.uom == 'm2' || doc.uom == 'M2' || doc.uom == 'm²' || doc.uom == 'Bộ')) || (doc.inventory_mode == 'Nhôm cây/lá' && (doc.uom == 'Mét' || doc.uom == 'M' || doc.uom == 'Cây' || doc.uom == 'Lá'))",
-     "description": "Ô máy tính theo quy cách của dòng: cửa = m² đã chốt × số bộ; ray/trục = dài × số cây; phụ kiện = số lượng theo ĐVT bán."
+     "description": "Ô máy tính theo quy cách của dòng: cửa = m² đã chốt × số bộ; ray/trục = dài × số cây; phụ kiện = số lượng theo ĐVT bán.",
+     "surface": "quick"
     },
-    "conversion_factor:Float~- Hệ số về ĐVT tồn",
-    "stock_qty:Float~- SL quy đổi tồn",
-    "available_qty:Float~- Còn theo ĐVT bán",
-    "available_stock_qty:Float~- Còn theo ĐVT tồn",
-    "available_stock_uom:Link(UOM)~- ĐVT tồn khả dụng",
-    "availability_status:Data~- Tồn và giá",
-    "rate:Currency! Đơn giá",
-    "amount:Currency~ Thành tiền",
-    "motor_model:Link(Item) Mô tơ kèm theo",
-    "accessories:Small Text Phụ kiện kèm theo",
-    "install_note:Small Text Ghi chú lắp đặt",
-    "warehouse:Link(Warehouse) Kho xuất",
-    "delivered_qty:Float~ Đã giao"
+    {
+     "fieldname": "conversion_factor",
+     "label": "Hệ số về ĐVT tồn",
+     "fieldtype": "Float",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "stock_qty",
+     "label": "SL quy đổi tồn",
+     "fieldtype": "Float",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "available_qty",
+     "label": "Còn theo ĐVT bán",
+     "fieldtype": "Float",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "available_stock_qty",
+     "label": "Còn theo ĐVT tồn",
+     "fieldtype": "Float",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "available_stock_uom",
+     "label": "ĐVT tồn khả dụng",
+     "fieldtype": "Link",
+     "options": "UOM",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "availability_status",
+     "label": "Tồn và giá",
+     "fieldtype": "Data",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "rate",
+     "label": "Đơn giá",
+     "fieldtype": "Currency",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "amount",
+     "label": "Thành tiền",
+     "fieldtype": "Currency",
+     "read_only": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "motor_model",
+     "label": "Mô tơ kèm theo",
+     "fieldtype": "Link",
+     "options": "Item",
+     "surface": "internal"
+    },
+    {
+     "fieldname": "accessories",
+     "label": "Phụ kiện kèm theo",
+     "fieldtype": "Small Text",
+     "surface": "internal"
+    },
+    {
+     "fieldname": "install_note",
+     "label": "Ghi chú lắp đặt",
+     "fieldtype": "Small Text",
+     "surface": "internal"
+    },
+    {
+     "fieldname": "warehouse",
+     "label": "Kho xuất",
+     "fieldtype": "Link",
+     "options": "Warehouse",
+     "surface": "internal"
+    },
+    {
+     "fieldname": "delivered_qty",
+     "label": "Đã giao",
+     "fieldtype": "Float",
+     "read_only": true,
+     "surface": "internal"
+    }
    ],
    "permissions": {
     "Chủ xưởng": "rwc",
     "Kinh doanh": "rwc",
     "Thủ kho": "r",
     "Kế toán": "r"
+   },
+   "form": {
+    "fields": [
+     "item_code",
+     "color",
+     "sales_mode",
+     "height_m",
+     "width_m",
+     "set_count",
+     "leaf_variant",
+     "single_layer_leaf_count",
+     "double_layer_leaf_count",
+     "cut_width_m",
+     "billable_area_sqm",
+     "formula_policy",
+     "formula_version",
+     "length_m",
+     "qty_bar",
+     "uom",
+     "qty",
+     "rate",
+     "amount"
+    ]
+   },
+   "quickEntry": {
+    "fields": [
+     "item_code",
+     "color",
+     "sales_mode",
+     "height_m",
+     "width_m",
+     "set_count",
+     "length_m",
+     "qty_bar",
+     "uom",
+     "qty",
+     "rate",
+     "amount"
+    ]
    }
   },
   {
@@ -3080,114 +3745,278 @@
    ],
    "fields": [
     {
+     "label": "Mã hàng",
      "//": "Ô chọn chỉ hiện mặt hàng ĐƯỢC bán. Danh mục có gần 300 mã gồm cả dịch vụ, phụ thu và thành phẩm tự sản xuất; đưa hết vào ô chọn của phiếu bán thì người nhập phải tự nhớ mã nào hợp lệ, và chọn nhầm chỉ lộ ra ở bước ghi sổ.",
      "fieldname": "item_code",
      "fieldtype": "Link",
      "options": "Item",
-     "label": "Mã hàng",
      "required": true,
-     "link_filters": "{\"is_sales_item\":1,\"disabled\":0}"
+     "link_filters": "{\"is_sales_item\":1,\"disabled\":0}",
+     "surface": "quick"
     },
-    "item_name:Data~- Tên hàng",
     {
-     "fieldname": "sales_order_row_id",
+     "fieldname": "item_name",
+     "label": "Tên hàng",
      "fieldtype": "Data",
-     "label": "Dòng đơn hàng nguồn",
      "read_only": true,
      "hidden": true,
-     "description": "Khóa giao hàng theo đúng dòng, không cộng nhầm hai dòng cùng mã nhưng khác màu/kích thước."
+     "surface": "internal"
     },
-    "inventory_mode:Data~- Kiểu tính",
-    "measurement_profile:Link(Measurement Profile)~- Bộ quy cách",
-    "stock_uom:Link(UOM)~- ĐVT tồn",
-    "min_area_sqm:Float~- Diện tích tính tối thiểu",
     {
+     "label": "Dòng đơn hàng nguồn",
+     "fieldname": "sales_order_row_id",
+     "fieldtype": "Data",
+     "read_only": true,
+     "hidden": true,
+     "description": "Khóa giao hàng theo đúng dòng, không cộng nhầm hai dòng cùng mã nhưng khác màu/kích thước.",
+     "surface": "internal"
+    },
+    {
+     "fieldname": "inventory_mode",
+     "label": "Kiểu tính",
+     "fieldtype": "Data",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "measurement_profile",
+     "label": "Bộ quy cách",
+     "fieldtype": "Link",
+     "options": "Measurement Profile",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "stock_uom",
+     "label": "ĐVT tồn",
+     "fieldtype": "Link",
+     "options": "UOM",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "min_area_sqm",
+     "label": "Diện tích tính tối thiểu",
+     "fieldtype": "Float",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "label": "Màu / mã sơn",
      "fieldname": "color",
      "fieldtype": "Link",
      "options": "Item Color",
-     "label": "Màu / mã sơn",
-     "depends_on": "eval:doc.inventory_mode != 'Hàng thường'"
+     "depends_on": "eval:doc.inventory_mode != 'Hàng thường'",
+     "surface": "expanded"
     },
     {
+     "label": "Rộng (m)",
      "fieldname": "width_m",
      "fieldtype": "Float",
-     "label": "Rộng (m)",
      "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2' || doc.inventory_mode == 'Tấm/Kính'",
-     "mandatory_depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'"
+     "mandatory_depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
+     "surface": "expanded"
     },
     {
+     "label": "Cao (m)",
      "fieldname": "height_m",
      "fieldtype": "Float",
-     "label": "Cao (m)",
      "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2' || doc.inventory_mode == 'Tấm/Kính'",
-     "mandatory_depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'"
+     "mandatory_depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
+     "surface": "expanded"
     },
     {
+     "label": "Số bộ",
      "fieldname": "set_count",
      "fieldtype": "Int",
-     "label": "Số bộ",
      "default": 1,
      "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
-     "mandatory_depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'"
+     "mandatory_depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
+     "surface": "expanded"
     },
     {
+     "label": "Cách bán",
      "fieldname": "sales_mode",
      "fieldtype": "Select",
      "options": "Trọn bộ\nTách món",
-     "label": "Cách bán",
      "default": "Trọn bộ",
-     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'"
+     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
+     "surface": "expanded"
     },
     {
+     "label": "Có bản bướm",
      "fieldname": "has_butterfly_bracket",
      "fieldtype": "Check",
-     "label": "Có bản bướm",
-     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'"
+     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
+     "surface": "expanded"
     },
     {
+     "label": "Cao lưới (m)",
      "fieldname": "mesh_height_m",
      "fieldtype": "Float",
-     "label": "Cao lưới (m)",
-     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'"
+     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
+     "surface": "expanded"
     },
-    "formula_policy:Link(Cutting Policy)~- Công thức đã áp",
-    "width_basis:Data~- Cơ sở rộng",
-    "cut_width_m:Float~- Rộng cắt lá (m)",
-    "billable_area_sqm:Float~- Diện tích tính tiền (m2)",
     {
+     "fieldname": "formula_policy",
+     "label": "Công thức đã áp",
+     "fieldtype": "Link",
+     "options": "Cutting Policy",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "width_basis",
+     "label": "Cơ sở rộng",
+     "fieldtype": "Data",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "cut_width_m",
+     "label": "Rộng cắt lá (m)",
+     "fieldtype": "Float",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "billable_area_sqm",
+     "label": "Diện tích tính tiền (m2)",
+     "fieldtype": "Float",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "label": "Dài một cây (m)",
      "fieldname": "length_m",
      "fieldtype": "Float",
-     "label": "Dài một cây (m)",
-     "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'"
+     "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'",
+     "surface": "expanded"
     },
     {
+     "label": "Số cây/lá",
      "fieldname": "qty_bar",
      "fieldtype": "Float",
-     "label": "Số cây/lá",
-     "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'"
+     "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'",
+     "surface": "expanded"
     },
-    "uom:Link(UOM)! ĐVT giao",
     {
+     "fieldname": "uom",
+     "label": "ĐVT giao",
+     "fieldtype": "Link",
+     "options": "UOM",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "label": "SL giao theo ĐVT",
      "fieldname": "qty",
      "fieldtype": "Float",
-     "label": "SL giao theo ĐVT",
      "required": true,
-     "read_only_depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2' && (doc.uom == 'm2' || doc.uom == 'M2' || doc.uom == 'm²')"
+     "read_only_depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2' && (doc.uom == 'm2' || doc.uom == 'M2' || doc.uom == 'm²')",
+     "surface": "quick"
     },
-    "conversion_factor:Float~- Hệ số về ĐVT tồn",
-    "stock_qty:Float~- SL thực xuất kho",
-    "warehouse:Link(Warehouse)! Kho xuất",
-    "serial_and_batch_bundle:Link(Serial and Batch Bundle) Lô xuất (bundle Outward)",
-    "weight_kg:Float Khối lượng xuất (kg)",
-    "rate:Currency Đơn giá bán",
-    "valuation_rate:Currency Giá vốn",
-    "amount:Currency~ Thành tiền"
+    {
+     "fieldname": "conversion_factor",
+     "label": "Hệ số về ĐVT tồn",
+     "fieldtype": "Float",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "stock_qty",
+     "label": "SL thực xuất kho",
+     "fieldtype": "Float",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "warehouse",
+     "label": "Kho xuất",
+     "fieldtype": "Link",
+     "options": "Warehouse",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "serial_and_batch_bundle",
+     "label": "Lô xuất (bundle Outward)",
+     "fieldtype": "Link",
+     "options": "Serial and Batch Bundle",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "weight_kg",
+     "label": "Khối lượng xuất (kg)",
+     "fieldtype": "Float",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "rate",
+     "label": "Đơn giá bán",
+     "fieldtype": "Currency",
+     "surface": "quick"
+    },
+    {
+     "fieldname": "valuation_rate",
+     "label": "Giá vốn",
+     "fieldtype": "Currency",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "amount",
+     "label": "Thành tiền",
+     "fieldtype": "Currency",
+     "read_only": true,
+     "surface": "expanded"
+    }
    ],
    "permissions": {
     "Chủ xưởng": "rwc",
     "Thủ kho": "rwc",
     "Kinh doanh": "r",
     "Kế toán": "r"
+   },
+   "form": {
+    "fields": [
+     "item_code",
+     "color",
+     "width_m",
+     "height_m",
+     "set_count",
+     "sales_mode",
+     "has_butterfly_bracket",
+     "mesh_height_m",
+     "length_m",
+     "qty_bar",
+     "uom",
+     "qty",
+     "warehouse",
+     "serial_and_batch_bundle",
+     "weight_kg",
+     "rate",
+     "valuation_rate",
+     "amount"
+    ]
+   },
+   "quickEntry": {
+    "fields": [
+     "item_code",
+     "uom",
+     "qty",
+     "warehouse",
+     "rate"
+    ]
    }
   },
   {
@@ -3300,20 +4129,86 @@
     "target_warehouse"
    ],
    "fields": [
-    "item_code:Link(Item)! Mã vật tư",
-    "qty:Float! SL",
-    "source_warehouse:Link(Warehouse) Kho xuất",
-    "target_warehouse:Link(Warehouse) Kho nhập",
-    "serial_and_batch_bundle:Link(Serial and Batch Bundle) Lô (bundle)",
-    "weight_kg:Float Khối lượng (kg)",
-    "valuation_rate:Currency Đơn giá vốn",
-    "note:Data Ghi chú dòng"
+    {
+     "fieldname": "item_code",
+     "label": "Mã vật tư",
+     "fieldtype": "Link",
+     "options": "Item",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "qty",
+     "label": "SL",
+     "fieldtype": "Float",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "source_warehouse",
+     "label": "Kho xuất",
+     "fieldtype": "Link",
+     "options": "Warehouse",
+     "surface": "quick"
+    },
+    {
+     "fieldname": "target_warehouse",
+     "label": "Kho nhập",
+     "fieldtype": "Link",
+     "options": "Warehouse",
+     "surface": "quick"
+    },
+    {
+     "fieldname": "serial_and_batch_bundle",
+     "label": "Lô (bundle)",
+     "fieldtype": "Link",
+     "options": "Serial and Batch Bundle",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "weight_kg",
+     "label": "Khối lượng (kg)",
+     "fieldtype": "Float",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "valuation_rate",
+     "label": "Đơn giá vốn",
+     "fieldtype": "Currency",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "note",
+     "label": "Ghi chú dòng",
+     "fieldtype": "Data",
+     "surface": "expanded"
+    }
    ],
    "permissions": {
     "Chủ xưởng": "rwc",
     "Thủ kho": "rwc",
     "Sản xuất": "rwc",
     "Kế toán": "r"
+   },
+   "form": {
+    "fields": [
+     "item_code",
+     "qty",
+     "source_warehouse",
+     "target_warehouse",
+     "serial_and_batch_bundle",
+     "weight_kg",
+     "valuation_rate",
+     "note"
+    ]
+   },
+   "quickEntry": {
+    "fields": [
+     "item_code",
+     "qty",
+     "source_warehouse",
+     "target_warehouse"
+    ]
    }
   },
   {
@@ -3376,41 +4271,211 @@
    ],
    "fields": [
     {
+     "label": "Mã hàng",
      "//": "Ô chọn chỉ hiện mặt hàng ĐƯỢC bán. Danh mục có gần 300 mã gồm cả dịch vụ, phụ thu và thành phẩm tự sản xuất; đưa hết vào ô chọn của phiếu bán thì người nhập phải tự nhớ mã nào hợp lệ, và chọn nhầm chỉ lộ ra ở bước ghi sổ.",
      "fieldname": "item_code",
      "fieldtype": "Link",
      "options": "Item",
-     "label": "Mã hàng",
      "required": true,
-     "link_filters": "{\"is_sales_item\":1,\"disabled\":0}"
+     "link_filters": "{\"is_sales_item\":1,\"disabled\":0}",
+     "surface": "quick"
     },
-    "item_name:Data~- Tên hàng",
-    "inventory_mode:Data~- Kiểu tính",
-    "measurement_profile:Link(Measurement Profile)~- Bộ quy cách",
-    "stock_uom:Link(UOM)~- ĐVT tồn",
-    "min_area_sqm:Float~- Diện tích tính tối thiểu",
-    "color:Link(Item Color) Màu / mã sơn",
-    "width_m:Float Rộng (m)",
-    "height_m:Float Cao (m)",
-    "set_count:Int=(1) Số bộ",
-    "sales_mode:Select(Trọn bộ,Tách món)=(Trọn bộ) Cách bán",
-    "has_butterfly_bracket:Check Có bản bướm",
-    "mesh_height_m:Float Cao lưới (m)",
-    "formula_policy:Link(Cutting Policy)~- Công thức đã áp",
-    "width_basis:Data~- Cơ sở rộng",
-    "cut_width_m:Float~- Rộng cắt lá (m)",
-    "billable_area_sqm:Float~- Diện tích tính tiền (m2)",
-    "uom:Link(UOM)! ĐVT bán",
-    "qty:Float! SL tính tiền",
-    "conversion_factor:Float~- Hệ số về ĐVT tồn",
-    "stock_qty:Float~- SL quy đổi tồn",
-    "rate:Currency! Đơn giá",
-    "amount:Currency~ Thành tiền"
+    {
+     "fieldname": "item_name",
+     "label": "Tên hàng",
+     "fieldtype": "Data",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "inventory_mode",
+     "label": "Kiểu tính",
+     "fieldtype": "Data",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "measurement_profile",
+     "label": "Bộ quy cách",
+     "fieldtype": "Link",
+     "options": "Measurement Profile",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "stock_uom",
+     "label": "ĐVT tồn",
+     "fieldtype": "Link",
+     "options": "UOM",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "min_area_sqm",
+     "label": "Diện tích tính tối thiểu",
+     "fieldtype": "Float",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "color",
+     "label": "Màu / mã sơn",
+     "fieldtype": "Link",
+     "options": "Item Color",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "width_m",
+     "label": "Rộng (m)",
+     "fieldtype": "Float",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "height_m",
+     "label": "Cao (m)",
+     "fieldtype": "Float",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "set_count",
+     "label": "Số bộ",
+     "fieldtype": "Int",
+     "default": "1",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "sales_mode",
+     "label": "Cách bán",
+     "fieldtype": "Select",
+     "options": "Trọn bộ\nTách món",
+     "default": "Trọn bộ",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "has_butterfly_bracket",
+     "label": "Có bản bướm",
+     "fieldtype": "Check",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "mesh_height_m",
+     "label": "Cao lưới (m)",
+     "fieldtype": "Float",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "formula_policy",
+     "label": "Công thức đã áp",
+     "fieldtype": "Link",
+     "options": "Cutting Policy",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "width_basis",
+     "label": "Cơ sở rộng",
+     "fieldtype": "Data",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "cut_width_m",
+     "label": "Rộng cắt lá (m)",
+     "fieldtype": "Float",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "billable_area_sqm",
+     "label": "Diện tích tính tiền (m2)",
+     "fieldtype": "Float",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "uom",
+     "label": "ĐVT bán",
+     "fieldtype": "Link",
+     "options": "UOM",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "qty",
+     "label": "SL tính tiền",
+     "fieldtype": "Float",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "conversion_factor",
+     "label": "Hệ số về ĐVT tồn",
+     "fieldtype": "Float",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "stock_qty",
+     "label": "SL quy đổi tồn",
+     "fieldtype": "Float",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "rate",
+     "label": "Đơn giá",
+     "fieldtype": "Currency",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "amount",
+     "label": "Thành tiền",
+     "fieldtype": "Currency",
+     "read_only": true,
+     "surface": "quick"
+    }
    ],
    "permissions": {
     "Chủ xưởng": "rwc",
     "Kế toán": "rwc",
     "Kinh doanh": "r"
+   },
+   "form": {
+    "fields": [
+     "item_code",
+     "color",
+     "width_m",
+     "height_m",
+     "set_count",
+     "sales_mode",
+     "has_butterfly_bracket",
+     "mesh_height_m",
+     "uom",
+     "qty",
+     "rate",
+     "amount"
+    ]
+   },
+   "quickEntry": {
+    "fields": [
+     "item_code",
+     "uom",
+     "qty",
+     "rate",
+     "amount"
+    ]
    }
   },
   {
@@ -3509,9 +4574,23 @@
     "source_warehouse"
    ],
    "fields": [
-    "item_code:Link(Item)! Vật tư",
-    "qty:Float! SL",
     {
+     "fieldname": "item_code",
+     "label": "Vật tư",
+     "fieldtype": "Link",
+     "options": "Item",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "qty",
+     "label": "SL",
+     "fieldtype": "Float",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "label": "ĐVT định mức",
      "//": "ĐƠN VỊ của con số định mức — không phải đơn vị tồn của vật tư.",
      "//vi-du": [
       "Bù lon khai 0,096 KG/CON: tồn đếm theo CON, còn định mức tính theo KG.",
@@ -3519,9 +4598,10 @@
      ],
      "fieldname": "uom",
      "fieldtype": "Data",
-     "label": "ĐVT định mức"
+     "surface": "expanded"
     },
     {
+     "label": "Nhân theo",
      "//": "NHÂN THEO GÌ — thứ biến định mức từ con số chết thành công thức.",
      "//vi-sao": [
       "Sheet ĐM của xưởng có KG/M NGANG, KG/M CAO, KG/M2 — tức lượng vật tư phụ thuộc kích",
@@ -3533,24 +4613,53 @@
      "fieldname": "qty_basis",
      "fieldtype": "Select",
      "options": "Cố định\nTheo chiều cao\nTheo chiều rộng\nTheo diện tích\nTheo số lá",
-     "label": "Nhân theo",
-     "default": "Cố định"
+     "default": "Cố định",
+     "surface": "expanded"
     },
     {
+     "label": "Ghi chú nguồn",
      "fieldname": "source_note",
      "fieldtype": "Data",
-     "label": "Ghi chú nguồn",
      "read_only": true,
-     "hidden": true
+     "hidden": true,
+     "surface": "internal"
     },
-    "source_warehouse:Link(Warehouse) Kho xuất vật tư",
-    "note:Data Ghi chú"
+    {
+     "fieldname": "source_warehouse",
+     "label": "Kho xuất vật tư",
+     "fieldtype": "Link",
+     "options": "Warehouse",
+     "surface": "quick"
+    },
+    {
+     "fieldname": "note",
+     "label": "Ghi chú",
+     "fieldtype": "Data",
+     "surface": "expanded"
+    }
    ],
    "permissions": {
     "Chủ xưởng": "rwc",
     "Sản xuất": "rwc",
     "Thủ kho": "r",
     "Kế toán": "r"
+   },
+   "form": {
+    "fields": [
+     "item_code",
+     "qty",
+     "uom",
+     "qty_basis",
+     "source_warehouse",
+     "note"
+    ]
+   },
+   "quickEntry": {
+    "fields": [
+     "item_code",
+     "qty",
+     "source_warehouse"
+    ]
    }
   },
   {
@@ -3627,15 +4736,67 @@
     "schedule_date"
    ],
    "fields": [
-    "item_code:Link(Item)! Vật tư cần",
-    "color:Link(Item Color) Màu cần",
-    "qty:Float! SL",
-    "uom:Link(UOM) ĐVT",
-    "conversion_factor:Float Hệ số quy đổi",
-    "stock_qty:Float~ Quy ra đơn vị tồn",
-    "warehouse:Link(Warehouse) Cần về kho",
-    "schedule_date:Date Cần trước ngày",
-    "note:Data Lý do / dùng cho việc gì"
+    {
+     "fieldname": "item_code",
+     "label": "Vật tư cần",
+     "fieldtype": "Link",
+     "options": "Item",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "color",
+     "label": "Màu cần",
+     "fieldtype": "Link",
+     "options": "Item Color",
+     "surface": "quick"
+    },
+    {
+     "fieldname": "qty",
+     "label": "SL",
+     "fieldtype": "Float",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "uom",
+     "label": "ĐVT",
+     "fieldtype": "Link",
+     "options": "UOM",
+     "surface": "quick"
+    },
+    {
+     "fieldname": "conversion_factor",
+     "label": "Hệ số quy đổi",
+     "fieldtype": "Float",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "stock_qty",
+     "label": "Quy ra đơn vị tồn",
+     "fieldtype": "Float",
+     "read_only": true,
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "warehouse",
+     "label": "Cần về kho",
+     "fieldtype": "Link",
+     "options": "Warehouse",
+     "surface": "quick"
+    },
+    {
+     "fieldname": "schedule_date",
+     "label": "Cần trước ngày",
+     "fieldtype": "Date",
+     "surface": "quick"
+    },
+    {
+     "fieldname": "note",
+     "label": "Lý do / dùng cho việc gì",
+     "fieldtype": "Data",
+     "surface": "expanded"
+    }
    ],
    "permissions": {
     "Chủ xưởng": "rwc",
@@ -3643,6 +4804,29 @@
     "Thủ kho": "rwc",
     "Kế toán": "r",
     "Kinh doanh": "r"
+   },
+   "form": {
+    "fields": [
+     "item_code",
+     "color",
+     "qty",
+     "uom",
+     "conversion_factor",
+     "stock_qty",
+     "warehouse",
+     "schedule_date",
+     "note"
+    ]
+   },
+   "quickEntry": {
+    "fields": [
+     "item_code",
+     "color",
+     "qty",
+     "uom",
+     "warehouse",
+     "schedule_date"
+    ]
    }
   },
   {
@@ -3703,15 +4887,45 @@
     "contact"
    ],
    "fields": [
-    "supplier:Link(Supplier)! Nhà cung cấp",
-    "contact:Data Người nhận yêu cầu",
-    "note:Data Ghi chú"
+    {
+     "fieldname": "supplier",
+     "label": "Nhà cung cấp",
+     "fieldtype": "Link",
+     "options": "Supplier",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "contact",
+     "label": "Người nhận yêu cầu",
+     "fieldtype": "Data",
+     "surface": "quick"
+    },
+    {
+     "fieldname": "note",
+     "label": "Ghi chú",
+     "fieldtype": "Data",
+     "surface": "expanded"
+    }
    ],
    "permissions": {
     "Chủ xưởng": "rwc",
     "Kế toán": "rwc",
     "Thủ kho": "r",
     "Kinh doanh": "r"
+   },
+   "form": {
+    "fields": [
+     "supplier",
+     "contact",
+     "note"
+    ]
+   },
+   "quickEntry": {
+    "fields": [
+     "supplier",
+     "contact"
+    ]
    }
   },
   {
@@ -3770,98 +4984,214 @@
     "amount"
    ],
    "fields": [
-    "item_code:Link(Item)! Mã hàng",
-    "item_name:Data~- Tên hàng",
     {
-     "fieldname": "inventory_mode",
-     "fieldtype": "Data",
-     "label": "Kiểu quản lý tồn",
-     "read_only": true,
-     "hidden": true
+     "fieldname": "item_code",
+     "label": "Mã hàng",
+     "fieldtype": "Link",
+     "options": "Item",
+     "required": true,
+     "surface": "quick"
     },
     {
+     "fieldname": "item_name",
+     "label": "Tên hàng",
+     "fieldtype": "Data",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "label": "Kiểu quản lý tồn",
+     "fieldname": "inventory_mode",
+     "fieldtype": "Data",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "label": "Bộ quy cách",
      "fieldname": "measurement_profile",
      "fieldtype": "Link",
      "options": "Measurement Profile",
-     "label": "Bộ quy cách",
      "read_only": true,
-     "hidden": true
+     "hidden": true,
+     "surface": "internal"
     },
-    "stock_uom:Link(UOM)~- ĐVT tồn",
-    "min_area_sqm:Float~- Diện tích tính tối thiểu",
     {
+     "fieldname": "stock_uom",
+     "label": "ĐVT tồn",
+     "fieldtype": "Link",
+     "options": "UOM",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "min_area_sqm",
+     "label": "Diện tích tính tối thiểu",
+     "fieldtype": "Float",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "label": "Màu",
      "fieldname": "color",
      "fieldtype": "Link",
      "options": "Item Color",
-     "label": "Màu",
-     "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'"
+     "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'",
+     "surface": "quick"
     },
     {
+     "label": "KT (m)",
      "fieldname": "length_m",
      "fieldtype": "Float",
-     "label": "KT (m)",
      "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'",
      "mandatory_depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'",
-     "non_negative": true
+     "non_negative": true,
+     "surface": "expanded"
     },
-    "qty:Float! SL",
     {
+     "fieldname": "qty",
+     "label": "SL",
+     "fieldtype": "Float",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "label": "SL (bó)",
      "fieldname": "qty_bundle",
      "fieldtype": "Float",
-     "label": "SL (bó)",
      "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'",
-     "non_negative": true
+     "non_negative": true,
+     "surface": "expanded"
     },
     {
+     "label": "SL (cây/lá)",
      "fieldname": "qty_bar",
      "fieldtype": "Float",
-     "label": "SL (cây/lá)",
      "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'",
      "mandatory_depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'",
-     "non_negative": true
+     "non_negative": true,
+     "surface": "expanded"
     },
     {
+     "label": "Tổng mét",
      "fieldname": "total_length_m",
      "fieldtype": "Float",
-     "label": "Tổng mét",
      "read_only": true,
-     "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'"
+     "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'",
+     "surface": "expanded"
     },
     {
+     "label": "Tổng kg thực cân",
      "fieldname": "actual_weight_kg",
      "fieldtype": "Float",
-     "label": "Tổng kg thực cân",
      "depends_on": "eval:doc.uom != 'Kg' && doc.uom != 'KG' && doc.uom != 'kg'",
      "non_negative": true,
-     "description": "Chỉ nhập khi ĐVT giao dịch không phải Kg nhưng vẫn cần đối chiếu trọng lượng bình quân. Không thay đổi số lượng mua hay tồn kho."
+     "description": "Chỉ nhập khi ĐVT giao dịch không phải Kg nhưng vẫn cần đối chiếu trọng lượng bình quân. Không thay đổi số lượng mua hay tồn kho.",
+     "surface": "expanded"
     },
     {
+     "label": "TL trung bình (kg/m · kg/cái)",
      "fieldname": "actual_kg_per_m",
      "fieldtype": "Float",
-     "label": "TL trung bình (kg/m · kg/cái)",
      "read_only": true,
      "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá' || doc.actual_weight_kg > 0",
-     "description": "ĐVT Kg: lấy SL làm tổng kg. ĐVT khác: chỉ tính khi có Tổng kg thực cân; tuyệt đối không coi số Bộ/Cái là kg. Chia cho tổng mét, số cây hoặc số lượng giao dịch. Số để đối chiếu, không vào sổ."
+     "description": "ĐVT Kg: lấy SL làm tổng kg. ĐVT khác: chỉ tính khi có Tổng kg thực cân; tuyệt đối không coi số Bộ/Cái là kg. Chia cho tổng mét, số cây hoặc số lượng giao dịch. Số để đối chiếu, không vào sổ.",
+     "surface": "expanded"
     },
     {
+     "label": "Số SO NCC",
      "fieldname": "so_no",
      "fieldtype": "Data",
-     "label": "Số SO NCC",
-     "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'"
+     "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'",
+     "surface": "expanded"
     },
-    "uom:Link(UOM) ĐVT",
-    "conversion_factor:Float~- Hệ số quy đổi",
-    "stock_qty:Float~- Quy ra đơn vị tồn",
-    "rate:Currency! Đơn giá NCC chào",
-    "amount:Currency~ Thành tiền",
-    "lead_time_days:Int Số ngày giao",
-    "note:Data Ghi chú dòng"
+    {
+     "fieldname": "uom",
+     "label": "ĐVT",
+     "fieldtype": "Link",
+     "options": "UOM",
+     "surface": "quick"
+    },
+    {
+     "fieldname": "conversion_factor",
+     "label": "Hệ số quy đổi",
+     "fieldtype": "Float",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "stock_qty",
+     "label": "Quy ra đơn vị tồn",
+     "fieldtype": "Float",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "rate",
+     "label": "Đơn giá NCC chào",
+     "fieldtype": "Currency",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "amount",
+     "label": "Thành tiền",
+     "fieldtype": "Currency",
+     "read_only": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "lead_time_days",
+     "label": "Số ngày giao",
+     "fieldtype": "Int",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "note",
+     "label": "Ghi chú dòng",
+     "fieldtype": "Data",
+     "surface": "expanded"
+    }
    ],
    "permissions": {
     "Chủ xưởng": "rwc",
     "Kế toán": "rwc",
     "Thủ kho": "r",
     "Kinh doanh": "r"
+   },
+   "form": {
+    "fields": [
+     "item_code",
+     "color",
+     "length_m",
+     "qty",
+     "qty_bundle",
+     "qty_bar",
+     "total_length_m",
+     "actual_weight_kg",
+     "actual_kg_per_m",
+     "so_no",
+     "uom",
+     "rate",
+     "amount",
+     "lead_time_days",
+     "note"
+    ]
+   },
+   "quickEntry": {
+    "fields": [
+     "item_code",
+     "color",
+     "qty",
+     "uom",
+     "rate",
+     "amount"
+    ]
    }
   },
   {
@@ -3941,152 +5271,264 @@
    ],
    "fields": [
     {
+     "label": "Mã sản phẩm",
      "//": "Ô chọn chỉ hiện mặt hàng ĐƯỢC mua. Danh mục có gần 300 mã gồm cả dịch vụ, phụ thu và thành phẩm tự sản xuất; đưa hết vào ô chọn của phiếu mua thì người nhập phải tự nhớ mã nào hợp lệ, và chọn nhầm chỉ lộ ra ở bước ghi sổ.",
      "fieldname": "item_code",
      "fieldtype": "Link",
      "options": "Item",
-     "label": "Mã sản phẩm",
      "required": true,
-     "link_filters": "{\"is_purchase_item\":1,\"disabled\":0}"
+     "link_filters": "{\"is_purchase_item\":1,\"disabled\":0}",
+     "surface": "quick"
     },
-    "item_name:Data~- Tên hàng",
     {
+     "fieldname": "item_name",
+     "label": "Tên hàng",
+     "fieldtype": "Data",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "label": "Kiểu quản lý tồn",
      "fieldname": "inventory_mode",
      "fieldtype": "Data",
-     "label": "Kiểu quản lý tồn",
      "read_only": true,
-     "hidden": true
+     "hidden": true,
+     "surface": "internal"
     },
     {
+     "label": "Bộ quy cách",
      "fieldname": "measurement_profile",
      "fieldtype": "Link",
      "options": "Measurement Profile",
-     "label": "Bộ quy cách",
      "read_only": true,
-     "hidden": true
+     "hidden": true,
+     "surface": "internal"
     },
-    "stock_uom:Link(UOM)~- ĐVT tồn",
-    "min_area_sqm:Float~- Diện tích tính tối thiểu",
     {
+     "fieldname": "stock_uom",
+     "label": "ĐVT tồn",
+     "fieldtype": "Link",
+     "options": "UOM",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "min_area_sqm",
+     "label": "Diện tích tính tối thiểu",
+     "fieldtype": "Float",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "label": "Màu",
      "fieldname": "color",
      "fieldtype": "Link",
      "options": "Item Color",
-     "label": "Màu",
-     "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'"
+     "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'",
+     "surface": "expanded"
     },
     {
+     "label": "Kích thước (chiều rộng) (m)",
      "fieldname": "length_m",
      "fieldtype": "Float",
-     "label": "Kích thước (chiều rộng) (m)",
      "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'",
      "mandatory_depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'",
-     "non_negative": true
+     "non_negative": true,
+     "surface": "expanded"
     },
-    "uom:Link(UOM)~- ĐVT mua",
     {
+     "fieldname": "uom",
+     "label": "ĐVT mua",
+     "fieldtype": "Link",
+     "options": "UOM",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "label": "Số lượng",
      "fieldname": "qty",
      "fieldtype": "Float",
-     "label": "Số lượng",
      "precision": 2,
      "required": true,
      "read_only_depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'",
-     "description": "Số lượng tính tiền theo ĐVT mua. Riêng nhôm cây/lá tự tính bằng chiều dài × định mức kg/m × số cây/lá."
+     "description": "Số lượng tính tiền theo ĐVT mua. Riêng nhôm cây/lá tự tính bằng chiều dài × định mức kg/m × số cây/lá.",
+     "surface": "quick"
     },
     {
+     "label": "Rộng (m)",
      "fieldname": "width_m",
      "fieldtype": "Float",
-     "label": "Rộng (m)",
-     "depends_on": "eval:doc.inventory_mode == 'Tấm/Kính' || doc.inventory_mode == 'Thành phẩm theo m2'"
+     "depends_on": "eval:doc.inventory_mode == 'Tấm/Kính' || doc.inventory_mode == 'Thành phẩm theo m2'",
+     "surface": "internal"
     },
     {
+     "label": "Cao (m)",
      "fieldname": "height_m",
      "fieldtype": "Float",
-     "label": "Cao (m)",
-     "depends_on": "eval:doc.inventory_mode == 'Tấm/Kính' || doc.inventory_mode == 'Thành phẩm theo m2'"
+     "depends_on": "eval:doc.inventory_mode == 'Tấm/Kính' || doc.inventory_mode == 'Thành phẩm theo m2'",
+     "surface": "internal"
     },
     {
+     "label": "Số bộ",
      "fieldname": "set_count",
      "fieldtype": "Int",
-     "label": "Số bộ",
      "default": 1,
-     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'"
+     "depends_on": "eval:doc.inventory_mode == 'Thành phẩm theo m2'",
+     "surface": "internal"
     },
     {
+     "label": "SL (bó)",
      "fieldname": "qty_bundle",
      "fieldtype": "Float",
-     "label": "SL (bó)",
      "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'",
-     "non_negative": true
+     "non_negative": true,
+     "surface": "expanded"
     },
     {
+     "label": "Số cây/lá",
      "fieldname": "qty_bar",
      "fieldtype": "Float",
-     "label": "Số cây/lá",
      "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'",
      "mandatory_depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'",
-     "non_negative": true
+     "non_negative": true,
+     "surface": "expanded"
     },
     {
+     "label": "Tổng mét",
      "fieldname": "total_length_m",
      "fieldtype": "Float",
-     "label": "Tổng mét",
      "read_only": true,
-     "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'"
+     "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'",
+     "surface": "internal"
     },
     {
+     "label": "Quy cách định mức",
      "fieldname": "material_specification",
      "fieldtype": "Link",
      "options": "Material Specification",
-     "label": "Quy cách định mức",
      "read_only": true,
-     "hidden": true
+     "hidden": true,
+     "surface": "internal"
     },
     {
+     "label": "Trọng lượng định mức (kg/m)",
      "fieldname": "theoretical_kg_per_m",
      "fieldtype": "Float",
-     "label": "Trọng lượng định mức (kg/m)",
      "precision": 3,
      "read_only": true,
      "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'",
-     "description": "Tự lấy từ quy cách kỹ thuật của mã hàng."
+     "description": "Tự lấy từ quy cách kỹ thuật của mã hàng.",
+     "surface": "expanded"
     },
     {
+     "label": "Số kg barem",
      "fieldname": "theoretical_kg",
      "fieldtype": "Float",
-     "label": "Số kg barem",
      "precision": 2,
      "read_only": true,
      "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'",
-     "description": "Kích thước × trọng lượng định mức × số cây/lá."
+     "description": "Kích thước × trọng lượng định mức × số cây/lá.",
+     "surface": "expanded"
     },
     {
+     "label": "Dập",
      "fieldname": "is_stamped",
      "fieldtype": "Select",
      "options": "Có\nKhông",
-     "label": "Dập",
      "required": true,
      "default": "Không",
      "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'",
-     "description": "Bắt buộc chọn rõ Có hoặc Không."
+     "description": "Bắt buộc chọn rõ Có hoặc Không.",
+     "surface": "expanded"
     },
     {
+     "label": "Số SO NCC",
      "fieldname": "so_no",
      "fieldtype": "Data",
-     "label": "Số SO NCC",
-     "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'"
+     "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'",
+     "surface": "expanded"
     },
-    "rate:Currency! Đơn giá",
-    "amount:Currency~ Thành tiền",
-    "note:Data Ghi chú",
-    "warehouse:Link(Warehouse) Kho nhận",
-    "conversion_factor:Float~- Hệ số quy đổi về ĐVT tồn",
-    "stock_qty:Float~- Số lượng quy đổi tồn"
+    {
+     "fieldname": "rate",
+     "label": "Đơn giá",
+     "fieldtype": "Currency",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "amount",
+     "label": "Thành tiền",
+     "fieldtype": "Currency",
+     "read_only": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "note",
+     "label": "Ghi chú",
+     "fieldtype": "Data",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "warehouse",
+     "label": "Kho nhận",
+     "fieldtype": "Link",
+     "options": "Warehouse",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "conversion_factor",
+     "label": "Hệ số quy đổi về ĐVT tồn",
+     "fieldtype": "Float",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "stock_qty",
+     "label": "Số lượng quy đổi tồn",
+     "fieldtype": "Float",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    }
    ],
    "permissions": {
     "Chủ xưởng": "rwc",
     "Kế toán": "rwc",
     "Thủ kho": "r",
     "Kinh doanh": "r"
+   },
+   "form": {
+    "fields": [
+     "item_code",
+     "length_m",
+     "theoretical_kg_per_m",
+     "qty_bundle",
+     "qty_bar",
+     "theoretical_kg",
+     "qty",
+     "uom",
+     "rate",
+     "amount",
+     "color",
+     "is_stamped",
+     "so_no",
+     "warehouse",
+     "note"
+    ]
+   },
+   "quickEntry": {
+    "fields": [
+     "item_code",
+     "qty",
+     "uom",
+     "rate",
+     "amount"
+    ]
    }
   },
   {
@@ -4173,133 +5615,213 @@
    ],
    "fields": [
     {
+     "label": "Mã sản phẩm",
      "//": "Ô chọn chỉ hiện mặt hàng ĐƯỢC mua. Danh mục có gần 300 mã gồm cả dịch vụ, phụ thu và thành phẩm tự sản xuất; đưa hết vào ô chọn của phiếu mua thì người nhập phải tự nhớ mã nào hợp lệ, và chọn nhầm chỉ lộ ra ở bước ghi sổ.",
      "fieldname": "item_code",
      "fieldtype": "Link",
      "options": "Item",
-     "label": "Mã sản phẩm",
      "required": true,
-     "link_filters": "{\"is_purchase_item\":1,\"disabled\":0}"
+     "link_filters": "{\"is_purchase_item\":1,\"disabled\":0}",
+     "surface": "quick"
     },
-    "item_name:Data~- Tên hàng",
     {
+     "fieldname": "item_name",
+     "label": "Tên hàng",
+     "fieldtype": "Data",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "label": "Kiểu quản lý tồn",
      "fieldname": "inventory_mode",
      "fieldtype": "Data",
-     "label": "Kiểu quản lý tồn",
      "read_only": true,
-     "hidden": true
+     "hidden": true,
+     "surface": "internal"
     },
     {
+     "label": "Bộ quy cách",
      "fieldname": "measurement_profile",
      "fieldtype": "Link",
      "options": "Measurement Profile",
-     "label": "Bộ quy cách",
      "read_only": true,
-     "hidden": true
+     "hidden": true,
+     "surface": "internal"
     },
-    "stock_uom:Link(UOM)~- ĐVT tồn",
-    "min_area_sqm:Float~- Diện tích tính tối thiểu",
     {
+     "fieldname": "stock_uom",
+     "label": "ĐVT tồn",
+     "fieldtype": "Link",
+     "options": "UOM",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "min_area_sqm",
+     "label": "Diện tích tính tối thiểu",
+     "fieldtype": "Float",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "label": "Màu",
      "fieldname": "color",
      "fieldtype": "Link",
      "options": "Item Color",
-     "label": "Màu",
      "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá' || doc.inventory_mode == 'Tấm/Kính' || doc.inventory_mode == 'Thành phẩm theo m2'",
-     "mandatory_depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá' || doc.inventory_mode == 'Thành phẩm theo m2'"
+     "mandatory_depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá' || doc.inventory_mode == 'Thành phẩm theo m2'",
+     "surface": "expanded"
     },
     {
+     "label": "KT (m)",
      "fieldname": "length_m",
      "fieldtype": "Float",
-     "label": "KT (m)",
      "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'",
      "mandatory_depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'",
-     "non_negative": true
+     "non_negative": true,
+     "surface": "expanded"
     },
-    "uom:Link(UOM) ĐVT mua",
-    "qty:Float! Số lượng",
     {
+     "fieldname": "uom",
+     "label": "ĐVT mua",
+     "fieldtype": "Link",
+     "options": "UOM",
+     "surface": "quick"
+    },
+    {
+     "fieldname": "qty",
+     "label": "Số lượng",
+     "fieldtype": "Float",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "label": "Rộng (m)",
      "fieldname": "width_m",
      "fieldtype": "Float",
-     "label": "Rộng (m)",
-     "depends_on": "eval:doc.inventory_mode == 'Tấm/Kính' || doc.inventory_mode == 'Thành phẩm theo m2'"
+     "depends_on": "eval:doc.inventory_mode == 'Tấm/Kính' || doc.inventory_mode == 'Thành phẩm theo m2'",
+     "surface": "internal"
     },
     {
+     "label": "Cao (m)",
      "fieldname": "height_m",
      "fieldtype": "Float",
-     "label": "Cao (m)",
-     "depends_on": "eval:doc.inventory_mode == 'Tấm/Kính' || doc.inventory_mode == 'Thành phẩm theo m2'"
+     "depends_on": "eval:doc.inventory_mode == 'Tấm/Kính' || doc.inventory_mode == 'Thành phẩm theo m2'",
+     "surface": "internal"
     },
     {
+     "label": "Số cái/bộ",
      "fieldname": "set_count",
      "fieldtype": "Int",
-     "label": "Số cái/bộ",
      "default": 1,
      "depends_on": "eval:doc.inventory_mode == 'Tấm/Kính' || doc.inventory_mode == 'Thành phẩm theo m2'",
      "mandatory_depends_on": "eval:doc.inventory_mode == 'Tấm/Kính' || doc.inventory_mode == 'Thành phẩm theo m2'",
      "non_negative": true,
-     "description": "Số tấm hoặc số bộ cửa thực nhận. Dùng cùng Cao × Rộng để tính tổng diện tích thực."
+     "description": "Số tấm hoặc số bộ cửa thực nhận. Dùng cùng Cao × Rộng để tính tổng diện tích thực.",
+     "surface": "internal"
     },
     {
+     "label": "SL (bó)",
      "fieldname": "qty_bundle",
      "fieldtype": "Float",
-     "label": "SL (bó)",
      "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'",
-     "non_negative": true
+     "non_negative": true,
+     "surface": "expanded"
     },
     {
+     "label": "SL (cây/lá)",
      "fieldname": "qty_bar",
      "fieldtype": "Float",
-     "label": "SL (cây/lá)",
      "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'",
      "mandatory_depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'",
-     "non_negative": true
+     "non_negative": true,
+     "surface": "expanded"
     },
     {
+     "label": "Tổng mét",
      "fieldname": "total_length_m",
      "fieldtype": "Float",
-     "label": "Tổng mét",
      "read_only": true,
-     "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'"
+     "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'",
+     "surface": "internal"
     },
     {
+     "label": "Tổng kg thực cân",
      "//": "QĐ-2: với hàng catch weight đây là số lượng tồn thứ hai; với cửa/tấm đây là số cân để đối chiếu TL kg/m².",
      "fieldname": "actual_weight_kg",
      "fieldtype": "Float",
-     "label": "Tổng kg thực cân",
      "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá' || doc.inventory_mode == 'Tấm/Kính' || doc.inventory_mode == 'Thành phẩm theo m2'",
      "mandatory_depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'",
      "non_negative": true,
-     "description": "Nhôm cây/lá: số kg thực nhận đi vào sổ kho. Cửa/tấm: số kg cân để đối chiếu TL thực theo m²; không bắt buộc nếu NCC không cân."
+     "description": "Nhôm cây/lá: số kg thực nhận đi vào sổ kho. Cửa/tấm: số kg cân để đối chiếu TL thực theo m²; không bắt buộc nếu NCC không cân.",
+     "surface": "expanded"
     },
     {
+     "label": "TL thực (kg/m)",
      "fieldname": "actual_kg_per_m",
      "fieldtype": "Float",
-     "label": "TL thực (kg/m)",
      "read_only": true,
      "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'",
-     "description": "Nhôm cây/lá: Tổng kg ÷ (chiều dài một cây × số cây/lá). Chỉ để đối chiếu, không nhập tay."
+     "description": "Nhôm cây/lá: Tổng kg ÷ (chiều dài một cây × số cây/lá). Chỉ để đối chiếu, không nhập tay.",
+     "surface": "internal"
     },
     {
+     "label": "TL thực (kg/m²)",
      "//": "TL theo diện tích thật, tách riêng khỏi kg/m của nhôm để không trộn hai đơn vị.",
      "fieldname": "actual_kg_per_sqm",
      "fieldtype": "Float",
-     "label": "TL thực (kg/m²)",
      "read_only": true,
      "depends_on": "eval:(doc.inventory_mode == 'Tấm/Kính' || doc.inventory_mode == 'Thành phẩm theo m2') && doc.actual_weight_kg > 0",
-     "description": "Tự tính = Tổng kg thực cân ÷ (Cao × Rộng × Số cái/bộ). Cao và Rộng nhập theo mét; kết quả chỉ để đối chiếu."
+     "description": "Tự tính = Tổng kg thực cân ÷ (Cao × Rộng × Số cái/bộ). Cao và Rộng nhập theo mét; kết quả chỉ để đối chiếu.",
+     "surface": "internal"
     },
     {
+     "label": "Số SO NCC",
      "fieldname": "so_no",
      "fieldtype": "Data",
-     "label": "Số SO NCC",
-     "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'"
+     "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'",
+     "surface": "expanded"
     },
-    "rate:Currency! Đơn giá",
-    "rate_uom:Link(UOM) ĐVT của đơn giá — mặc định theo ĐVT khối lượng nếu hàng cân theo kiện",
-    "amount:Currency~ Thành tiền",
-    "note:Data Ghi chú",
-    "warehouse:Link(Warehouse)! Kho nhập",
     {
+     "fieldname": "rate",
+     "label": "Đơn giá",
+     "fieldtype": "Currency",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "rate_uom",
+     "label": "ĐVT của đơn giá — mặc định theo ĐVT khối lượng nếu hàng cân theo kiện",
+     "fieldtype": "Link",
+     "options": "UOM",
+     "surface": "internal"
+    },
+    {
+     "fieldname": "amount",
+     "label": "Thành tiền",
+     "fieldtype": "Currency",
+     "read_only": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "note",
+     "label": "Ghi chú",
+     "fieldtype": "Data",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "warehouse",
+     "label": "Kho nhập",
+     "fieldtype": "Link",
+     "options": "Warehouse",
+     "required": true,
+     "surface": "expanded"
+    },
+    {
+     "label": "Lô nhận (Serial/Batch Bundle)",
      "//": [
       "TÊN TRƯỜNG COPY ĐÚNG CỦA NỀN TẢNG (`Stock Entry Detail.serial_and_batch_bundle`).",
       "buildTrackedStockLines đọc đúng tên này (tracking.ts:29); đặt tên khác là app tự cắt",
@@ -4308,52 +5830,111 @@
      "fieldname": "serial_and_batch_bundle",
      "fieldtype": "Link",
      "options": "Serial and Batch Bundle",
-     "label": "Lô nhận (Serial/Batch Bundle)"
+     "surface": "internal"
     },
     {
+     "label": "Tình trạng",
      "fieldname": "condition",
      "fieldtype": "Select",
      "options": "Thô\nĐã sơn\nLỗi",
-     "label": "Tình trạng",
-     "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'"
+     "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'",
+     "surface": "internal"
     },
     {
+     "label": "Dập",
      "//": "Sơn và dập là HAI chiều độc lập — 'đã sơn + chưa dập' là tổ hợp có thật trong bảng giá NCC.",
      "fieldname": "is_stamped",
      "fieldtype": "Select",
      "options": "Có\nKhông",
-     "label": "Dập",
      "required": true,
      "default": "Không",
      "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'",
-     "description": "Bắt buộc chọn rõ Có hoặc Không; lưu cùng lô nhận để đối chiếu giá nhà cung cấp."
+     "description": "Bắt buộc chọn rõ Có hoặc Không; lưu cùng lô nhận để đối chiếu giá nhà cung cấp.",
+     "surface": "expanded"
     },
     {
+     "label": "Kg lý thuyết (barem)",
      "fieldname": "theoretical_kg",
      "fieldtype": "Float",
-     "label": "Kg lý thuyết (barem)",
      "read_only": true,
      "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'",
-     "description": "khổ × kg/m của bộ quy cách × số cây. Dùng để đối chiếu cân, không vào sổ."
+     "description": "khổ × kg/m của bộ quy cách × số cây. Dùng để đối chiếu cân, không vào sổ.",
+     "surface": "expanded"
     },
     {
+     "label": "Lệch cân (%)",
      "fieldname": "weight_variance_pct",
      "fieldtype": "Float",
-     "label": "Lệch cân (%)",
      "read_only": true,
      "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'",
-     "description": "Vượt ngưỡng của bộ quy cách thì cảnh báo, KHÔNG chặn ghi sổ."
+     "description": "Vượt ngưỡng của bộ quy cách thì cảnh báo, KHÔNG chặn ghi sổ.",
+     "surface": "internal"
     },
-    "purchase_order:Link(Purchase Order) Đơn mua của dòng này",
-    "conversion_factor:Float~- Hệ số quy đổi về ĐVT tồn",
-    "stock_qty:Float~- Thực vào kho",
-    "valuation_rate:Currency- Giá vốn nhập kho"
+    {
+     "fieldname": "purchase_order",
+     "label": "Đơn mua của dòng này",
+     "fieldtype": "Link",
+     "options": "Purchase Order",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "conversion_factor",
+     "label": "Hệ số quy đổi về ĐVT tồn",
+     "fieldtype": "Float",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "stock_qty",
+     "label": "Thực vào kho",
+     "fieldtype": "Float",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "valuation_rate",
+     "label": "Giá vốn nhập kho",
+     "fieldtype": "Currency",
+     "hidden": true,
+     "surface": "internal"
+    }
    ],
    "permissions": {
     "Chủ xưởng": "rwc",
     "Thủ kho": "rwc",
     "Kế toán": "rwc",
     "Kinh doanh": "r"
+   },
+   "form": {
+    "fields": [
+     "item_code",
+     "length_m",
+     "qty_bundle",
+     "qty_bar",
+     "qty",
+     "uom",
+     "rate",
+     "amount",
+     "theoretical_kg",
+     "actual_weight_kg",
+     "color",
+     "is_stamped",
+     "so_no",
+     "warehouse",
+     "purchase_order",
+     "note"
+    ]
+   },
+   "quickEntry": {
+    "fields": [
+     "item_code",
+     "qty",
+     "uom",
+     "rate",
+     "amount"
+    ]
    }
   },
   {
@@ -4475,36 +6056,172 @@
    ],
    "fields": [
     {
+     "label": "Mã hàng",
      "//": "Ô chọn chỉ hiện mặt hàng ĐƯỢC mua. Danh mục có gần 300 mã gồm cả dịch vụ, phụ thu và thành phẩm tự sản xuất; đưa hết vào ô chọn của phiếu mua thì người nhập phải tự nhớ mã nào hợp lệ, và chọn nhầm chỉ lộ ra ở bước ghi sổ.",
      "fieldname": "item_code",
      "fieldtype": "Link",
      "options": "Item",
-     "label": "Mã hàng",
      "required": true,
-     "link_filters": "{\"is_purchase_item\":1,\"disabled\":0}"
+     "link_filters": "{\"is_purchase_item\":1,\"disabled\":0}",
+     "surface": "quick"
     },
-    "item_name:Data~- Tên hàng",
-    "inventory_mode:Data~- Kiểu tính",
-    "measurement_profile:Link(Measurement Profile)~- Bộ quy cách",
-    "stock_uom:Link(UOM)~- ĐVT tồn",
-    "min_area_sqm:Float~- Diện tích tính tối thiểu",
-    "color:Link(Item Color) Màu",
-    "width_m:Float Rộng (m)",
-    "height_m:Float Cao (m)",
-    "set_count:Int=(1) Số bộ",
-    "qty:Float! SL",
-    "uom:Link(UOM) ĐVT mua",
-    "conversion_factor:Float~- Hệ số quy đổi",
-    "stock_qty:Float~- SL quy đổi tồn",
-    "rate:Currency! Đơn giá",
-    "amount:Currency~ Thành tiền",
-    "expense_account:Link(Account)-!=(Hàng tồn kho) Tài khoản ghi nợ",
-    "warehouse:Link(Warehouse) Kho"
+    {
+     "fieldname": "item_name",
+     "label": "Tên hàng",
+     "fieldtype": "Data",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "inventory_mode",
+     "label": "Kiểu tính",
+     "fieldtype": "Data",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "measurement_profile",
+     "label": "Bộ quy cách",
+     "fieldtype": "Link",
+     "options": "Measurement Profile",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "stock_uom",
+     "label": "ĐVT tồn",
+     "fieldtype": "Link",
+     "options": "UOM",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "min_area_sqm",
+     "label": "Diện tích tính tối thiểu",
+     "fieldtype": "Float",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "color",
+     "label": "Màu",
+     "fieldtype": "Link",
+     "options": "Item Color",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "width_m",
+     "label": "Rộng (m)",
+     "fieldtype": "Float",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "height_m",
+     "label": "Cao (m)",
+     "fieldtype": "Float",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "set_count",
+     "label": "Số bộ",
+     "fieldtype": "Int",
+     "default": "1",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "qty",
+     "label": "SL",
+     "fieldtype": "Float",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "uom",
+     "label": "ĐVT mua",
+     "fieldtype": "Link",
+     "options": "UOM",
+     "surface": "quick"
+    },
+    {
+     "fieldname": "conversion_factor",
+     "label": "Hệ số quy đổi",
+     "fieldtype": "Float",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "stock_qty",
+     "label": "SL quy đổi tồn",
+     "fieldtype": "Float",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "rate",
+     "label": "Đơn giá",
+     "fieldtype": "Currency",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "amount",
+     "label": "Thành tiền",
+     "fieldtype": "Currency",
+     "read_only": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "expense_account",
+     "label": "Tài khoản ghi nợ",
+     "fieldtype": "Link",
+     "options": "Account",
+     "required": true,
+     "hidden": true,
+     "default": "Hàng tồn kho",
+     "surface": "internal"
+    },
+    {
+     "fieldname": "warehouse",
+     "label": "Kho",
+     "fieldtype": "Link",
+     "options": "Warehouse",
+     "surface": "expanded"
+    }
    ],
    "permissions": {
     "Chủ xưởng": "rwc",
     "Kế toán": "rwc",
     "Thủ kho": "r"
+   },
+   "form": {
+    "fields": [
+     "item_code",
+     "color",
+     "width_m",
+     "height_m",
+     "set_count",
+     "qty",
+     "uom",
+     "rate",
+     "amount",
+     "warehouse"
+    ]
+   },
+   "quickEntry": {
+    "fields": [
+     "item_code",
+     "qty",
+     "uom",
+     "rate",
+     "amount"
+    ]
    }
   },
   {
@@ -4564,16 +6281,64 @@
     "rate"
    ],
    "fields": [
-    "item_code:Link(Item)! Mã hàng trả",
-    "qty:Float! SL",
-    "warehouse:Link(Warehouse)! Kho xuất trả (phải đúng kho đã nhập)",
-    "rate:Currency! Đơn giá theo phiếu nhập",
-    "note:Data Lý do trả"
+    {
+     "fieldname": "item_code",
+     "label": "Mã hàng trả",
+     "fieldtype": "Link",
+     "options": "Item",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "qty",
+     "label": "SL",
+     "fieldtype": "Float",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "warehouse",
+     "label": "Kho xuất trả (phải đúng kho đã nhập)",
+     "fieldtype": "Link",
+     "options": "Warehouse",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "rate",
+     "label": "Đơn giá theo phiếu nhập",
+     "fieldtype": "Currency",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "note",
+     "label": "Lý do trả",
+     "fieldtype": "Data",
+     "surface": "expanded"
+    }
    ],
    "permissions": {
     "Chủ xưởng": "rwc",
     "Thủ kho": "rwc",
     "Kế toán": "rwc"
+   },
+   "form": {
+    "fields": [
+     "item_code",
+     "qty",
+     "warehouse",
+     "rate",
+     "note"
+    ]
+   },
+   "quickEntry": {
+    "fields": [
+     "item_code",
+     "qty",
+     "warehouse",
+     "rate"
+    ]
    }
   },
   {
@@ -4639,16 +6404,63 @@
     "amount"
    ],
    "fields": [
-    "item_code:Link(Item)! Mã hàng",
-    "qty:Float! SL",
-    "rate:Currency! Đơn giá theo hoá đơn gốc",
-    "amount:Currency~ Thành tiền",
-    "note:Data Ghi chú dòng"
+    {
+     "fieldname": "item_code",
+     "label": "Mã hàng",
+     "fieldtype": "Link",
+     "options": "Item",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "qty",
+     "label": "SL",
+     "fieldtype": "Float",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "rate",
+     "label": "Đơn giá theo hoá đơn gốc",
+     "fieldtype": "Currency",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "amount",
+     "label": "Thành tiền",
+     "fieldtype": "Currency",
+     "read_only": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "note",
+     "label": "Ghi chú dòng",
+     "fieldtype": "Data",
+     "surface": "expanded"
+    }
    ],
    "permissions": {
     "Chủ xưởng": "rwc",
     "Kế toán": "rwc",
     "Thủ kho": "r"
+   },
+   "form": {
+    "fields": [
+     "item_code",
+     "qty",
+     "rate",
+     "amount",
+     "note"
+    ]
+   },
+   "quickEntry": {
+    "fields": [
+     "item_code",
+     "qty",
+     "rate",
+     "amount"
+    ]
    }
   },
   {
@@ -4886,17 +6698,76 @@
     "amount"
    ],
    "fields": [
-    "product:Data! Sản phẩm / quy cách gốc",
-    "item_code:Link(Item) Mã hàng đã ghép",
-    "order_description:Small Text Nội dung đặt hàng",
-    "delivery_description:Small Text Nội dung xuất kho",
-    "qty:Float Số lượng",
-    "uom:Link(UOM) ĐVT",
-    "rate:Currency Đơn giá",
-    "amount:Currency Thành tiền",
-    "error:Data Lỗi",
-    "note:Data Ghi chú",
-    "source_row:Int- Dòng nguồn"
+    {
+     "fieldname": "product",
+     "label": "Sản phẩm / quy cách gốc",
+     "fieldtype": "Data",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "item_code",
+     "label": "Mã hàng đã ghép",
+     "fieldtype": "Link",
+     "options": "Item",
+     "surface": "quick"
+    },
+    {
+     "fieldname": "order_description",
+     "label": "Nội dung đặt hàng",
+     "fieldtype": "Small Text",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "delivery_description",
+     "label": "Nội dung xuất kho",
+     "fieldtype": "Small Text",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "qty",
+     "label": "Số lượng",
+     "fieldtype": "Float",
+     "surface": "quick"
+    },
+    {
+     "fieldname": "uom",
+     "label": "ĐVT",
+     "fieldtype": "Link",
+     "options": "UOM",
+     "surface": "quick"
+    },
+    {
+     "fieldname": "rate",
+     "label": "Đơn giá",
+     "fieldtype": "Currency",
+     "surface": "quick"
+    },
+    {
+     "fieldname": "amount",
+     "label": "Thành tiền",
+     "fieldtype": "Currency",
+     "surface": "quick"
+    },
+    {
+     "fieldname": "error",
+     "label": "Lỗi",
+     "fieldtype": "Data",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "note",
+     "label": "Ghi chú",
+     "fieldtype": "Data",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "source_row",
+     "label": "Dòng nguồn",
+     "fieldtype": "Int",
+     "hidden": true,
+     "surface": "internal"
+    }
    ],
    "permissions": {
     "Chủ xưởng": "rwc",
@@ -4904,6 +6775,30 @@
     "Kế toán": "r",
     "Thủ kho": "r",
     "Sản xuất": "r"
+   },
+   "form": {
+    "fields": [
+     "product",
+     "item_code",
+     "order_description",
+     "delivery_description",
+     "qty",
+     "uom",
+     "rate",
+     "amount",
+     "error",
+     "note"
+    ]
+   },
+   "quickEntry": {
+    "fields": [
+     "product",
+     "item_code",
+     "qty",
+     "uom",
+     "rate",
+     "amount"
+    ]
    }
   },
   {
@@ -5165,47 +7060,252 @@
     "estimated_minutes"
    ],
    "fields": [
-    "request_line_key:Data*! Khóa bộ sản xuất",
-    "sales_order_row_id:Data! Dòng đơn hàng nguồn",
-    "item_code:Link(Item)! Thành phẩm",
-    "item_group:Link(Item Group) Nhóm sản phẩm",
-    "door_type:Select(Cửa Đức,Cửa Úc,Cửa Lưới,Cửa Đài Loan,Cửa Siêu Trường,Cửa tấm liền Úc)! Loại cửa",
-    "department:Data! Bộ phận",
-    "set_no:Int! Bộ số",
-    "set_count:Int!=(1) Số bộ dòng",
-    "width_m:Float! Rộng (m)",
-    "height_m:Float! Cao (m)",
-    "mesh_height_m:Float Cao lưới (m)",
-    "color:Link(Item Color) Màu",
-    "motor_model:Link(Item) Mô tơ",
-    "sales_mode:Select(Trọn bộ,Tách món)! Cách bán",
-    "formula_policy:Link(Cutting Policy)! Công thức",
-    "formula_version:Data! Phiên bản công thức",
-    "width_basis:Data! Cơ sở rộng",
-    "cut_width_m:Float! Rộng cắt lá (m)",
-    "billable_area_sqm:Float! Diện tích tính tiền (m2)",
-    "leaf_count:Float! Tổng số lá",
-    "single_layer_leaf_count:Float Lá một lớp",
-    "double_layer_leaf_count:Float Lá hai lớp",
-    "estimated_weight_kg:Float Kg dự toán",
-    "estimated_minutes:Float Phút dự toán",
-    "schedule_warning:Data Cảnh báo lịch",
-    "source_warehouse:Link(Warehouse)! Kho vật tư",
-    "target_warehouse:Link(Warehouse)! Kho thành phẩm",
-    "bom_no:Link(Bill of Materials)! BOM áp dụng",
-    "output_qty:Float! Số lượng đầu ra",
-    "stock_uom:Link(UOM)! ĐVT đầu ra",
-    "paint_required:Check Dự kiến cần sơn",
     {
+     "fieldname": "request_line_key",
+     "label": "Khóa bộ sản xuất",
+     "fieldtype": "Data",
+     "required": true,
+     "unique": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "sales_order_row_id",
+     "label": "Dòng đơn hàng nguồn",
+     "fieldtype": "Data",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "item_code",
+     "label": "Thành phẩm",
+     "fieldtype": "Link",
+     "options": "Item",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "item_group",
+     "label": "Nhóm sản phẩm",
+     "fieldtype": "Link",
+     "options": "Item Group",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "door_type",
+     "label": "Loại cửa",
+     "fieldtype": "Select",
+     "options": "Cửa Đức\nCửa Úc\nCửa Lưới\nCửa Đài Loan\nCửa Siêu Trường\nCửa tấm liền Úc",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "department",
+     "label": "Bộ phận",
+     "fieldtype": "Data",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "set_no",
+     "label": "Bộ số",
+     "fieldtype": "Int",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "set_count",
+     "label": "Số bộ dòng",
+     "fieldtype": "Int",
+     "required": true,
+     "default": "1",
+     "surface": "quick"
+    },
+    {
+     "fieldname": "width_m",
+     "label": "Rộng (m)",
+     "fieldtype": "Float",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "height_m",
+     "label": "Cao (m)",
+     "fieldtype": "Float",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "mesh_height_m",
+     "label": "Cao lưới (m)",
+     "fieldtype": "Float",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "color",
+     "label": "Màu",
+     "fieldtype": "Link",
+     "options": "Item Color",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "motor_model",
+     "label": "Mô tơ",
+     "fieldtype": "Link",
+     "options": "Item",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "sales_mode",
+     "label": "Cách bán",
+     "fieldtype": "Select",
+     "options": "Trọn bộ\nTách món",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "formula_policy",
+     "label": "Công thức",
+     "fieldtype": "Link",
+     "options": "Cutting Policy",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "formula_version",
+     "label": "Phiên bản công thức",
+     "fieldtype": "Data",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "width_basis",
+     "label": "Cơ sở rộng",
+     "fieldtype": "Data",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "cut_width_m",
+     "label": "Rộng cắt lá (m)",
+     "fieldtype": "Float",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "billable_area_sqm",
+     "label": "Diện tích tính tiền (m2)",
+     "fieldtype": "Float",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "leaf_count",
+     "label": "Tổng số lá",
+     "fieldtype": "Float",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "single_layer_leaf_count",
+     "label": "Lá một lớp",
+     "fieldtype": "Float",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "double_layer_leaf_count",
+     "label": "Lá hai lớp",
+     "fieldtype": "Float",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "estimated_weight_kg",
+     "label": "Kg dự toán",
+     "fieldtype": "Float",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "estimated_minutes",
+     "label": "Phút dự toán",
+     "fieldtype": "Float",
+     "surface": "quick"
+    },
+    {
+     "fieldname": "schedule_warning",
+     "label": "Cảnh báo lịch",
+     "fieldtype": "Data",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "source_warehouse",
+     "label": "Kho vật tư",
+     "fieldtype": "Link",
+     "options": "Warehouse",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "target_warehouse",
+     "label": "Kho thành phẩm",
+     "fieldtype": "Link",
+     "options": "Warehouse",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "bom_no",
+     "label": "BOM áp dụng",
+     "fieldtype": "Link",
+     "options": "Bill of Materials",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "output_qty",
+     "label": "Số lượng đầu ra",
+     "fieldtype": "Float",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "stock_uom",
+     "label": "ĐVT đầu ra",
+     "fieldtype": "Link",
+     "options": "UOM",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "paint_required",
+     "label": "Dự kiến cần sơn",
+     "fieldtype": "Check",
+     "surface": "expanded"
+    },
+    {
+     "label": "Snapshot công thức",
      "fieldname": "formula_snapshot",
      "fieldtype": "Long Text",
-     "label": "Snapshot công thức",
      "read_only": true,
-     "hidden": true
+     "hidden": true,
+     "surface": "internal"
     },
-    "accessories:Small Text Phụ kiện",
-    "install_note:Small Text Ghi chú lắp đặt",
-    "note:Small Text Ghi chú dòng"
+    {
+     "fieldname": "accessories",
+     "label": "Phụ kiện",
+     "fieldtype": "Small Text",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "install_note",
+     "label": "Ghi chú lắp đặt",
+     "fieldtype": "Small Text",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "note",
+     "label": "Ghi chú dòng",
+     "fieldtype": "Small Text",
+     "surface": "expanded"
+    }
    ],
    "permissions": {
     "Chủ xưởng": "rwc",
@@ -5213,6 +7313,70 @@
     "Kinh doanh": "r",
     "Thủ kho": "r",
     "Kế toán": "r"
+   },
+   "form": {
+    "fields": [
+     "request_line_key",
+     "sales_order_row_id",
+     "item_code",
+     "item_group",
+     "door_type",
+     "department",
+     "set_no",
+     "set_count",
+     "width_m",
+     "height_m",
+     "mesh_height_m",
+     "color",
+     "motor_model",
+     "sales_mode",
+     "formula_policy",
+     "formula_version",
+     "width_basis",
+     "cut_width_m",
+     "billable_area_sqm",
+     "leaf_count",
+     "single_layer_leaf_count",
+     "double_layer_leaf_count",
+     "estimated_weight_kg",
+     "estimated_minutes",
+     "schedule_warning",
+     "source_warehouse",
+     "target_warehouse",
+     "bom_no",
+     "output_qty",
+     "stock_uom",
+     "paint_required",
+     "accessories",
+     "install_note",
+     "note"
+    ]
+   },
+   "quickEntry": {
+    "fields": [
+     "request_line_key",
+     "sales_order_row_id",
+     "item_code",
+     "door_type",
+     "department",
+     "set_no",
+     "set_count",
+     "width_m",
+     "height_m",
+     "sales_mode",
+     "formula_policy",
+     "formula_version",
+     "width_basis",
+     "cut_width_m",
+     "billable_area_sqm",
+     "leaf_count",
+     "estimated_minutes",
+     "source_warehouse",
+     "target_warehouse",
+     "bom_no",
+     "output_qty",
+     "stock_uom"
+    ]
    }
   },
   {
@@ -5325,17 +7489,64 @@
    "group": "Bảo hành",
    "naming": "autoincrement",
    "fields": [
-    "operation:Data*! Công việc",
-    "quantity:Float!=(1) Số lượng",
-    "rate:Currency! Đơn giá",
-    "amount:Currency~ Thành tiền",
-    "note:Data Ghi chú"
+    {
+     "fieldname": "operation",
+     "label": "Công việc",
+     "fieldtype": "Data",
+     "required": true,
+     "unique": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "quantity",
+     "label": "Số lượng",
+     "fieldtype": "Float",
+     "required": true,
+     "default": "1",
+     "surface": "quick"
+    },
+    {
+     "fieldname": "rate",
+     "label": "Đơn giá",
+     "fieldtype": "Currency",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "amount",
+     "label": "Thành tiền",
+     "fieldtype": "Currency",
+     "read_only": true,
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "note",
+     "label": "Ghi chú",
+     "fieldtype": "Data",
+     "surface": "expanded"
+    }
    ],
    "permissions": {
     "Chủ xưởng": "rwc",
     "Kinh doanh": "rwc",
     "Kế toán": "rwc",
     "Thủ kho": "rwc"
+   },
+   "form": {
+    "fields": [
+     "operation",
+     "quantity",
+     "rate",
+     "amount",
+     "note"
+    ]
+   },
+   "quickEntry": {
+    "fields": [
+     "operation",
+     "quantity",
+     "rate"
+    ]
    }
   },
   {
@@ -5351,15 +7562,46 @@
     "addend"
    ],
    "fields": [
-    "variant_label:Data*! Biến thể",
-    "addend:Float! Cộng thêm",
-    "note:Data Ghi chú"
+    {
+     "fieldname": "variant_label",
+     "label": "Biến thể",
+     "fieldtype": "Data",
+     "required": true,
+     "unique": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "addend",
+     "label": "Cộng thêm",
+     "fieldtype": "Float",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "note",
+     "label": "Ghi chú",
+     "fieldtype": "Data",
+     "surface": "expanded"
+    }
    ],
    "permissions": {
     "Chủ xưởng": "rwc",
     "Kế toán": "r",
     "Sản xuất": "r",
     "Kinh doanh": "r"
+   },
+   "form": {
+    "fields": [
+     "variant_label",
+     "addend",
+     "note"
+    ]
+   },
+   "quickEntry": {
+    "fields": [
+     "variant_label",
+     "addend"
+    ]
    }
   },
   {
@@ -5440,7 +7682,14 @@
     "item_group"
    ],
    "fields": [
-    "item_group:Link(Item Group)! Nhóm hàng"
+    {
+     "fieldname": "item_group",
+     "label": "Nhóm hàng",
+     "fieldtype": "Link",
+     "options": "Item Group",
+     "required": true,
+     "surface": "quick"
+    }
    ],
    "permissions": {
     "Chủ xưởng": "rwc",
@@ -5448,6 +7697,16 @@
     "Kế toán": "r",
     "Sản xuất": "r",
     "Kinh doanh": "r"
+   },
+   "form": {
+    "fields": [
+     "item_group"
+    ]
+   },
+   "quickEntry": {
+    "fields": [
+     "item_group"
+    ]
    }
   },
   {
@@ -5505,81 +7764,185 @@
     "offcut_length_m"
    ],
    "fields": [
-    "serial_and_batch_bundle:Link(Serial and Batch Bundle)! Lô đem cắt (bundle Outward)",
     {
+     "fieldname": "serial_and_batch_bundle",
+     "label": "Lô đem cắt (bundle Outward)",
+     "fieldtype": "Link",
+     "options": "Serial and Batch Bundle",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "label": "Bundle nhập đầu thừa",
      "//": "Mỗi dòng có lô mẹ và kho đầu thừa riêng; đặt trên đầu phiếu làm mất quan hệ khi cắt nhiều mã/kho.",
      "fieldname": "offcut_bundle",
      "fieldtype": "Link",
      "options": "Serial and Batch Bundle",
-     "label": "Bundle nhập đầu thừa",
-     "read_only": true
+     "read_only": true,
+     "surface": "expanded"
     },
-    "item_code:Link(Item)! Mã nhôm",
     {
+     "fieldname": "item_code",
+     "label": "Mã nhôm",
+     "fieldtype": "Link",
+     "options": "Item",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "label": "Kho lô mẹ",
      "fieldname": "source_warehouse",
      "fieldtype": "Link",
      "options": "Warehouse",
-     "label": "Kho lô mẹ",
-     "read_only": true
+     "read_only": true,
+     "surface": "expanded"
     },
-    "source_length_m:Float! Khổ cây (m)",
-    "cut_width_m:Float! Rộng cắt lá (m)",
-    "sheets_cut:Float! Số lá cắt",
-    "cuts_count:Int Số nhát cắt",
-    "kerf_total_m:Float~- Tổng kerf (m)",
-    "kg_consumed:Float Kg tiêu hao",
-    "kg_weighed:Float Kg cân thật lúc xuất",
-    "offcut_length_m:Float~- Đầu thừa (m)",
-    "scrap_m:Float Phế bỏ hẳn (m)",
     {
+     "fieldname": "source_length_m",
+     "label": "Khổ cây (m)",
+     "fieldtype": "Float",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "cut_width_m",
+     "label": "Rộng cắt lá (m)",
+     "fieldtype": "Float",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "sheets_cut",
+     "label": "Số lá cắt",
+     "fieldtype": "Float",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "cuts_count",
+     "label": "Số nhát cắt",
+     "fieldtype": "Int",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "kerf_total_m",
+     "label": "Tổng kerf (m)",
+     "fieldtype": "Float",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "kg_consumed",
+     "label": "Kg tiêu hao",
+     "fieldtype": "Float",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "kg_weighed",
+     "label": "Kg cân thật lúc xuất",
+     "fieldtype": "Float",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "offcut_length_m",
+     "label": "Đầu thừa (m)",
+     "fieldtype": "Float",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "scrap_m",
+     "label": "Phế bỏ hẳn (m)",
+     "fieldtype": "Float",
+     "surface": "expanded"
+    },
+    {
+     "label": "Giá trị lô đã trừ (minor)",
      "fieldname": "stock_value_consumed_minor",
      "fieldtype": "Int",
-     "label": "Giá trị lô đã trừ (minor)",
      "hidden": true,
-     "read_only": true
+     "read_only": true,
+     "surface": "internal"
     },
     {
+     "label": "Giá trị đầu thừa (minor)",
      "fieldname": "offcut_stock_value_minor",
      "fieldtype": "Int",
-     "label": "Giá trị đầu thừa (minor)",
      "hidden": true,
-     "read_only": true
+     "read_only": true,
+     "surface": "internal"
     },
     {
+     "label": "Giá trị phần đã cắt (minor)",
      "fieldname": "cut_product_value_minor",
      "fieldtype": "Int",
-     "label": "Giá trị phần đã cắt (minor)",
      "hidden": true,
-     "read_only": true
+     "read_only": true,
+     "surface": "internal"
     },
     {
+     "label": "Kg tiêu hao (micros)",
      "fieldname": "kg_consumed_micros",
      "fieldtype": "Int",
-     "label": "Kg tiêu hao (micros)",
      "hidden": true,
-     "read_only": true
+     "read_only": true,
+     "surface": "internal"
     },
     {
+     "label": "Kg đầu thừa (micros)",
      "fieldname": "offcut_weight_micros",
      "fieldtype": "Int",
-     "label": "Kg đầu thừa (micros)",
      "hidden": true,
-     "read_only": true
+     "read_only": true,
+     "surface": "internal"
     },
     {
+     "label": "Kg phần đã cắt (micros)",
      "fieldname": "cut_product_weight_micros",
      "fieldtype": "Int",
-     "label": "Kg phần đã cắt (micros)",
      "hidden": true,
-     "read_only": true
+     "read_only": true,
+     "surface": "internal"
     },
-    "note:Data Ghi chú"
+    {
+     "fieldname": "note",
+     "label": "Ghi chú",
+     "fieldtype": "Data",
+     "surface": "expanded"
+    }
    ],
    "permissions": {
     "Chủ xưởng": "rwcsxa",
     "Thủ kho": "rwcsxa",
     "Sản xuất": "rwcsxa",
     "Kế toán": "r"
+   },
+   "form": {
+    "fields": [
+     "serial_and_batch_bundle",
+     "offcut_bundle",
+     "item_code",
+     "source_warehouse",
+     "source_length_m",
+     "cut_width_m",
+     "sheets_cut",
+     "cuts_count",
+     "kg_consumed",
+     "kg_weighed",
+     "scrap_m",
+     "note"
+    ]
+   },
+   "quickEntry": {
+    "fields": [
+     "serial_and_batch_bundle",
+     "item_code",
+     "source_length_m",
+     "cut_width_m",
+     "sheets_cut"
+    ]
    }
   },
   {
@@ -5677,60 +8040,139 @@
     "variance_reason"
    ],
    "fields": [
-    "item_code:Link(Item)! Mã hàng",
     {
+     "fieldname": "item_code",
+     "label": "Mã hàng",
+     "fieldtype": "Link",
+     "options": "Item",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "label": "Lô chụp sổ",
      "fieldname": "batch_no",
      "fieldtype": "Link",
      "options": "Batch",
-     "label": "Lô chụp sổ",
-     "read_only": true
+     "read_only": true,
+     "surface": "expanded"
     },
-    "serial_and_batch_bundle:Link(Serial and Batch Bundle) Lô đếm được",
-    "book_qty:Float~- Số sổ (chụp lúc chốt)",
-    "book_weight_kg:Float~- Kg theo sổ",
-    "counted_qty:Float! Số đếm thực tế",
-    "counted_weight_kg:Float Kg cân thực tế",
-    "variance_qty:Float~- Chênh lệch",
-    "variance_weight_kg:Float~- Chênh kg",
     {
+     "fieldname": "serial_and_batch_bundle",
+     "label": "Lô đếm được",
+     "fieldtype": "Link",
+     "options": "Serial and Batch Bundle",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "book_qty",
+     "label": "Số sổ (chụp lúc chốt)",
+     "fieldtype": "Float",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "book_weight_kg",
+     "label": "Kg theo sổ",
+     "fieldtype": "Float",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "counted_qty",
+     "label": "Số đếm thực tế",
+     "fieldtype": "Float",
+     "required": true,
+     "surface": "quick"
+    },
+    {
+     "fieldname": "counted_weight_kg",
+     "label": "Kg cân thực tế",
+     "fieldtype": "Float",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "variance_qty",
+     "label": "Chênh lệch",
+     "fieldtype": "Float",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "fieldname": "variance_weight_kg",
+     "label": "Chênh kg",
+     "fieldtype": "Float",
+     "read_only": true,
+     "hidden": true,
+     "surface": "internal"
+    },
+    {
+     "label": "Số sổ (micros)",
      "fieldname": "book_qty_micros",
      "fieldtype": "Int",
-     "label": "Số sổ (micros)",
      "hidden": true,
-     "read_only": true
+     "read_only": true,
+     "surface": "internal"
     },
     {
+     "label": "Kg sổ (micros)",
      "fieldname": "book_weight_micros",
      "fieldtype": "Int",
-     "label": "Kg sổ (micros)",
      "hidden": true,
-     "read_only": true
+     "read_only": true,
+     "surface": "internal"
     },
     {
+     "label": "Giá trị sổ (minor)",
      "fieldname": "book_stock_value_minor",
      "fieldtype": "Int",
-     "label": "Giá trị sổ (minor)",
      "hidden": true,
-     "read_only": true
+     "read_only": true,
+     "surface": "internal"
     },
     {
+     "label": "Chênh SL (micros)",
      "fieldname": "variance_qty_micros",
      "fieldtype": "Int",
-     "label": "Chênh SL (micros)",
      "hidden": true,
-     "read_only": true
+     "read_only": true,
+     "surface": "internal"
     },
     {
+     "label": "Chênh kg (micros)",
      "fieldname": "variance_weight_micros",
      "fieldtype": "Int",
-     "label": "Chênh kg (micros)",
      "hidden": true,
-     "read_only": true
+     "read_only": true,
+     "surface": "internal"
     },
-    "valuation_rate:Currency Đơn giá điều chỉnh (khi lô chưa có giá)",
-    "variance_reason:Link(Nguyên nhân chênh lệch) Nguyên nhân",
-    "variance_note:Data Diễn giải",
-    "photo:Attach Image Ảnh hiện trạng"
+    {
+     "fieldname": "valuation_rate",
+     "label": "Đơn giá điều chỉnh (khi lô chưa có giá)",
+     "fieldtype": "Currency",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "variance_reason",
+     "label": "Nguyên nhân",
+     "fieldtype": "Link",
+     "options": "Nguyên nhân chênh lệch",
+     "surface": "quick"
+    },
+    {
+     "fieldname": "variance_note",
+     "label": "Diễn giải",
+     "fieldtype": "Data",
+     "surface": "expanded"
+    },
+    {
+     "fieldname": "photo",
+     "label": "Ảnh hiện trạng",
+     "fieldtype": "Attach Image",
+     "surface": "expanded"
+    }
    ],
    "permissions": {
     "Chủ xưởng": "rwcsxa",
@@ -5738,6 +8180,26 @@
     "Kế toán": "rwcs",
     "Sản xuất": "r",
     "Kinh doanh": "r"
+   },
+   "form": {
+    "fields": [
+     "item_code",
+     "batch_no",
+     "serial_and_batch_bundle",
+     "counted_qty",
+     "counted_weight_kg",
+     "valuation_rate",
+     "variance_reason",
+     "variance_note",
+     "photo"
+    ]
+   },
+   "quickEntry": {
+    "fields": [
+     "item_code",
+     "counted_qty",
+     "variance_reason"
+    ]
    }
   }
  ],
@@ -6342,9 +8804,8 @@
    "doctype": "Purchase Order",
    "default": true,
    "css": [
-    "@page{size:A4 portrait;margin:12mm 8mm 8mm}@page :first{margin-top:23.7mm}",
-    "*{box-sizing:border-box}html,body{margin:0}body{width:194mm;font-family:Arial,'Liberation Sans',sans-serif;font-size:9px;color:#111;padding:0;font-kerning:none;letter-spacing:0;word-spacing:0}",
-        "@media screen{html{width:210mm}body{width:210mm;min-height:297mm;padding:23.7mm 8mm 8mm}}",
+    "@page{size:A4 portrait;margin:0}",
+    "*{box-sizing:border-box}html,body{margin:0;width:210mm;min-height:297mm}body{font-family:Arial,'Liberation Sans',sans-serif;font-size:9px;color:#111;padding:23.7mm 8mm 8mm;font-kerning:none;letter-spacing:0;word-spacing:0}",
     ".letterhead{position:relative;width:194mm;height:17mm;margin-left:0;overflow:hidden}",
     ".brand-logo{position:absolute;left:0;top:1.35mm;width:74mm;height:auto}",
     ".company-header-img{position:absolute;right:-13.5mm;top:0;width:114.3mm;height:auto;display:block}",

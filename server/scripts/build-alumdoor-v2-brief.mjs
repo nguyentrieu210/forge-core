@@ -12,6 +12,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
+import { applyAlumdoorChildPresentation } from "./lib/alumdoor-child-presentation.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const SRC = resolve(here, "../briefs/alumdoor.json");
@@ -1360,6 +1361,9 @@ note("G3 · Warehouse: K36/K12 khai stock_role + mỗi kho có một kho đầu 
   }
   note(`chốt chặn: ${brief.fixtures.length} fixture, không cái nào thiếu trường bắt buộc`);
 }
+
+const childPresentation = applyAlumdoorChildPresentation(brief);
+note(`UI ?? child-grid presentation metadata: ${childPresentation.migrated} child DocType`);
 
 writeFileSync(OUT, JSON.stringify(brief, null, 1) + "\n", "utf8");
 console.log(log.map((l) => "  " + l).join("\n"));
