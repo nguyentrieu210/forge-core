@@ -7,6 +7,11 @@ export interface PricingContext {
   priceList: string;
   documentCurrency: string;
   uom?: string;
+  /**
+   * Existing callers keep legacy behavior by default. Commercial composition can ask for
+   * the raw Item Price and apply Pricing Rule effects exactly once in the shared resolver.
+   */
+  applyPricingRules?: boolean;
   partyType?: "Customer" | "Supplier";
   party?: string;
   customerGroup?: string;
