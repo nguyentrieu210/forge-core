@@ -22,10 +22,10 @@ export interface SalesItem extends UomLine {
   serial_and_batch_bundle?: string;
   batch_no?: string;
   serial_nos?: string[];
-  item_price?: string;
+  item_price?: string | undefined;
   /** Raw Item Price before Pricing Rule effects. */
-  base_rate?: DecimalInput;
-  base_rate_minor?: number;
+  base_rate?: DecimalInput | undefined;
+  base_rate_minor?: number | undefined;
   /** Price-list baseline retained when a salesperson overrides the line rate. */
   standard_rate?: DecimalInput;
   /** Server-derived flag: submitted rate differs from the active commercial policy. */
@@ -43,7 +43,7 @@ export interface SalesItem extends UomLine {
   adjustment_amount_minor?: number;
   taxable_adjustment_amount?: string;
   taxable_adjustment_amount_minor?: number;
-  pricing_as_of?: string;
+  pricing_as_of?: string | undefined;
   pricing_rule_snapshots?: PricingRuleSnapshot[];
   /** Source Quotation child row. Required when a Sales Order declares against_quotation. */
   quotation_item?: string;
