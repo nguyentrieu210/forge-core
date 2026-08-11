@@ -8,13 +8,16 @@ on:
       - "server/packages/clouderp-stock/**"
       - "server/packages/clouderp-erpnext/**"
       - "server/apps-src/alumdoor-worker/**"
+      - "server/briefs/alumdoor-v2.json"
       - "server/tests/aluminum-*.test.mjs"
+      - "server/tests/alumdoor-item-model.test.mjs"
       - "server/tests/alumdoor-item-validator.test.mjs"
       - "server/tests/alumdoor-v2-inventory.test.mjs"
       - "server/tests/purchase-*.test.mjs"
       - "server/tests/catch-weight-valuation.test.mjs"
       - "server/tests/stock-reservation-integrity.test.mjs"
       - "server/tests/manufacturing-*.test.mjs"
+      - "server/scripts/apply-alumdoor-aluminum-metadata-overlay.mjs"
       - "server/scripts/alumdoor-aluminum-inventory-cutover-plan.mjs"
       - "server/scripts/seed-purchase-qa-local.mjs"
       - "client/e2e-forge/auth-tests/purchase-fifo-lifecycle.spec.ts"
@@ -90,10 +93,12 @@ jobs:
             tests/r5-03-purchase-allocation-measure.test.mjs \
             tests/catch-weight-valuation.test.mjs
 
-      - name: Validator mixed-document and authenticated-QA boundary
+      - name: Validator package and authenticated-QA boundary
         working-directory: server
         run: |
+          node scripts/apply-alumdoor-aluminum-metadata-overlay.mjs briefs/alumdoor-v2.json --check
           node --test \
+            tests/alumdoor-item-model.test.mjs \
             tests/alumdoor-item-validator.test.mjs \
             tests/aluminum-item-validator-boundary.test.mjs \
             tests/aluminum-validation-bridge.test.mjs \
