@@ -30,6 +30,14 @@ export interface SalesItem extends UomLine {
   sales_option_version?: number;
   sales_mode?: string;
   sales_package?: string;
+  /** Frozen package authority; downstream fulfillment never re-resolves mutable package master data. */
+  sales_package_version?: number;
+  sales_package_checksum?: string;
+  sales_package_snapshot?: JsonObject;
+  /** Exact Sales Order child-row identity used by Delivery/Billing progress. */
+  sales_order_row_id?: string;
+  /** Exact component within a frozen package when the physical line fulfills a package parent. */
+  sales_package_component_key?: string;
 
   item_price?: string | undefined;
   price_variant?: string;
