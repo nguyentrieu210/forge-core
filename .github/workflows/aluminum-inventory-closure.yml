@@ -17,13 +17,16 @@ on:
       - "server/tests/catch-weight-valuation.test.mjs"
       - "server/tests/stock-reservation-integrity.test.mjs"
       - "server/tests/manufacturing-*.test.mjs"
+      - "server/scripts/build-alumdoor-v2-brief.mjs"
       - "server/scripts/apply-alumdoor-aluminum-metadata-overlay.mjs"
       - "server/scripts/alumdoor-aluminum-inventory-cutover-plan.mjs"
       - "server/scripts/seed-purchase-qa-local.mjs"
       - "client/e2e-forge/auth-tests/purchase-fifo-lifecycle.spec.ts"
       - "client/e2e-forge/auth-tests/purchase-bulk-transaction.spec.ts"
       - "docs/agents/alumdoor/ALUMINUM_INVENTORY_CLOSURE_20260811.md"
+      - "docs/agents/aluminum/**"
       - ".github/workflows/aluminum-inventory-closure.yml"
+      - ".github/workflows/r6-pass-convergence.yml"
 
 permissions:
   contents: read
@@ -93,10 +96,12 @@ jobs:
             tests/r5-03-purchase-allocation-measure.test.mjs \
             tests/catch-weight-valuation.test.mjs
 
-      - name: Validator package and authenticated-QA boundary
+      - name: Canonical V2 builder, validator package and authenticated-QA boundary
         working-directory: server
         run: |
+          node scripts/build-alumdoor-v2-brief.mjs
           node scripts/apply-alumdoor-aluminum-metadata-overlay.mjs briefs/alumdoor-v2.json --check
+          git diff --exit-code -- briefs/alumdoor-v2.json
           node --test \
             tests/alumdoor-item-model.test.mjs \
             tests/alumdoor-item-validator.test.mjs \
