@@ -25,6 +25,8 @@ const INTERNAL_CORRECTION_ROLE = "AlumDoor Attendance System";
 const INTERNAL_PAYROLL_ROLE = "AlumDoor Payroll System";
 const DAY_DOCTYPE = "AlumDoor Attendance Day";
 const SEGMENT_DOCTYPE = "AlumDoor Attendance Segment";
+const DEVICE_DOCTYPE = "AlumDoor Attendance Device";
+const DEVICE_SYSTEM_ROLE = "AlumDoor Device System";
 
 type SegmentInput = SegmentSnapshot & { row_id?: string; in_checkin?: string; out_checkin?: string };
 
@@ -32,9 +34,13 @@ export class AlumDoorAttendanceDayController implements DocumentController<JsonO
   readonly doctype = DAY_DOCTYPE;
 
   async buildPlan(context: ControllerContext<JsonObject>): Promise<MutationPlan<JsonObject>> {
+    // Internal roles identify the coordinator that issued this command, not ordinary
+    // user capabilities. An Administrator may carry all declared roles in development;
+    // a QR command must still remain a QR command instead of being misclassified as a
+    // correction/payroll create (both of which correctly reject new attendance days).
     const isScan = context.command.actor.roles.includes(INTERNAL_SCAN_ROLE);
-    const isCorrection = context.command.actor.roles.includes(INTERNAL_CORRECTION_ROLE);
-    const isPayroll = context.command.actor.roles.includes(INTERNAL_PAYROLL_ROLE);
+    const isPayroll = !isScan && context.command.actor.roles.includes(INTERNAL_PAYROLL_ROLE);
+    const isCorrection = !isScan && !isPayroll && context.command.actor.roles.includes(INTERNAL_CORRECTION_ROLE);
     if (!isScan && !isCorrection && !isPayroll) {
       throw errors.permission("AlumDoor Attendance Day chỉ được cập nhật từ giao dịch QR, phiếu sửa công đã duyệt hoặc điều phối lương nội bộ.");
     }
@@ -101,6 +107,76 @@ export class AlumDoorAttendanceDayController implements DocumentController<JsonO
         regular_minutes: data.regular_minutes,
         overtime_minutes: data.overtime_minutes,
       },
+    };
+  }
+}
+
+/** Registered attendance credentials. Plaintext credentials never cross this controller. */
+export class AlumDoorAttendanceDeviceController implements DocumentController<JsonObject> {
+  readonly doctype = DEVICE_DOCTYPE;
+
+  async buildPlan(context: ControllerContext<JsonObject>): Promise<MutationPlan<JsonObject>> {
+    if (!["create", "save"].includes(context.command.action)) throw errors.lifecycle("Thiết bị chấm công chỉ hỗ trợ tạo, cập nhật hoặc thu hồi.");
+    const internal = context.command.actor.roles.includes(DEVICE_SYSTEM_ROLE);
+    const manager = context.command.actor.user_id === "Administrator"
+      || context.command.actor.roles.some((role) => ["Administrator", "System Manager", "HR Manager", "AlumDoor Attendance Manager"].includes(role));
+    if (!internal && !manager) throw errors.permission("Chỉ hệ thống chấm công hoặc quản lý được cập nhật thiết bị.");
+    if (context.command.action === "create" && !internal) throw errors.permission("Thiết bị chỉ được tạo qua luồng đăng ký an toàn.");
+
+    const input = context.command.document;
+    const deviceId = H.requiredText(input.device_id, "Attendance device id");
+    if (deviceId !== context.command.aggregate.name || !/^[A-Za-z0-9_-]{16,128}$/u.test(deviceId)) throw errors.validation("Attendance device id is invalid");
+    const employee = H.requiredText(input.employee, "Attendance device employee");
+    const credentialHash = H.requiredText(input.credential_hash, "Attendance credential hash").toLowerCase();
+    if (!/^[a-f0-9]{64}$/u.test(credentialHash)) throw errors.validation("Attendance credential hash is invalid");
+    await H.requireRecord(context as H.HrmContext, "Employee", employee);
+    if (context.existing) {
+      if (H.text(context.existing.data.employee) !== employee || H.text(context.existing.data.credential_hash) !== credentialHash) {
+        throw errors.lifecycle("Employee và credential của thiết bị là bất biến; hãy thu hồi và đăng ký thiết bị mới.");
+      }
+    }
+    const status = H.text(input.status) || "Active";
+    if (!(["Active", "Revoked"] as const).includes(status as "Active" | "Revoked")) throw errors.validation("Attendance device status is invalid");
+    if (!internal && status !== "Revoked") throw errors.lifecycle("Quản lý chỉ có thể thu hồi thiết bị; thiết bị đã thu hồi phải đăng ký lại bằng credential mới.");
+    const data: JsonObject = {
+      ...input,
+      device_id: deviceId,
+      device_label: H.requiredText(input.device_label, "Attendance device label"),
+      employee,
+      credential_hash: credentialHash,
+      status,
+      registered_at: context.existing ? H.requiredDatetime(context.existing.data.registered_at, "Attendance device registered_at") : context.now,
+      last_seen_at: H.text(input.last_seen_at) ? H.requiredDatetime(input.last_seen_at, "Attendance device last_seen_at") : context.now,
+      ...(status === "Revoked" ? { revoked_at: H.text(input.revoked_at) || context.now } : {}),
+    };
+    const document: CanonicalDocument<JsonObject> = {
+      tenant_id: context.command.tenant_id,
+      doctype: this.doctype,
+      name: deviceId,
+      owner: context.existing?.owner ?? context.command.actor.user_id,
+      docstatus: 0,
+      status,
+      version: context.nextVersion,
+      created_at: context.existing?.created_at ?? context.now,
+      modified_at: context.now,
+      data,
+      children: [],
+    };
+    return {
+      command: context.command,
+      document,
+      gl_entries: [], stock_entries: [], payment_entries: [], fulfillment_entries: [],
+      events: [domainEvent({
+        type: status === "Revoked" ? "alumdoor_attendance_device.revoked" : context.command.action === "create" ? "alumdoor_attendance_device.registered" : "alumdoor_attendance_device.seen",
+        tenantId: context.command.tenant_id,
+        aggregate: context.command.aggregate,
+        aggregateVersion: context.nextVersion,
+        actor: context.command.actor.user_id,
+        commandId: context.command.command_id,
+        occurredAt: context.now,
+        payload: { employee, status },
+      })],
+      result: { doctype: this.doctype, name: deviceId, version: context.nextVersion, status },
     };
   }
 }

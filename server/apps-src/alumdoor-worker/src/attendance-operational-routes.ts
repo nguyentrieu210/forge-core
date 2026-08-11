@@ -21,14 +21,29 @@ async function method(call: AttendanceOperationalCall, name: string, body: Json)
   if (!response.ok) throw new Error(text(payload.message) || text((payload.error as Json | undefined)?.message) || `HTTP ${response.status}`);
   return payload.message ?? payload.data ?? payload;
 }
-async function list(call: AttendanceOperationalCall, filters: unknown): Promise<unknown> {
-  return method(call, "frappe.client.get_list", {
+function records(value: unknown): Json[] {
+  return Array.isArray(value) ? value.filter((row): row is Json => Boolean(row) && typeof row === "object" && !Array.isArray(row)) : [];
+}
+async function attendanceDocument(call: AttendanceOperationalCall, row: Json): Promise<Json> {
+  const name = text(row.name);
+  if (!name) return row;
+  const payload = await method(call, "frappe.desk.form.load.getdoc", { doctype: "AlumDoor Attendance Day", name });
+  const docs = payload && typeof payload === "object" && !Array.isArray(payload) ? records((payload as Json).docs) : [];
+  return docs[0] ? { ...row, ...docs[0] } : row;
+}
+async function list(call: AttendanceOperationalCall, filters: unknown): Promise<Json[]> {
+  const rows = records(await method(call, "frappe.client.get_list", {
     doctype: "AlumDoor Attendance Day",
-    fields: ["name", "employee", "company", "branch", "department", "work_date", "state", "locked_by_payroll", "regular_minutes", "overtime_minutes", "payable_work_fraction_bp", "segments", "modified"],
+    fields: ["name", "employee", "company", "branch", "department", "work_date", "state", "locked_by_payroll", "regular_minutes", "overtime_minutes", "payable_work_fraction_bp", "modified"],
     filters,
     order_by: "work_date desc, employee asc",
     limit_page_length: 1000,
-  });
+  }));
+  const hydrated: Json[] = [];
+  for (let offset = 0; offset < rows.length; offset += 20) {
+    hydrated.push(...await Promise.all(rows.slice(offset, offset + 20).map((row) => attendanceDocument(call, row))));
+  }
+  return hydrated;
 }
 
 export async function attendanceToday(input: { call: AttendanceOperationalCall; args: Json; now?: Date }): Promise<Response> {
@@ -58,6 +73,18 @@ export async function attendanceExceptions(input: { call: AttendanceOperationalC
     if (text(input.args.employee)) filters.push(["employee", "=", text(input.args.employee)]);
     return json(await list(input.call, filters));
   } catch (error) { return fail("ATTENDANCE_EXCEPTION_FAILED", error instanceof Error ? error.message : "Không đọc được ngoại lệ chấm công."); }
+}
+
+export async function attendanceCorrectionRequests(input: { call: AttendanceOperationalCall }): Promise<Response> {
+  try {
+    return json(await method(input.call, "frappe.client.get_list", {
+      doctype: "Attendance Request",
+      fields: ["name", "employee", "from_date", "to_date", "reason", "workflow_state", "alu_segment_code", "alu_requested_in", "alu_requested_out", "modified"],
+      filters: [["request_type", "=", "Sửa chấm công"], ["workflow_state", "=", "Chờ duyệt"]],
+      order_by: "modified desc",
+      limit_page_length: 200,
+    }));
+  } catch (error) { return fail("ATTENDANCE_CORRECTION_LIST_FAILED", error instanceof Error ? error.message : "Không đọc được phiếu sửa công."); }
 }
 
 export async function attendanceSubmitCorrection(input: { call: AttendanceOperationalCall; args: Json }): Promise<Response> {

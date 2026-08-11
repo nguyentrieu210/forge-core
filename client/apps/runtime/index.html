@@ -23,7 +23,7 @@
         let remembered = null;
         try { remembered = localStorage.getItem("metaforge-app"); } catch { /* chế độ riêng tư */ }
         const alumdoor = remembered === "alumdoor"
-          || location.hostname.toLowerCase() === "alu.kairo.vn"
+          || ["alu.kairo.vn", "alumdoor.kairo.vn"].includes(location.hostname.toLowerCase())
           || params.get("alumdoor") === "1";
         if (!alumdoor) return;
         const logo = "/alumdoor/app-icon-192.png";

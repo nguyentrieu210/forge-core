@@ -79,6 +79,8 @@ export function TextAreaControl(p: FieldControlProps) {
 
 export function NumberControl(p: FieldControlProps) {
   if (p.masked) return <Masked />;
+  if (p.field.ui_control === "time_of_day_minutes") return <MinuteOfDayControl {...p} />;
+  if (p.field.ui_control === "duration_minutes") return <MinuteDurationControl {...p} />;
   const step = p.field.fieldtype === "Int" ? "1" : "any";
   const suffix = p.field.fieldtype === "Percent" ? "%" : undefined;
   // Bảng bán hàng dùng VNĐ: giá và thành tiền luôn là số nguyên. Chuẩn hoá ngay
@@ -138,6 +140,136 @@ export function NumberControl(p: FieldControlProps) {
         onChange={(e: ChangeEvent<HTMLInputElement>) => p.onChange(e.target.value === "" ? null : Number(e.target.value))}
       />
       {suffix ? <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">{suffix}</span> : null}
+    </div>
+  );
+}
+
+function minuteValue(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? Math.max(0, Math.round(numeric)) : null;
+}
+
+function formatMinuteOfDay(value: unknown): string {
+  const total = minuteValue(value);
+  return total === null
+    ? ""
+    : `${String(Math.floor(total / 60) % 24).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+
+function parseMinuteOfDay(text: string): number | null {
+  const value = text.trim();
+  let hours: number;
+  let minutes: number;
+  const colon = value.match(/^(\d{1,2}):(\d{2})$/);
+  const compact = value.match(/^(\d{3,4})$/);
+  if (colon) {
+    hours = Number(colon[1]);
+    minutes = Number(colon[2]);
+  } else if (compact) {
+    const digits = compact[1] ?? "";
+    hours = Number(digits.slice(0, -2));
+    minutes = Number(digits.slice(-2));
+  } else {
+    return null;
+  }
+  return hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59
+    ? hours * 60 + minutes
+    : null;
+}
+
+/** Integer minutes since midnight in storage, familiar HH:mm at the form boundary. */
+export function MinuteOfDayControl(p: FieldControlProps) {
+  const display = formatMinuteOfDay(p.value);
+  const [text, setText] = useState(display);
+  const [editing, setEditing] = useState(false);
+  useEffect(() => { if (!editing) setText(display); }, [display, editing]);
+
+  if (p.readOnly) {
+    return <span id={labelId(p)} className="mf-control text-sm tabular-nums">{display || "—"}</span>;
+  }
+
+  return (
+    <Input
+      id={labelId(p)}
+      className="mf-control tabular-nums"
+      type="text"
+      inputMode="numeric"
+      autoComplete="off"
+      maxLength={5}
+      placeholder="HH:mm"
+      title="Nhập giờ theo định dạng 24 giờ HH:mm"
+      value={text}
+      aria-invalid={p.error || (editing && text !== "" && parseMinuteOfDay(text) === null) ? true : undefined}
+      {...a11y(p)}
+      onChange={(e: ChangeEvent<HTMLInputElement>) => {
+        const next = e.target.value.replace(/[^\d:]/g, "").slice(0, 5);
+        setText(next);
+        const parsed = parseMinuteOfDay(next);
+        if (parsed !== null) p.onChange(parsed);
+      }}
+      onFocus={() => setEditing(true)}
+      onBlur={() => {
+        setEditing(false);
+        if (!text) {
+          p.onChange(null);
+          return;
+        }
+        const parsed = parseMinuteOfDay(text);
+        if (parsed === null) setText(display);
+        else {
+          p.onChange(parsed);
+          setText(formatMinuteOfDay(parsed));
+        }
+      }}
+    />
+  );
+}
+
+/** Integer duration in storage, split into hours/minutes so operators never calculate it by hand. */
+export function MinuteDurationControl(p: FieldControlProps) {
+  const total = minuteValue(p.value) ?? 0;
+  const hours = Math.floor(total / 60);
+  const minutes = total % 60;
+
+  if (p.readOnly) {
+    return (
+      <span id={labelId(p)} className="mf-control text-sm tabular-nums">
+        {p.value === null || p.value === undefined || p.value === "" ? "—" : `${hours} giờ ${minutes} phút`}
+      </span>
+    );
+  }
+
+  const commit = (part: "hours" | "minutes", raw: string) => {
+    const value = Math.max(0, Math.round(Number(raw) || 0));
+    p.onChange(part === "hours" ? value * 60 + minutes : hours * 60 + Math.min(value, 59));
+  };
+
+  return (
+    <div id={labelId(p)} className="mf-duration flex items-end gap-2">
+      <div className="flex flex-col gap-1">
+        <Input
+          type="number"
+          min={0}
+          value={hours}
+          aria-label="Giờ"
+          className="mf-control h-9 w-24 text-center tabular-nums"
+          onChange={(e: ChangeEvent<HTMLInputElement>) => commit("hours", e.target.value)}
+        />
+        <span className="text-center text-[10px] text-muted-foreground">giờ</span>
+      </div>
+      <div className="flex flex-col gap-1">
+        <Input
+          type="number"
+          min={0}
+          max={59}
+          value={minutes}
+          aria-label="Phút"
+          className="mf-control h-9 w-24 text-center tabular-nums"
+          onChange={(e: ChangeEvent<HTMLInputElement>) => commit("minutes", e.target.value)}
+        />
+        <span className="text-center text-[10px] text-muted-foreground">phút</span>
+      </div>
     </div>
   );
 }

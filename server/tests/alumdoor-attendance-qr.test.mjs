@@ -2,63 +2,47 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   AttendanceQrError,
-  attendanceScanExternalId,
-  issueAttendanceQr,
-  verifyAttendanceQr,
+  inspectStaticAttendanceStationToken,
+  issueStaticAttendanceStationToken,
+  verifyStaticAttendanceStationToken,
 } from "../dist/apps-src/alumdoor-worker/src/attendance-qr.js";
 
 const input = {
   tenant: "alu",
   station: "CỔNG-XƯỞNG",
   secret: "attendance-secret-for-tests-only",
-  secretVersion: "v1",
-  ttlSeconds: 15,
+  tokenVersion: "1",
 };
 
-test("the same 15-second bucket produces a signed QR without exposing the secret", async () => {
-  const first = await issueAttendanceQr({ ...input, now: 100_000 });
-  const second = await issueAttendanceQr({ ...input, now: 104_999 });
+test("static station QR is stable and contains no employee, coordinates or secret", async () => {
+  const first = await issueStaticAttendanceStationToken(input);
+  const second = await issueStaticAttendanceStationToken(input);
   assert.equal(first.token, second.token);
-  assert.equal(first.payload.expires_at, 105);
   assert.equal(first.token.includes(input.secret), false);
-
-  const verified = await verifyAttendanceQr({ ...input, token: first.token, now: 104_999 });
-  assert.equal(verified.payload.station, input.station);
-  assert.match(verified.nonceHash, /^[0-9a-f]{64}$/);
+  assert.equal(first.token.includes("EMP"), false);
+  assert.equal(first.token.includes("latitude"), false);
+  assert.equal(inspectStaticAttendanceStationToken(first.token).station, input.station);
+  const verified = await verifyStaticAttendanceStationToken({ ...input, token: first.token });
+  assert.match(verified.tokenHash, /^[0-9a-f]{64}$/);
 });
 
-test("QR is rejected once its server-side bucket expires", async () => {
-  const challenge = await issueAttendanceQr({ ...input, now: 100_000 });
+test("rotating station version invalidates the old printed QR", async () => {
+  const old = await issueStaticAttendanceStationToken(input);
   await assert.rejects(
-    () => verifyAttendanceQr({ ...input, token: challenge.token, now: 105_000 }),
-    (error) => error instanceof AttendanceQrError && error.code === "QR_EXPIRED",
+    () => verifyStaticAttendanceStationToken({ ...input, tokenVersion: "2", token: old.token }),
+    (error) => error instanceof AttendanceQrError && error.code === "QR_REVOKED",
   );
 });
 
 test("tampering or changing station never becomes a valid scan", async () => {
-  const challenge = await issueAttendanceQr({ ...input, now: 100_000 });
-  const [payload, signature] = challenge.token.split(".");
+  const issued = await issueStaticAttendanceStationToken(input);
+  const [payload, signature] = issued.token.split(".");
   await assert.rejects(
-    () => verifyAttendanceQr({ ...input, token: `${payload}a.${signature}`, now: 101_000 }),
+    () => verifyStaticAttendanceStationToken({ ...input, token: `${payload}a.${signature}` }),
     (error) => error instanceof AttendanceQrError && error.code === "QR_INVALID",
   );
   await assert.rejects(
-    () => verifyAttendanceQr({ ...input, station: "TRẠM-KHÁC", token: challenge.token, now: 101_000 }),
+    () => verifyStaticAttendanceStationToken({ ...input, station: "TRẠM-KHÁC", token: issued.token }),
     (error) => error instanceof AttendanceQrError && error.code === "QR_STATION_MISMATCH",
-  );
-});
-
-test("scan idempotency is stable for the same employee, challenge and segment", async () => {
-  const same = {
-    tenant: "alu",
-    employee: "EMP-0001",
-    station: "CỔNG-XƯỞNG",
-    nonceHash: "a".repeat(64),
-    segment: "SHIFT1",
-  };
-  assert.equal(await attendanceScanExternalId(same), await attendanceScanExternalId(same));
-  assert.notEqual(
-    await attendanceScanExternalId(same),
-    await attendanceScanExternalId({ ...same, segment: "SHIFT2" }),
   );
 });

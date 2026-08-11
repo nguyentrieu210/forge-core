@@ -60,6 +60,7 @@ export function toFrappeDocField(field: DocFieldMeta): JsonObject {
   if (field.form_width !== undefined) row.form_width = field.form_width;
   if (field.form_region !== undefined) row.form_region = field.form_region;
   if (field.form_control_width !== undefined) row.form_control_width = field.form_control_width;
+  if (field.ui_control !== undefined) row.ui_control = field.ui_control;
   // MetaForge's canonical form contract travels with the ordinary Frappe field row.
   // Older clients ignore these extra keys; current clients use `surface` for compact
   // quick-entry and the other keys to explain why a field cannot be edited.

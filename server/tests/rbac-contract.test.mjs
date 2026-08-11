@@ -136,6 +136,58 @@ test("capabilities and trace are evaluated with the selected actor", async () =>
   assert.ok(calls.every((request) => request.actor.user_id === USER.user_id));
 });
 
+test("an opted-in configuration master can be deleted after approval", async () => {
+  const permissions = {
+    async assert(request) {
+      if (["read", "save"].includes(request.action)) return;
+      throw new Error(`Role is not allowed to ${request.action}`);
+    },
+  };
+  const document = {
+    tenant_id: "tenant-a",
+    doctype: "Attendance Policy",
+    name: "ATP-1",
+    owner: USER.user_id,
+    docstatus: 1,
+    status: "Approved",
+    version: 1,
+    created_at: "2026-07-31T00:00:00.000Z",
+    modified_at: "2026-07-31T00:00:00.000Z",
+    data: {},
+    children: [],
+  };
+  const baseMeta = {
+    name: "Attendance Policy",
+    module: "Attendance",
+    kind: "master",
+    fields: [],
+    permissions: [{ role: "Stock User", read: true, write: true }],
+    is_submittable: true,
+    revision: 1,
+  };
+
+  const regular = await evaluatePermissionCapabilities({
+    actor: USER,
+    tenantId: "tenant-a",
+    doctype: "Attendance Policy",
+    meta: baseMeta,
+    document,
+    permissions,
+  });
+  assert.equal(regular.capabilities.delete, false, "submitted documents stay protected by default");
+
+  const optedIn = await evaluatePermissionCapabilities({
+    actor: USER,
+    tenantId: "tenant-a",
+    doctype: "Attendance Policy",
+    meta: { ...baseMeta, allow_delete_non_draft: true },
+    document,
+    permissions,
+  });
+  assert.equal(optedIn.capabilities.delete, true);
+  assert.ok(optedIn.trace.some((item) => item.detail.includes("Danh mục cấu hình")));
+});
+
 test("user-permission identity is stable, reversible and includes the applicable doctype", () => {
   const base = { user: USER.user_id, allow: "Warehouse", forValue: "KHO-1" };
   assert.equal(userPermissionIdentity(base), userPermissionIdentity(base));

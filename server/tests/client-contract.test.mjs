@@ -147,6 +147,44 @@ test("integer flags survive the round trip, since booleans would read as absent"
   assert.equal(normalized.track_seen, 1);
 });
 
+test("minute presentation controls survive the server-to-client metadata round trip", () => {
+  const hinted = parseDocTypeMeta({
+    name: "Shift Policy",
+    module: "Custom",
+    fields: [
+      { fieldname: "starts_at", label: "Starts at", fieldtype: "Int", ui_control: "time_of_day_minutes" },
+      { fieldname: "daily_cap", label: "Daily cap", fieldtype: "Int", ui_control: "duration_minutes" },
+    ],
+    permissions: [{ role: "System Manager", read: true, write: true }],
+    revision: 1,
+  });
+  const normalized = throughClient(hinted);
+  assert.equal(normalized.fields[0].ui_control, "time_of_day_minutes");
+  assert.equal(normalized.fields[1].ui_control, "duration_minutes");
+
+  assert.throws(() => parseDocTypeMeta({
+    ...hinted,
+    fields: [{ fieldname: "invalid", label: "Invalid", fieldtype: "Data", ui_control: "duration_minutes" }],
+  }), /requires fieldtype Int/);
+});
+
+test("non-draft deletion requires an explicit master DocType opt-in", () => {
+  const master = parseDocTypeMeta({
+    ...META,
+    name: "Attendance Policy",
+    kind: "master",
+    allow_delete_non_draft: true,
+  });
+  assert.equal(master.allow_delete_non_draft, true);
+
+  assert.throws(() => parseDocTypeMeta({
+    ...META,
+    name: "Payroll Entry",
+    kind: "transaction",
+    allow_delete_non_draft: true,
+  }), /only valid for master DocTypes/);
+});
+
 test("a child doctype in the bundle is found by name, not by position", () => {
   // getdoctype(with_parent=1) answers a child query with the parent's whole bundle,
   // parent first; taking docs[0] would hand the client the wrong meta entirely.

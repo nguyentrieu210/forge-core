@@ -17,12 +17,13 @@ function permission(meta, role) {
 test("AlumDoor attendance payroll metadata stays an isolated HRM-dependent package", async () => {
   const manifest = parseAppManifest(await readAppSource(source));
   assert.equal(manifest.id, "alumdoor-attendance");
-  assert.equal(manifest.version, "0.2.0");
+  assert.equal(manifest.version, "0.4.0");
   assert.deepEqual(manifest.requires, [{ id: "hrm", version: "1.8.0" }]);
   assert.deepEqual(
     manifest.doctypes.map((meta) => meta.name).sort(),
     [
       "AlumDoor Attendance Day",
+      "AlumDoor Attendance Device",
       "AlumDoor Attendance Policy",
       "AlumDoor Attendance Segment",
       "AlumDoor Pay Profile",
@@ -33,7 +34,9 @@ test("AlumDoor attendance payroll metadata stays an isolated HRM-dependent packa
     manifest.roles.map((entry) => entry.role).sort(),
     [
       "AlumDoor Attendance Manager",
+      "AlumDoor Attendance System",
       "AlumDoor Attendance Viewer",
+      "AlumDoor Device System",
       "AlumDoor Payroll Approver",
       "AlumDoor Payroll System",
       "AlumDoor Payroll User",
@@ -86,7 +89,21 @@ test("AlumDoor QR station stores a version reference, never signing material", a
   assert.equal(field(station, "secret_version")?.hidden, true);
   assert.equal(field(station, "secret_version")?.serverEnforced, true);
   assert.equal(field(station, "policy")?.options, "AlumDoor Attendance Policy");
+  for (const required of ["company", "branch", "latitude", "longitude", "allowed_radius_m", "max_gps_accuracy_m"]) {
+    assert.equal(field(station, required)?.required, true, `station.${required} must be required`);
+  }
   assert.equal(station?.fields.some((entry) => /secret|token|private.?key/i.test(entry.fieldname) && entry.fieldname !== "secret_version"), false);
+});
+
+test("registered device stores only a credential hash and can be revoked by managers", async () => {
+  const manifest = parseAppManifest(await readAppSource(source));
+  const device = manifest.doctypes.find((meta) => meta.name === "AlumDoor Attendance Device");
+  assert.equal(field(device, "credential_hash")?.hidden, true);
+  assert.equal(field(device, "credential_hash")?.read_only, true);
+  assert.equal(field(device, "employee")?.options, "Employee");
+  assert.deepEqual(field(device, "status")?.options, "Active\nRevoked");
+  assert.equal(permission(device, "AlumDoor Attendance Manager")?.write, true);
+  assert.notEqual(permission(device, "AlumDoor Attendance Manager")?.create, true);
 });
 
 test("Attendance policy and pay profile use explicit approval workflows", async () => {
@@ -95,6 +112,9 @@ test("Attendance policy and pay profile use explicit approval workflows", async 
   const policyWorkflow = manifest.workflows.find((entry) => entry.document_type === "AlumDoor Attendance Policy");
   assert.equal(policy?.is_submittable, true);
   assert.equal(policyWorkflow?.state_field, "policy_status");
+  assert.equal(field(policy, "qr_ttl_seconds"), undefined);
+  assert.equal(field(policy, "duplicate_scan_window_seconds")?.default, 60);
+  assert.equal(field(policy, "max_devices_per_employee")?.default, 2);
 
   const profile = manifest.doctypes.find((meta) => meta.name === "AlumDoor Pay Profile");
   const profileWorkflow = manifest.workflows.find((entry) => entry.document_type === "AlumDoor Pay Profile");

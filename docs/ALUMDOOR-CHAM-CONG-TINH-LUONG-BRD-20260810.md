@@ -512,3 +512,6 @@ Chỉ chuyển sang Pha 3 khi chủ doanh nghiệp xác nhận bằng `Duyệt B
 - `docs/hrm/VN_STATUTORY_PAYROLL_SOURCE_LOCK_2026.md`: tham số pháp lý phải theo hiệu lực, nguồn và phê duyệt; không dùng fixture chưa được promote làm cấu hình production.
 - `server/apps-src/hrm/doctypes/employee-checkin.json`, `attendance.json`, `shift-type.json`, `overtime-request.json`: base DocType dùng chung cần ưu tiên tái sử dụng/customization thay vì sửa phá tenant khác.
 - `server/packages/clouderp-erpnext/src/hrm-shift-attendance-controllers.ts`: logic attendance hiện hữu cần được thay/mở rộng có kiểm soát cho policy AlumDoor, không tạo đường tính song song mâu thuẫn.
+# Cập nhật kiến trúc ngày 2026-08-11
+
+Phần QR động/kiosk/TTL trong tài liệu gốc đã được **thay thế** bởi [ALUMDOOR-ATTENDANCE-STATIC-QR-GPS-DEVICE-20260811.md](./ALUMDOOR-ATTENDANCE-STATIC-QR-GPS-DEVICE-20260811.md). Nguồn sự thật công và lương bên dưới vẫn giữ nguyên; cơ chế thu nhận mới là QR cố định theo trạm + GPS + credential thiết bị.

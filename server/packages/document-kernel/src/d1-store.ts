@@ -452,25 +452,32 @@ export class D1MutationStore implements MutationStore {
   }
 
   /**
-   * Deletes a DRAFT document and everything attached to it.
+   * Deletes a document and everything attached to it.
    *
    * Deliberately narrower than Frappe, which also allows deleting a cancelled
    * document. Here a cancelled document still owns its reversing ledger rows
    * (`gl_entries` and friends are keyed by voucher + revision, not by a
    * foreign key), so removing it would leave those reversals pointing at nothing
-   * and silently unbalance the books. A submitted document is never deletable.
+   * and silently unbalance the books. Non-draft deletion is available only through
+   * an explicit metadata opt-in for configuration masters; the ledger check below
+   * remains authoritative even for those masters.
    *
    * Returns false when the document is already gone, so a retried delete is
    * idempotent rather than a 404 the caller has to special-case.
    */
-  async deleteDraftDocument(tenantId: string, doctype: string, name: string): Promise<boolean> {
+  async deleteDraftDocument(
+    tenantId: string,
+    doctype: string,
+    name: string,
+    options: { allowNonDraft?: boolean } = {},
+  ): Promise<boolean> {
     const key = documentKey(doctype, name);
     const row = await this.writer.prepare(
       `SELECT docstatus FROM documents WHERE tenant_id=?1 AND doc_key=?2`,
     ).bind(tenantId, key).first<{ docstatus: number }>();
     if (!row) return false;
-    if (row.docstatus === 1) throw errors.lifecycle("A submitted document cannot be deleted; cancel it instead");
-    if (row.docstatus === 2) throw errors.lifecycle("A cancelled document cannot be deleted because its reversing ledger entries would be orphaned");
+    if (!options.allowNonDraft && row.docstatus === 1) throw errors.lifecycle("A submitted document cannot be deleted; cancel it instead");
+    if (!options.allowNonDraft && row.docstatus === 2) throw errors.lifecycle("A cancelled document cannot be deleted because its reversing ledger entries would be orphaned");
 
     // A draft has no ledger of its own, but an unposted projection would still
     // orphan; check rather than assume.
@@ -496,7 +503,11 @@ export class D1MutationStore implements MutationStore {
       this.writer.prepare(`DELETE FROM document_tags WHERE tenant_id=?1 AND doctype=?2 AND name=?3`).bind(tenantId, doctype, name),
       this.writer.prepare(`UPDATE files SET attached_to_doctype=NULL, attached_to_name=NULL
                            WHERE tenant_id=?1 AND attached_to_doctype=?2 AND attached_to_name=?3`).bind(tenantId, doctype, name),
-      this.writer.prepare(`DELETE FROM documents WHERE tenant_id=?1 AND doc_key=?2 AND docstatus=0`).bind(tenantId, key),
+      this.writer.prepare(
+        options.allowNonDraft
+          ? `DELETE FROM documents WHERE tenant_id=?1 AND doc_key=?2`
+          : `DELETE FROM documents WHERE tenant_id=?1 AND doc_key=?2 AND docstatus=0`,
+      ).bind(tenantId, key),
     ]);
     return true;
   }

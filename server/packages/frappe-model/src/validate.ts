@@ -104,6 +104,10 @@ export function parseDocTypeMeta(value: unknown, expectedName?: string): DocType
   const isTree = bool(input.is_tree, false);
   const isSingle = bool(input.is_single, false);
   const isSubmittable = bool(input.is_submittable, false);
+  const allowDeleteNonDraft = bool(input.allow_delete_non_draft, false);
+  if (allowDeleteNonDraft && kind !== "master") {
+    throw errors.validation("allow_delete_non_draft is only valid for master DocTypes");
+  }
   let viewPolicy: DocTypeViewPolicy | undefined;
   if (input.viewPolicy !== undefined) {
     viewPolicy = parseViewPolicy(input.viewPolicy, fields);
@@ -136,6 +140,7 @@ export function parseDocTypeMeta(value: unknown, expectedName?: string): DocType
     track_changes: bool(input.track_changes, true),
     track_seen: bool(input.track_seen, false),
     allow_rename: bool(input.allow_rename, false),
+    allow_delete_non_draft: allowDeleteNonDraft,
     ...(input.autoname === undefined ? {} : { autoname: text(input.autoname, "autoname", 240) }),
     ...(input.title_field === undefined ? {} : { title_field: text(input.title_field, "title_field", 160) }),
     ...(input.image_field === undefined ? {} : { image_field: text(input.image_field, "image_field", 160) }),
@@ -171,6 +176,13 @@ function parseField(value: unknown, index: number): DocFieldMeta {
   const formControlWidth = input.form_control_width === undefined ? undefined : text(input.form_control_width, `fields[${index}].form_control_width`, 16);
   if (formControlWidth !== undefined && formControlWidth !== "compact") {
     throw errors.validation(`fields[${index}].form_control_width must be compact`);
+  }
+  const uiControl = input.ui_control === undefined ? undefined : text(input.ui_control, `fields[${index}].ui_control`, 40);
+  if (uiControl !== undefined && uiControl !== "time_of_day_minutes" && uiControl !== "duration_minutes") {
+    throw errors.validation(`fields[${index}].ui_control is not recognised: ${uiControl}`);
+  }
+  if (uiControl !== undefined && fieldtype !== "Int") {
+    throw errors.validation(`fields[${index}].ui_control requires fieldtype Int`);
   }
   const valueSource = input.valueSource === undefined ? undefined : text(input.valueSource, `fields[${index}].valueSource`, 24);
   const editMode = input.editMode === undefined ? undefined : text(input.editMode, `fields[${index}].editMode`, 32);
@@ -218,6 +230,7 @@ function parseField(value: unknown, index: number): DocFieldMeta {
     ...(formWidth === undefined ? {} : { form_width: formWidth as "full" | "two_thirds" | "half" | "third" }),
     ...(formRegion === undefined ? {} : { form_region: formRegion as "main" | "aside" | "full" }),
     ...(formControlWidth === undefined ? {} : { form_control_width: "compact" as const }),
+    ...(uiControl === undefined ? {} : { ui_control: uiControl as NonNullable<DocFieldMeta["ui_control"]> }),
     ...(valueSource ? { valueSource: valueSource as NonNullable<DocFieldMeta["valueSource"]> } : {}),
     ...(editMode ? { editMode: editMode as NonNullable<DocFieldMeta["editMode"]> } : {}),
     ...(surface ? { surface: surface as NonNullable<DocFieldMeta["surface"]> } : {}),

@@ -19,7 +19,7 @@ const required = [
   "pnpm-lock.yaml)",
   "git restore --source=HEAD --staged --worktree -- pnpm-lock.yaml",
   "name: Guard full-release generated worktree",
-  "client/apps/kho/dist-mobile/*|server/apps/gateway-worker/public/*)",
+  "client/apps/kho/dist-mobile/*|client/apps/kho/dist-attendance-mobile/*|server/apps/gateway-worker/public/*)",
   "node server/scripts/verify-tenant-backup.mjs",
   "node scripts/migrate-tenant.mjs --tenant \"$TENANT\" --execute --confirm \"$TENANT\" --allow-dirty",
   "node scripts/deploy-tenant.mjs --tenant \"$TENANT\" --execute --confirm \"$TENANT\" --allow-dirty",
@@ -66,6 +66,7 @@ if (!installGuardBlock.includes('test -z "$(git status --porcelain --untracked-f
 const generatedGuardBlock = workflow.slice(generatedGuardIndex, backupIndex);
 const approvedGeneratedRoots = [
   "client/apps/kho/dist-mobile/*",
+  "client/apps/kho/dist-attendance-mobile/*",
   "server/apps/gateway-worker/public/*",
 ];
 for (const root of approvedGeneratedRoots) {

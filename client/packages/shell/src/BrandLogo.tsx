@@ -25,7 +25,7 @@ export function isAlumdoorSurface() {
   const host = window.location.hostname.toLowerCase();
   const params = new URLSearchParams(window.location.search);
   // Giữ ba đường cũ làm dự phòng: trang công khai/landing render TRƯỚC khi manifest kịp tải.
-  return host === "alu.kairo.vn" || params.get("alumdoor") === "1" || window.location.pathname.startsWith("/mobile/warehouse/");
+  return ["alu.kairo.vn", "alumdoor.kairo.vn"].includes(host) || params.get("alumdoor") === "1" || window.location.pathname.startsWith("/mobile/warehouse/");
 }
 
 function getAlumdoorLogoUrl() {

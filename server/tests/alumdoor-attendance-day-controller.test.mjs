@@ -54,7 +54,7 @@ function context(document, roles = ["AlumDoor QR System"]) {
 test("AlumDoor daily projection calculates 3 shifts without changing standard Attendance", async () => {
   const plan = await new AlumDoorAttendanceDayController().buildPlan(context(completeDay));
   assert.equal(plan.document.data.regular_minutes, 480);
-  assert.equal(plan.document.data.overtime_minutes, 30);
+  assert.equal(plan.document.data.overtime_minutes, 60);
   assert.equal(plan.document.data.payable_work_fraction_bp, 10_000);
   assert.equal(plan.document.status, "complete");
   assert.deepEqual(plan.document.children.map((row) => row.child_doctype), [
@@ -64,9 +64,16 @@ test("AlumDoor daily projection calculates 3 shifts without changing standard At
   ]);
 });
 
+test("QR create keeps scan intent when an administrator also carries correction and payroll roles", async () => {
+  const roles = ["Administrator", "AlumDoor QR System", "AlumDoor Attendance System", "AlumDoor Payroll System"];
+  const plan = await new AlumDoorAttendanceDayController().buildPlan(context(completeDay, roles));
+  assert.equal(plan.document.status, "complete");
+  assert.equal(plan.events[0].event_type, "alumdoor_attendance_day.created");
+});
+
 test("daily projection refuses a direct save outside internal attendance/payroll roles", async () => {
   await assert.rejects(
     new AlumDoorAttendanceDayController().buildPlan(context(completeDay, ["Employee"])),
-    /chỉ được cập nhật từ giao dịch QR hoặc điều phối lương nội bộ/i,
+    /chỉ được cập nhật từ giao dịch QR, phiếu sửa công đã duyệt hoặc điều phối lương nội bộ/i,
   );
 });

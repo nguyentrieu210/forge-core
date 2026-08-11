@@ -1,7 +1,7 @@
 {
   "id": "alumdoor-attendance",
   "name": "AlumDoor — Chấm công & tính lương",
-  "version": "0.2.0",
+  "version": "0.4.0",
   "metaContractVersion": 1,
   "requires": [
     { "id": "hrm", "version": "1.8.0" }
@@ -28,6 +28,11 @@
     { "name": "Employee Checkin-alu_token_nonce_hash", "dt": "Employee Checkin", "fieldname": "alu_token_nonce_hash", "field": { "label": "Mã băm QR", "fieldtype": "Data", "read_only": true, "hidden": true }, "insert_after": "alu_segment_code" },
     { "name": "Employee Checkin-alu_capture_source", "dt": "Employee Checkin", "fieldname": "alu_capture_source", "field": { "label": "Nguồn quét AlumDoor", "fieldtype": "Select", "options": "QR", "read_only": true }, "insert_after": "alu_token_nonce_hash" },
     { "name": "Employee Checkin-alu_device_fingerprint_hash", "dt": "Employee Checkin", "fieldname": "alu_device_fingerprint_hash", "field": { "label": "Mã băm thiết bị", "fieldtype": "Data", "read_only": true, "hidden": true }, "insert_after": "alu_capture_source" },
+    { "name": "Employee Checkin-alu_attendance_device", "dt": "Employee Checkin", "fieldname": "alu_attendance_device", "field": { "label": "Thiết bị chấm công", "fieldtype": "Link", "options": "AlumDoor Attendance Device", "read_only": true }, "insert_after": "alu_device_fingerprint_hash" },
+    { "name": "Employee Checkin-alu_gps_accuracy_m", "dt": "Employee Checkin", "fieldname": "alu_gps_accuracy_m", "field": { "label": "Sai số GPS (m)", "fieldtype": "Float", "read_only": true }, "insert_after": "alu_attendance_device" },
+    { "name": "Employee Checkin-alu_distance_to_station_m", "dt": "Employee Checkin", "fieldname": "alu_distance_to_station_m", "field": { "label": "Khoảng cách tới trạm (m)", "fieldtype": "Float", "read_only": true }, "insert_after": "alu_gps_accuracy_m" },
+    { "name": "Employee Checkin-alu_allowed_radius_m", "dt": "Employee Checkin", "fieldname": "alu_allowed_radius_m", "field": { "label": "Bán kính cho phép (m)", "fieldtype": "Float", "read_only": true }, "insert_after": "alu_distance_to_station_m" },
+    { "name": "Employee Checkin-alu_verification_method", "dt": "Employee Checkin", "fieldname": "alu_verification_method", "field": { "label": "Phương thức xác minh", "fieldtype": "Select", "options": "GPS", "read_only": true }, "insert_after": "alu_allowed_radius_m" },
 
     { "name": "Attendance Request-alu_request_code", "dt": "Attendance Request", "fieldname": "alu_request_code", "field": { "label": "Mã yêu cầu AlumDoor", "fieldtype": "Data", "read_only": true }, "insert_after": "workflow_state" },
     { "name": "Attendance Request-alu_segment_code", "dt": "Attendance Request", "fieldname": "alu_segment_code", "field": { "label": "Ca cần sửa", "fieldtype": "Select", "options": "SHIFT1\nSHIFT2\nSHIFT3" }, "insert_after": "alu_request_code" },
@@ -80,11 +85,13 @@
     { "name": "Salary Slip-alu_formula_trace_json", "dt": "Salary Slip", "fieldname": "alu_formula_trace_json", "field": { "label": "Dấu vết công thức", "fieldtype": "Long Text", "read_only": true, "hidden": true }, "insert_after": "alu_input_hash" }
   ],
   "nav": [
-    { "key": "alumdoor-attendance:kiosk", "label": "Màn QR chấm công", "kind": "experience", "icon": "scan-line", "group": "Chấm công & ca", "required_roles": ["AlumDoor Attendance Manager", "HR Manager", "System Manager"] },
+    { "key": "alumdoor-attendance:scan", "label": "Quét chấm công", "kind": "experience", "icon": "scan-line", "group": "Chấm công & ca" },
+    { "key": "alumdoor-attendance:kiosk", "label": "In mã QR trạm", "kind": "experience", "icon": "qr-code", "group": "Chấm công & ca", "required_roles": ["AlumDoor Attendance Manager", "HR Manager", "System Manager"] },
     { "key": "alumdoor-attendance:today", "label": "Công hôm nay", "kind": "experience", "icon": "clock-3", "group": "Chấm công & ca" },
     { "key": "alumdoor-attendance:month", "label": "Bảng công", "kind": "experience", "icon": "calendar-range", "group": "Chấm công & ca", "required_roles": ["AlumDoor Attendance Viewer", "AlumDoor Attendance Manager", "AlumDoor Payroll User", "HR Manager", "System Manager"] },
     { "key": "alumdoor-attendance:exceptions", "label": "Ngoại lệ chấm công", "kind": "experience", "icon": "triangle-alert", "group": "Chấm công & ca", "required_roles": ["AlumDoor Attendance Manager", "HR Manager", "System Manager"] },
     { "key": "AlumDoor QR Station", "label": "Trạm QR", "kind": "doctype", "icon": "scan-line", "group": "Chấm công & ca", "required_roles": ["AlumDoor Attendance Manager", "HR Manager", "System Manager"] },
+    { "key": "AlumDoor Attendance Device", "label": "Thiết bị đã đăng ký", "kind": "doctype", "icon": "smartphone", "group": "Chấm công & ca", "required_roles": ["AlumDoor Attendance Manager", "HR Manager", "System Manager"] },
     { "key": "AlumDoor Attendance Policy", "label": "Chính sách ca", "kind": "doctype", "icon": "timer", "group": "Chấm công & ca", "required_roles": ["AlumDoor Attendance Manager", "HR Manager", "System Manager"] },
     { "key": "AlumDoor Pay Profile", "label": "Hồ sơ lương", "kind": "doctype", "icon": "badge-dollar-sign", "group": "Lương", "required_roles": ["AlumDoor Payroll User", "AlumDoor Payroll Approver", "HR Manager", "System Manager"] },
     { "key": "alumdoor-attendance:payroll-run", "label": "Tính lương", "kind": "experience", "icon": "calculator", "group": "Lương", "required_roles": ["AlumDoor Payroll User", "AlumDoor Payroll Approver", "HR Manager", "System Manager"] },

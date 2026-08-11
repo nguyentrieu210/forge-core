@@ -39,6 +39,8 @@ export interface FormActionCtx {
   isNew: boolean;
   dirty: boolean;
   hasWorkflow: boolean;
+  /** At least one field remains editable after submit (normally via allow_on_submit). */
+  hasEditableFields?: boolean;
   saving?: boolean;
   /** Chỉ hiện Đổi tên khi metadata thật sự cho phép; server vẫn chốt lại lần cuối. */
   allowRename?: boolean;
@@ -56,7 +58,8 @@ export function resolveFormActions(ctx: FormActionCtx): FormActionDesc[] {
 
   // Lưu — bản ghi đã lưu và sạch thì không hiện nút. Người dùng chỉ thấy Lưu sau
   // khi sửa dữ liệu; form tạo mới vẫn giữ nút để bắt đầu luồng nhập.
-  if (ctx.docstatus === 0 && (p.write || (ctx.isNew && p.create)) && (ctx.isNew || ctx.dirty || ctx.saving)) {
+  const canSaveCurrentStatus = ctx.docstatus === 0 || (ctx.docstatus === 1 && ctx.hasEditableFields === true);
+  if (canSaveCurrentStatus && (p.write || (ctx.isNew && p.create)) && (ctx.isNew || ctx.dirty || ctx.saving)) {
     out.push({
       kind: "save",
       label: ctx.saving ? "Đang lưu…" : "Lưu",

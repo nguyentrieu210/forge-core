@@ -326,6 +326,7 @@ export function FormView(props: FormViewProps) {
     isNew: props.isNew ?? (!doc.name || doc.name === "new"),
     dirty: form.formState.isDirty,
     hasWorkflow: (props.transitions?.length ?? 0) > 0 || props.hasWorkflow === true,
+    hasEditableFields: resolved.some((item) => !item.layout && item.visible && !item.readOnly),
     saving: props.saving,
     allowRename: meta.allow_rename === 1,
     perms: props.perms ?? { create: true, write: true, submit: true, cancel: true, delete: true, amend: true },

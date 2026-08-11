@@ -85,8 +85,16 @@ export interface FrappeRouterContext {
   /** AlumDoor-only native attendance scan transaction. */
   commitAlumdoorAttendanceScan?: (input: {
     station: string;
-    nonceHash: string;
-    deviceFingerprintHash?: string;
+    stationTokenHash: string;
+    requestId: string;
+    latitude: number;
+    longitude: number;
+    accuracy: number;
+    deviceId?: string;
+    credentialHash?: string;
+    employeeCode?: string;
+    newCredentialHash?: string;
+    deviceLabel?: string;
   }) => Promise<JsonObject>;
   submitAlumdoorAttendanceCorrection?: (input: {
     workDate: string; segmentCode: string; requestedIn?: string; requestedOut?: string;
@@ -847,7 +855,10 @@ async function deleteDocument(doctype: string, name: string, context: FrappeRout
   // write-class action, matching how the DocPerm rows are reported.
   await loadWritable(doctype, name, context);
   await assertNoLinkedDocuments(doctype, name, context);
-  const deleted = await context.documents.deleteDraftDocument(context.tenantId, doctype, name);
+  const meta = await requireMeta(doctype, context);
+  const deleted = await context.documents.deleteDraftDocument(context.tenantId, doctype, name, {
+    allowNonDraft: meta.kind === "master" && meta.allow_delete_non_draft === true,
+  });
   return { doctype, name, deleted };
 }
 
@@ -998,6 +1009,9 @@ async function dispatchMethod(
     // Employee the right to browse Attendance Policy or QR Station documents.
     case "metaforge.api.get_alumdoor_attendance_qr_config":
       return methodResponse(await alumdoorAttendanceQrConfig(args, context));
+
+    case "metaforge.api.rotate_alumdoor_attendance_station_qr":
+      return methodResponse(await rotateAlumdoorAttendanceStationQr(args, context));
 
     // The generic client's boot: what to render, from what is installed. Without it
     // every app needs its own compiled bundle.
@@ -1270,16 +1284,33 @@ async function commitAlumdoorAttendanceScan(args: FrappeArgs, context: FrappeRou
     throw errors.permission("AlumDoor attendance scan accepts only the verified AlumDoor app callback.");
   }
   const station = args.requireText("station", 160);
-  const nonceHash = args.requireText("nonce_hash", 128);
-  if (!/^[a-f0-9]{64}$/i.test(nonceHash)) throw errors.validation("nonce_hash must be a SHA-256 hex value");
-  const deviceFingerprintHash = args.text("device_fingerprint_hash");
-  if (deviceFingerprintHash && deviceFingerprintHash.length > 128) {
-    throw errors.validation("device_fingerprint_hash must be at most 128 characters");
+  const stationTokenHash = args.requireText("station_token_hash", 64);
+  const credentialHash = args.text("credential_hash");
+  const newCredentialHash = args.text("new_credential_hash");
+  for (const [label, value] of [["station_token_hash", stationTokenHash], ["credential_hash", credentialHash], ["new_credential_hash", newCredentialHash]] as const) {
+    if (value && !/^[a-f0-9]{64}$/i.test(value)) throw errors.validation(`${label} must be a SHA-256 hex value`);
+  }
+  const deviceId = args.text("device_id");
+  const employeeCode = args.text("employee_code");
+  const deviceLabel = args.text("device_label");
+  const latitude = Number(args.get("latitude"));
+  const longitude = Number(args.get("longitude"));
+  const accuracy = Number(args.get("accuracy"));
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || !Number.isFinite(accuracy)) {
+    throw errors.validation("latitude, longitude and accuracy must be finite numbers");
   }
   return context.commitAlumdoorAttendanceScan({
     station,
-    nonceHash: nonceHash.toLowerCase(),
-    ...(deviceFingerprintHash ? { deviceFingerprintHash } : {}),
+    stationTokenHash: stationTokenHash.toLowerCase(),
+    requestId: args.requireText("request_id", 128),
+    latitude,
+    longitude,
+    accuracy,
+    ...(deviceId ? { deviceId } : {}),
+    ...(credentialHash ? { credentialHash: credentialHash.toLowerCase() } : {}),
+    ...(employeeCode ? { employeeCode } : {}),
+    ...(newCredentialHash ? { newCredentialHash: newCredentialHash.toLowerCase() } : {}),
+    ...(deviceLabel ? { deviceLabel } : {}),
   });
 }
 
@@ -1338,15 +1369,46 @@ async function alumdoorAttendanceQrConfig(args: FrappeArgs, context: FrappeRoute
       policy: policyName,
       secret_version: station.secret_version ?? null,
       is_active: station.is_active ?? false,
+      company: station.company ?? "",
+      branch: station.branch ?? "",
+      latitude: station.latitude ?? null,
+      longitude: station.longitude ?? null,
+      allowed_radius_m: station.allowed_radius_m ?? null,
+      max_gps_accuracy_m: station.max_gps_accuracy_m ?? null,
     },
     policy: {
       policy_status: policy.policy_status ?? "",
       timezone: policy.timezone ?? "Asia/Ho_Chi_Minh",
-      qr_ttl_seconds: policy.qr_ttl_seconds ?? 15,
+      duplicate_scan_window_seconds: policy.duplicate_scan_window_seconds ?? 60,
+      max_devices_per_employee: policy.max_devices_per_employee ?? 2,
       effective_from: policy.effective_from ?? null,
       effective_to: policy.effective_to ?? null,
     },
   };
+}
+
+async function rotateAlumdoorAttendanceStationQr(args: FrappeArgs, context: FrappeRouterContext): Promise<JsonObject> {
+  if (context.appCallbackAppId !== "alumdoor") throw errors.permission("Only the verified AlumDoor app can rotate station QR tokens.");
+  const stationName = args.requireText("station", 160);
+  const current = await context.documents.getDocument<JsonObject>(context.tenantId, "AlumDoor QR Station", stationName);
+  if (!current || current.docstatus === 2) throw errors.notFound(`AlumDoor QR Station ${stationName} was not found`);
+  const allowed = context.actor.user_id === "Administrator"
+    || context.actor.roles.some((role) => ["Administrator", "System Manager", "HR Manager", "AlumDoor Attendance Manager"].includes(role));
+  if (!allowed) throw errors.permission("Attendance station manager permission is required");
+  const version = Number(current.data.secret_version ?? 1);
+  if (!Number.isSafeInteger(version) || version < 1) throw errors.validation("Station QR version is invalid");
+  const document: JsonObject = { ...current.data, secret_version: version + 1, qr_rotated_at: context.now() };
+  const actor: Actor = { ...context.actor, roles: [...new Set([...context.actor.roles, "AlumDoor QR System"])] };
+  await context.runCommand(await buildCommand({
+    tenantId: context.tenantId,
+    actor,
+    doctype: "AlumDoor QR Station",
+    name: stationName,
+    action: "save",
+    expectedVersion: current.version,
+    document,
+  }));
+  return { station: stationName, secret_version: version + 1, rotated_at: document.qr_rotated_at };
 }
 
 async function setAccountingPeriodLock(args: FrappeArgs, context: FrappeRouterContext): Promise<JsonObject> {
@@ -1686,7 +1748,9 @@ async function capabilityFlags(
     // Ở form có document cụ thể: chỉ bản nháp mới được xoá. Ở list không có document:
     // trả quyền write ở cấp DocType để giao diện có thể hiện thao tác; từng dòng vẫn bị
     // kernel kiểm tra docstatus và quyền lại khi người dùng xác nhận xoá.
-    delete: document ? document.docstatus === 0 && write : write,
+    delete: document
+      ? (document.docstatus === 0 || (meta.kind === "master" && meta.allow_delete_non_draft === true)) && write
+      : write,
     submit,
     cancel,
     amend,
@@ -2601,6 +2665,8 @@ async function printView(args: FrappeArgs, context: FrappeRouterContext): Promis
  */
 async function bulkDelete(args: FrappeArgs, context: FrappeRouterContext): Promise<JsonObject> {
   const doctype = args.requireText("doctype", 160);
+  const meta = await requireMeta(doctype, context);
+  const allowNonDraft = meta.kind === "master" && meta.allow_delete_non_draft === true;
   const names = args.array<string>("items") ?? [];
   if (!names.length) throw errors.validation("items is required");
   if (names.length > 100) throw errors.validation("At most 100 documents may be deleted at once");
@@ -2610,7 +2676,13 @@ async function bulkDelete(args: FrappeArgs, context: FrappeRouterContext): Promi
     const name = String(raw);
     try {
       await loadWritable(doctype, name, context);
-      results.push({ name, deleted: await context.documents.deleteDraftDocument(context.tenantId, doctype, name) });
+      await assertNoLinkedDocuments(doctype, name, context);
+      results.push({ name, deleted: await context.documents.deleteDraftDocument(
+        context.tenantId,
+        doctype,
+        name,
+        { allowNonDraft },
+      ) });
     } catch (error) {
       results.push({ name, deleted: false, error: error instanceof Error ? error.message : "Delete failed" });
     }

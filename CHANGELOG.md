@@ -8,6 +8,8 @@
 
 ### Changed
 
+- Chính sách ca AlumDoor đã duyệt cho phép quản lý sửa tên, múi giờ, các mốc ca, giới hạn công, chu kỳ QR và khoảng hiệu lực; có thể xoá chính sách khi không còn bản ghi tham chiếu hoặc phát sinh sổ cái.
+- Chính sách ca AlumDoor nhập các mốc ca bằng giờ 24 giờ `HH:mm` và giới hạn công bằng `giờ + phút`; backend vẫn lưu phút để giữ nguyên thuật toán chấm công/lương và tương thích dữ liệu cũ.
 - The sales-line mesh-height field appears only for Cửa Lưới.
 - Sales Orders now select the latest active price list for the customer's price group, while preserving a manual override.
 - Renamed the Item tracking section to “Quản lý lô & serial”.

@@ -4,9 +4,9 @@
   "state_field": "policy_status",
   "is_active": true,
   "states": [
-    { "state": "draft", "docstatus": 0, "allow_edit": "AlumDoor Attendance Manager" },
-    { "state": "approved", "docstatus": 1, "allow_edit": "AlumDoor Attendance Manager" },
-    { "state": "retired", "docstatus": 2, "allow_edit": "AlumDoor Attendance Manager" }
+    { "state": "draft", "docstatus": 0 },
+    { "state": "approved", "docstatus": 1 },
+    { "state": "retired", "docstatus": 2 }
   ],
   "transitions": [
     { "state": "draft", "action": "Duyet chinh sach", "next_state": "approved", "allowed_role": "AlumDoor Attendance Manager", "allow_self_approval": true },

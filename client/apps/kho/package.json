@@ -6,8 +6,10 @@
   "scripts": {
     "dev": "vite",
     "dev:mobile": "vite --config vite.mobile.config.ts",
-    "typecheck": "tsc -b && tsc -p ../warehouse-mobile/tsconfig.json",
-    "build": "tsc -b && vite build && tsc -p ../warehouse-mobile/tsconfig.json && vite build --config vite.mobile.config.ts"
+    "dev:attendance": "vite --config vite.attendance.config.ts",
+    "typecheck": "tsc -b && tsc -p ../warehouse-mobile/tsconfig.json && tsc -p ../attendance-mobile/tsconfig.json",
+    "build:attendance": "tsc -p ../attendance-mobile/tsconfig.json && vite build --config vite.attendance.config.ts",
+    "build": "tsc -b && vite build && tsc -p ../warehouse-mobile/tsconfig.json && vite build --config vite.mobile.config.ts && pnpm run build:attendance"
   },
   "dependencies": {
     "@metaforge/adapter-frappe": "workspace:*",
@@ -16,6 +18,7 @@
     "@metaforge/shell": "workspace:*",
     "@metaforge/ui": "workspace:*",
     "@metaforge/views": "workspace:*",
+    "jsqr": "1.4.0",
     "lucide-react": "^0.460.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",

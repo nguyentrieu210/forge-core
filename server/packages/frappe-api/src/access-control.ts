@@ -215,13 +215,19 @@ export async function evaluatePermissionCapabilities(input: {
     });
   }
 
-  const canDelete = document ? document.docstatus === 0 && write : write;
+  const canDelete = document
+    ? (document.docstatus === 0 || (meta.kind === "master" && meta.allow_delete_non_draft === true)) && write
+    : write;
   trace.push({
     source: "document",
     effect: canDelete ? "allow" : "deny",
     label: `delete: ${canDelete ? "được phép" : "bị từ chối"}`,
     detail: document
-      ? (document.docstatus === 0 ? "Bản nháp và quyền ghi cho phép xoá." : "Chỉ bản nháp mới được xoá.")
+      ? (document.docstatus === 0
+        ? "Bản nháp và quyền ghi cho phép xoá."
+        : meta.kind === "master" && meta.allow_delete_non_draft === true
+          ? "Danh mục cấu hình cho phép xoá sau duyệt; liên kết và sổ cái vẫn được kiểm tra."
+          : "Chỉ bản nháp mới được xoá.")
       : "Chưa chọn bản ghi; trạng thái sẽ được kiểm tra lại khi xoá.",
   });
 

@@ -2,6 +2,8 @@
 
 ## Unreleased — Alumdoor UI
 
+- Hồ sơ Chính sách ca đã duyệt cho phép quản lý sửa trực tiếp và có thao tác Xoá kèm xác nhận; server vẫn chặn xoá khi chính sách đang được dữ liệu khác sử dụng.
+- Chính sách ca không còn bắt người dùng quy đổi giờ sang phút: sáu mốc ca dùng định dạng 24 giờ `HH:mm`, còn giới hạn công thường nhập theo giờ và phút.
 - Màn Tính công thức cửa chỉ giữ dữ liệu bán hàng; bỏ toàn bộ trường/kết quả sản xuất và mua hàng. Rộng PB ray và Rộng PB nhựa là hai ô riêng, tự ẩn/hiện theo nhóm khách. Kết quả giữ cố định diện tích, đơn giá và thành tiền khi sửa giá.
 - Sidebar Alumdoor dùng nền đen ở cả giao diện sáng và tối; chữ/icon trắng xám, hover tương phản và mục đang chọn giữ màu cam thương hiệu.
 - Bảng dòng bán hàng đổi sang quy cách tính tiền theo Item/ĐVT: cửa dùng m² từ Cutting Policy × số bộ, ray/trục dùng chiều dài × số cây, phụ kiện nhập trực tiếp theo ĐVT; số lượng tính tiền và thành tiền là ô máy tính, server kiểm tra lại trước khi ghi.
