@@ -34,6 +34,10 @@ const EXACT = new Map([
 const SALES_PREVIEW = new Set(["Quotation Item", "Sales Order Item", "Delivery Note Item", "Sales Invoice Item"]);
 const PURCHASE_PREVIEW = new Set(["Supplier Quotation Item", "Purchase Order Item", "Purchase Receipt Item", "Purchase Invoice Item"]);
 const PREVIEW_METHOD = "alumdoor.ui.preview_child_row";
+const CONDITIONAL_PURCHASE_REQUIREMENTS = new Set([
+  "Purchase Order Item.is_stamped",
+  "Purchase Receipt Item.is_stamped",
+]);
 
 // Current Selling authority keeps these values for compatibility, audit, fulfilment identity,
 // or downstream reproducibility. They are not normal operator columns. Do not let a generic
@@ -75,6 +79,18 @@ function existing(names, fieldNames) {
 function hasConditionalApplicability(field) {
   return [field.depends_on, field.mandatory_depends_on, field.reqd_depends_on]
     .some((value) => typeof value === "string" && value.trim().length > 0);
+}
+
+function normalizeConditionalRequirement(doctypeName, field) {
+  const key = `${doctypeName}.${field.fieldname}`;
+  if (!CONDITIONAL_PURCHASE_REQUIREMENTS.has(key) || !field.required || typeof field.depends_on !== "string" || !field.depends_on.trim()) {
+    return field;
+  }
+  return {
+    ...field,
+    required: false,
+    mandatory_depends_on: field.mandatory_depends_on ?? field.depends_on,
+  };
 }
 
 function isInternalField(doctypeName, field) {
@@ -157,7 +173,7 @@ export function applyAlumdoorChildPresentation(brief) {
   let migrated = 0;
   for (const doctype of brief.doctypes ?? []) {
     if (!doctype?.child) continue;
-    const fields = fieldObjects(doctype);
+    const fields = fieldObjects(doctype).map((field) => normalizeConditionalRequirement(doctype.name, field));
     const fieldNames = new Set(fields.map((field) => field.fieldname));
     const listed = new Set(existing(doctype.list ?? [], fieldNames));
     const declared = EXACT.get(doctype.name);
