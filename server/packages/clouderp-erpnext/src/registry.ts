@@ -66,8 +66,8 @@ import {
   Review360Controller, SuccessionPlanController, TalentPoolController, TrainingAssessmentController, TrainingCourseController,
 } from "./hrm-talent-controllers.js";
 import { HrmSalarySlipController } from "./hrm-salary-slip.js";
-import { CutOrderController } from "./alumdoor-inventory.js";
 import { AlumDoorAttendanceDayController } from "./alumdoor-attendance.js";
+import { CutOrderReservationIntegrityController } from "./cut-order-reservation-integrity.js";
 import { StockReservationIntegrityController } from "./stock-reservation-integrity.js";
 import { StockReconciliationIntegrityController } from "./stock-reconciliation-integrity.js";
 import { StockReturnIntegrityController } from "./stock-return-integrity.js";
@@ -196,7 +196,7 @@ export function registerErpNextCoreControllers(registry: ControllerRegistry): Co
     .register(new WarehouseCashTransferController())
     .register(new WarehouseCashCountController())
     .register(new AlumDoorAttendanceDayController())
-    .register(new CutOrderController())
+    .register(new CutOrderReservationIntegrityController())
     .register(new StockReservationIntegrityController())
     .register(new StockReconciliationIntegrityController());
 }
