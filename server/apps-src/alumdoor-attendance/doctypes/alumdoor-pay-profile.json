@@ -1,0 +1,35 @@
+{
+  "name": "AlumDoor Pay Profile",
+  "module": "AlumDoor",
+  "kind": "master",
+  "is_submittable": true,
+  "autoname": "ALU-LUONG-.YYYY.-#####",
+  "title_field": "employee",
+  "search_fields": ["employee", "profile_code", "status"],
+  "sort_field": "effective_from",
+  "sort_order": "DESC",
+  "track_changes": true,
+  "fields": [
+    { "fieldname": "profile_code", "label": "Mã hồ sơ lương", "fieldtype": "Data", "read_only": true, "unique": true, "in_list_view": true },
+    { "fieldname": "employee", "label": "Nhân viên", "fieldtype": "Link", "options": "Employee", "required": true, "set_only_once": true, "in_list_view": true, "in_standard_filter": true, "search_index": true },
+    { "fieldname": "company", "label": "Công ty", "fieldtype": "Link", "options": "Company", "required": true, "set_only_once": true, "in_standard_filter": true },
+    { "fieldname": "branch", "label": "Chi nhánh", "fieldtype": "Link", "options": "Branch", "required": true, "set_only_once": true, "in_list_view": true, "in_standard_filter": true },
+    { "fieldname": "pay_mode", "label": "Cách trả lương", "fieldtype": "Select", "options": "MONTHLY\nDAILY", "required": true, "default": "MONTHLY", "in_list_view": true },
+    { "fieldname": "base_salary_vnd", "label": "Lương cơ bản (VND)", "fieldtype": "Int", "required": true, "non_negative": true, "in_list_view": true },
+    { "fieldname": "overtime_multiplier_bp", "label": "Hệ số tăng ca (bp)", "fieldtype": "Int", "required": true, "default": 15000, "non_negative": true },
+    { "fieldname": "fixed_allowance_vnd", "label": "Phụ cấp cố định (VND)", "fieldtype": "Int", "required": true, "default": 0, "non_negative": true },
+    { "fieldname": "effective_from", "label": "Hiệu lực từ", "fieldtype": "Date", "required": true, "in_list_view": true, "in_standard_filter": true },
+    { "fieldname": "effective_to", "label": "Hiệu lực đến", "fieldtype": "Date", "in_standard_filter": true },
+    { "fieldname": "profile_key", "label": "Khóa phiên bản", "fieldtype": "Data", "required": true, "read_only": true, "unique": true, "hidden": true, "serverEnforced": true },
+    { "fieldname": "status", "label": "Trạng thái", "fieldtype": "Select", "options": "draft\napproved\nretired", "required": true, "default": "draft", "in_list_view": true, "in_standard_filter": true },
+    { "fieldname": "approved_by", "label": "Người duyệt", "fieldtype": "Link", "options": "User", "read_only": true },
+    { "fieldname": "approved_at", "label": "Duyệt lúc", "fieldtype": "Datetime", "read_only": true }
+  ],
+  "permissions": [
+    { "role": "AlumDoor Payroll User", "read": true, "write": true, "create": true, "report": true, "export": true },
+    { "role": "AlumDoor Payroll Approver", "read": true, "write": true, "create": true, "submit": true, "cancel": true, "report": true, "export": true },
+    { "role": "HR Manager", "read": true, "write": true, "create": true, "submit": true, "cancel": true, "report": true, "export": true },
+    { "role": "System Manager", "read": true, "write": true, "create": true, "submit": true, "cancel": true, "report": true, "export": true }
+  ],
+  "revision": 1
+}

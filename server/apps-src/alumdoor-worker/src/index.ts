@@ -49,6 +49,14 @@ import {
   validateProductionRequest,
 } from "./sales-production.js";
 import { attendanceChallenge, attendanceScan } from "./attendance-routes.js";
+import {
+  attendanceExceptions, attendanceMonth, attendanceReviewCorrection,
+  attendanceSubmitCorrection, attendanceToday,
+} from "./attendance-operational-routes.js";
+import {
+  payrollApprovePeriod, payrollCalculatePeriod, payrollCreatePeriod, payrollMarkPaid,
+  payrollMySlips, payrollPeriodList, payrollPeriodSlips, payrollSubmitPeriod,
+} from "./payroll-routes.js";
 
 interface Env {
   INTERNAL_AUTH_SECRET?: string;
@@ -3187,6 +3195,19 @@ export default {
         const call = platformCaller(request, env);
         if (method === "alumdoor.attendance.challenge") return await attendanceChallenge({ request, call, env, args });
         if (method === "alumdoor.attendance.scan") return await attendanceScan({ request, call, env, args });
+        if (method === "alumdoor.attendance.today") return await attendanceToday({ call, args });
+        if (method === "alumdoor.attendance.month") return await attendanceMonth({ call, args });
+        if (method === "alumdoor.attendance.exceptions") return await attendanceExceptions({ call, args });
+        if (method === "alumdoor.attendance.submit_correction") return await attendanceSubmitCorrection({ call, args });
+        if (method === "alumdoor.attendance.review_correction") return await attendanceReviewCorrection({ call, args });
+        if (method === "alumdoor.payroll.period_list") return await payrollPeriodList({ call, args });
+        if (method === "alumdoor.payroll.create_period") return await payrollCreatePeriod({ call, args });
+        if (method === "alumdoor.payroll.calculate_period") return await payrollCalculatePeriod({ call, args });
+        if (method === "alumdoor.payroll.submit_period") return await payrollSubmitPeriod({ call, args });
+        if (method === "alumdoor.payroll.approve_period") return await payrollApprovePeriod({ call, args });
+        if (method === "alumdoor.payroll.mark_paid") return await payrollMarkPaid({ call, args });
+        if (method === "alumdoor.payroll.period_slips") return await payrollPeriodSlips({ call, args });
+        if (method === "alumdoor.payroll.my_slips") return await payrollMySlips({ call, args, actorUser: platformActorUser(request) });
         if (method === "alumdoor.sales.item_context") return await salesItemContext(call, args);
         if (method === "alumdoor.sales.production_line_context") return await calculateSalesProductionLine(call, args);
         if (method === "alumdoor.sales.preview_production") return await previewSalesProduction(call, args);

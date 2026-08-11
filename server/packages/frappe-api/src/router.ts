@@ -87,6 +87,14 @@ export interface FrappeRouterContext {
     nonceHash: string;
     deviceFingerprintHash?: string;
   }) => Promise<JsonObject>;
+  submitAlumdoorAttendanceCorrection?: (input: {
+    workDate: string; segmentCode: string; requestedIn?: string; requestedOut?: string;
+    reason: string; attachment?: string;
+  }) => Promise<JsonObject>;
+  reviewAlumdoorAttendanceCorrection?: (input: {
+    request: string; action: "approve" | "reject"; note?: string;
+  }) => Promise<JsonObject>;
+  approveAlumdoorPayroll?: (input: { payrollEntry: string }) => Promise<JsonObject>;
   now(): string;
   /** Overlay store for Custom Field / Property Setter. */
   customizations: CustomizationStore;
@@ -972,6 +980,15 @@ async function dispatchMethod(
     case "metaforge.api.commit_alumdoor_attendance_scan":
       return methodResponse(await commitAlumdoorAttendanceScan(args, context));
 
+    case "metaforge.api.submit_alumdoor_attendance_correction":
+      return methodResponse(await submitAlumdoorAttendanceCorrection(args, context));
+
+    case "metaforge.api.review_alumdoor_attendance_correction":
+      return methodResponse(await reviewAlumdoorAttendanceCorrection(args, context));
+
+    case "metaforge.api.approve_alumdoor_payroll":
+      return methodResponse(await approveAlumdoorPayroll(args, context));
+
     // The QR page needs a tiny, non-sensitive station/policy snapshot before it can
     // verify a short HMAC challenge.  Keep that read here rather than granting every
     // Employee the right to browse Attendance Policy or QR Station documents.
@@ -1262,6 +1279,43 @@ async function commitAlumdoorAttendanceScan(args: FrappeArgs, context: FrappeRou
   });
 }
 
+async function submitAlumdoorAttendanceCorrection(args: FrappeArgs, context: FrappeRouterContext): Promise<JsonObject> {
+  if (context.appCallbackAppId !== "alumdoor" || !context.submitAlumdoorAttendanceCorrection) {
+    throw errors.permission("AlumDoor attendance correction accepts only the verified AlumDoor app callback.");
+  }
+  const requestedIn = args.text("requested_in");
+  const requestedOut = args.text("requested_out");
+  const attachment = args.text("attachment");
+  return context.submitAlumdoorAttendanceCorrection({
+    workDate: args.requireText("work_date", 10),
+    segmentCode: args.requireText("segment_code", 16),
+    ...(requestedIn ? { requestedIn } : {}),
+    ...(requestedOut ? { requestedOut } : {}),
+    reason: args.requireText("reason", 1000),
+    ...(attachment ? { attachment } : {}),
+  });
+}
+
+async function reviewAlumdoorAttendanceCorrection(args: FrappeArgs, context: FrappeRouterContext): Promise<JsonObject> {
+  if (context.appCallbackAppId !== "alumdoor" || !context.reviewAlumdoorAttendanceCorrection) {
+    throw errors.permission("AlumDoor attendance correction review accepts only the verified AlumDoor app callback.");
+  }
+  const action = args.requireText("action", 16);
+  if (action !== "approve" && action !== "reject") throw errors.validation("action must be approve or reject");
+  const note = args.text("note");
+  return context.reviewAlumdoorAttendanceCorrection({
+    request: args.requireText("request", 320),
+    action,
+    ...(note ? { note } : {}),
+  });
+}
+
+async function approveAlumdoorPayroll(args: FrappeArgs, context: FrappeRouterContext): Promise<JsonObject> {
+  if (context.appCallbackAppId !== "alumdoor" || !context.approveAlumdoorPayroll) {
+    throw errors.permission("AlumDoor payroll approval accepts only the verified AlumDoor app callback.");
+  }
+  return context.approveAlumdoorPayroll({ payrollEntry: args.requireText("payroll_entry", 320) });
+}
 async function alumdoorAttendanceQrConfig(args: FrappeArgs, context: FrappeRouterContext): Promise<JsonObject> {
   if (context.appCallbackAppId !== "alumdoor") {
     throw errors.permission("AlumDoor attendance QR configuration accepts only the verified AlumDoor app callback.");
