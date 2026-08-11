@@ -45,8 +45,8 @@ jobs:
             echo '$ pnpm run brief:check'
             pnpm run brief:check
             echo
-            echo '$ node --test tests/backend-ui-reconciliation.test.mjs'
-            node --test tests/backend-ui-reconciliation.test.mjs
+            echo '$ node --test tests/backend-ui-reconciliation.test.mjs tests/backend-ui-contract-validator.test.mjs'
+            node --test tests/backend-ui-reconciliation.test.mjs tests/backend-ui-contract-validator.test.mjs
             cd ..
             echo
             echo '$ git diff --check'
