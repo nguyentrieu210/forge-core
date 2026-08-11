@@ -121,6 +121,16 @@ await ensureResource("Item", "QA-PURCHASE-ITEM", {
   description: "Deterministic local fixture for authenticated Purchase QA",
 });
 
+await ensureResource("Material Specification", "AL71-QA-SPEC", {
+  spec_code: "AL71-QA-SPEC",
+  spec_name: "Định mức AL71 QA",
+  profile_system: "TIẾN ĐẠT",
+  section_code: "AL71-QA",
+  theoretical_kg_per_m: 0.389,
+  note: "Deterministic local-only barem for authenticated aluminum Purchase QA",
+  disabled: 0,
+}, { refresh: true });
+
 const canonicalAluminumQaItem = {
   item_code: "AL71-QA",
   item_name: "Nhôm AL71 QA",
@@ -134,6 +144,7 @@ const canonicalAluminumQaItem = {
   include_item_in_manufacturing: 1,
   inventory_mode: "Nhôm cây/lá",
   measurement_profile: "Nhôm cây/lá",
+  material_specification: "AL71-QA-SPEC",
   stock_uom: "Cây",
   default_purchase_uom: "Kg",
   default_sales_uom: "Cây",
@@ -156,4 +167,4 @@ const canonicalAluminumQaItem = {
 };
 await ensureResource("Item", "AL71-QA", canonicalAluminumQaItem, { refresh: true });
 
-console.log(`PURCHASE_QA_SEED_PASS suppliers=QA-SUPPLIER,TIEN-DAT items=QA-PURCHASE-ITEM,AL71-QA uom=Cái,Cây,Kg aluminum_stock_uom=Cây aluminum_weight_uom=Kg color=THÔ warehouse=K36 regular_item_group=${JSON.stringify(regularItemGroup)} aluminium_item_group=${JSON.stringify(aluminiumItemGroup)} origin=loopback`);
+console.log(`PURCHASE_QA_SEED_PASS suppliers=QA-SUPPLIER,TIEN-DAT items=QA-PURCHASE-ITEM,AL71-QA uom=Cái,Cây,Kg aluminum_stock_uom=Cây aluminum_weight_uom=Kg material_spec=AL71-QA-SPEC color=THÔ warehouse=K36 regular_item_group=${JSON.stringify(regularItemGroup)} aluminium_item_group=${JSON.stringify(aluminiumItemGroup)} origin=loopback`);
