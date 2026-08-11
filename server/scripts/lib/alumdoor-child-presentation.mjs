@@ -41,9 +41,12 @@ function existing(names, fieldNames) {
   return names.filter((fieldname) => fieldNames.has(fieldname));
 }
 
+/**
+ * `surface` describes how a field itself behaves; it is not a grid-membership flag.
+ * `form.fields`/`quickEntry.fields` decide whether the field is shown in this table view.
+ */
 function exactSurface(field, policy) {
   if (field.hidden || isLayout(field.fieldtype)) return "internal";
-  if (!policy.full.includes(field.fieldname)) return "internal";
   return policy.quick.includes(field.fieldname) ? "quick" : "expanded";
 }
 
