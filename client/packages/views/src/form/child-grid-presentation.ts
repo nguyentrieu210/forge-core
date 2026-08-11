@@ -18,11 +18,15 @@ function fieldMap(meta: DocTypeMeta): Map<string, DocField> {
   return new Map((meta.fields ?? []).map((field) => [field.fieldname, field]));
 }
 
+function isRenderableField(field: DocField | undefined): field is DocField {
+  return field !== undefined && !isLayout(field.fieldtype);
+}
+
 function orderedFields(meta: DocTypeMeta, names: readonly string[]): DocField[] {
   const byName = fieldMap(meta);
   return names
     .map((name) => byName.get(name))
-    .filter((field): field is DocField => Boolean(field) && !isLayout(field.fieldtype));
+    .filter(isRenderableField);
 }
 
 /**
