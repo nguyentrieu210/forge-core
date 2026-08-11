@@ -60,6 +60,11 @@ export {
   type ChildGridProps,
   type AverageWeightResult,
 } from "./form/ChildGridWithExtensions.js";
+export {
+  hasMetadataChildGridPresentation,
+  metadataChildGridColumns,
+  metadataChildGridHiddenColumns,
+} from "./form/child-grid-presentation.js";
 export { registerTableControls } from "./form/table-controls.js";
 export { KanbanView, type KanbanViewProps } from "./kanban/KanbanView.js";
 export { KanbanContainer, type KanbanContainerProps } from "./kanban/KanbanContainer.js";

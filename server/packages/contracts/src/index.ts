@@ -139,6 +139,12 @@ export interface FulfillmentEntry {
   kind: "Delivery" | "Billing";
   item_code: string;
   qty_micros: number;
+  /** Exact source commercial line. New SO-derived Delivery/Billing writes always populate it. */
+  sales_order_line_key?: string;
+  /** Exact frozen package component, blank/undefined for a direct commercial line. */
+  package_component_key?: string;
+  /** Package component rows are physical progress only and never enter legacy item-code progress. */
+  skip_legacy_projection?: boolean;
   /** Business posting timestamp used for progress and period reporting. */
   posting_at: string;
 }

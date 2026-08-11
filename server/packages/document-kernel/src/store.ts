@@ -112,6 +112,14 @@ export interface BankReconciliationReader {
 
 export interface SalesFulfillmentReader {
   getFulfilledQuantityMicros(tenantId: string, salesOrder: string, kind?: "Delivery" | "Billing", itemCode?: string): Promise<number>;
+  /** Source-line/component progress. Never aggregate duplicate commercial rows by item_code. */
+  getFulfilledLineQuantityMicros(
+    tenantId: string,
+    salesOrder: string,
+    kind: "Delivery" | "Billing",
+    salesOrderLineKey: string,
+    packageComponentKey?: string,
+  ): Promise<number>;
 }
 
 export interface ProcurementProgressReader {

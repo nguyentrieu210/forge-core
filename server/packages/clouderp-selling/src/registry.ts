@@ -13,9 +13,8 @@ import { CrmSalesTeamController, CrmSalesTeamMemberController, CrmTeamAwareDealC
 import { ArSalesInvoiceController } from "./ar-sales-invoice-controller.js";
 import { DeliveryNoteController } from "./controllers.js";
 import { PaymentAllocationController } from "./finance-controllers.js";
-import { QuotationController } from "./quotation-controller.js";
 import { R5FinanceHcmPaymentEntryController } from "./r5-finance-hcm-payment-entry.js";
-import { SalesOrderClosureController } from "./sales-order-closure-controller.js";
+import { CompleteQuotationController, CompleteSalesOrderController } from "./sales-commercial-complete-controllers.js";
 
 export function createO2CControllerRegistry(): ControllerRegistry {
   return new ControllerRegistry()
@@ -44,8 +43,8 @@ export function createO2CControllerRegistry(): ControllerRegistry {
     .register(new CrmSellOutReportController())
     .register(new CrmSubmittedSellInSnapshotController())
     .register(new CrmGeoVerifiedPromotionExecutionController())
-    .register(new QuotationController())
-    .register(new SalesOrderClosureController())
+    .register(new CompleteQuotationController())
+    .register(new CompleteSalesOrderController())
     .register(new DeliveryNoteController())
     .register(new ArSalesInvoiceController())
     .register(new R5FinanceHcmPaymentEntryController())

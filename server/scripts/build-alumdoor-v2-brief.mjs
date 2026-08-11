@@ -12,6 +12,8 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
+import { applyAlumdoorChildPresentation } from "./lib/alumdoor-child-presentation.mjs";
+import { parseField } from "./lib/compile-brief.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const SRC = resolve(here, "../briefs/alumdoor.json");
@@ -138,6 +140,28 @@ addAfter(operationalSalesOrder, "delivery_date",
   "manual_note:Small Text Ghi chú vận hành",
   "operational_change_reason:Small Text- Lý do đổi vận hành",
 );
+const salesFormHidden = new Set(["product_group", "against_quotation", "note"]);
+operationalSalesOrder.fields = operationalSalesOrder.fields.map((raw, index) => {
+  const field = parseField(raw, index);
+  if (!["Section Break", "Column Break", "Tab Break"].includes(field.fieldtype)) field.form_region = "full";
+  if (["transaction_date", "delivery_date", "payment_method"].includes(field.fieldname)) field.form_region = "aside";
+  if (["customer", "responsible_person", "manual_note", "operational_change_reason", "selling_price_list", "customer_group", "install_address"].includes(field.fieldname)) field.form_region = "main";
+  if (field.fieldname === "install_address") field.form_width = "full";
+  if (field.fieldname === "customer_group") field.label = "Nhóm khách hàng";
+  if (field.fieldname === "payment_method") { field.default = "Ghi công nợ"; field.form_control_style = "choice_list"; }
+  const summaryLabels = { total_amount: "Tổng cộng tiền hàng", discount_amount: "Tiền chiết khấu", surcharge_amount: "Phụ thu", vat_rate: "% VAT", vat_amount: "Số tiền VAT", grand_total: "Tiền phải thu" };
+  if (field.fieldname in summaryLabels) { field.label = summaryLabels[field.fieldname]; field.form_width = "full"; }
+  return field;
+});
+const salesSummaryIndex = operationalSalesOrder.fields.findIndex((field) => nameOf(field) === "total_amount");
+if (salesSummaryIndex >= 0 && !operationalSalesOrder.fields.some((field) => nameOf(field) === "sales_summary_section")) {
+  operationalSalesOrder.fields.splice(salesSummaryIndex, 0, { fieldname: "sales_summary_section", fieldtype: "Section Break", label: "Tổng kết", form_section_style: "summary" });
+}
+operationalSalesOrder.form = {
+  fields: operationalSalesOrder.fields.map(nameOf).filter((name) => name !== "sales_summary_section" && !salesFormHidden.has(name)),
+  previewMethod: "alumdoor.ui.preview_document",
+  previewParentFields: ["customer", "transaction_date", "items", "vat_rate", "surcharge_amount", "additional_discount_percentage"],
+};
 const warrantyDebitNote = doctype("Debit Note");
 warrantyDebitNote.permissions = {
   ...warrantyDebitNote.permissions,
@@ -1177,8 +1201,9 @@ brief.prints.push({
   doctype: "Purchase Order",
   default: true,
   css: [
-    "@page{size:A4 portrait;margin:12mm 8mm 8mm}@page :first{margin-top:23.7mm}",
-    "*{box-sizing:border-box}html,body{margin:0}body{width:194mm;font-family:Arial,'Liberation Sans',sans-serif;font-size:9px;color:#111;padding:0;font-kerning:none;letter-spacing:0;word-spacing:0}",
+    "@page{size:A4 portrait;margin:12mm 8mm 8mm}",
+    "@page :first{margin-top:23.7mm}",
+    "*{box-sizing:border-box}html,body{margin:0}body{font-family:Arial,'Liberation Sans',sans-serif;font-size:9px;color:#111;font-kerning:none;letter-spacing:0;word-spacing:0}",
     "@media screen{html{width:210mm}body{width:210mm;min-height:297mm;padding:23.7mm 8mm 8mm}}",
     ".letterhead{position:relative;width:194mm;height:17mm;margin-left:0;overflow:hidden}",
     ".brand-logo{position:absolute;left:0;top:1.35mm;width:74mm;height:auto}",
@@ -1391,6 +1416,9 @@ for (const f of brief.fixtures) {
   f.data.uom_conversions = [];
 }
 note('AL-INV · package canonical: Kg priced/catch-weight + Cây/Lá stock + Batch + qty_bar descriptors');
+
+const childPresentation = applyAlumdoorChildPresentation(brief);
+note(`UI ?? child-grid presentation metadata: ${childPresentation.migrated} child DocType`);
 
 writeFileSync(OUT, JSON.stringify(brief, null, 2) + "\n", "utf8");
 console.log(log.map((l) => "  " + l).join("\n"));

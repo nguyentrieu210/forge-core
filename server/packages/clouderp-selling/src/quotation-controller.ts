@@ -4,14 +4,14 @@ import type { ControllerContext, DocumentController } from "../../document-kerne
 import { nextDocStatus } from "../../document-kernel/src/index.js";
 import { domainEvent } from "../../outbox/src/index.js";
 import type { LeadData, OpportunityData } from "./crm-types.js";
-import { SalesOrderController } from "./controllers.js";
+import { CommercialSalesOrderController } from "./commercial-sales-order-controller.js";
 import type { QuotationData } from "./quotation-types.js";
 import type { SalesOrderData, SalesItem, TaxRow } from "./types.js";
 
-/** Reuses SalesOrder normalization so quotation and order share one pricing/UOM/tax path. */
+/** Reuses the canonical commercial Sales Order normalization so quotation and order share one pricing/UOM/tax path. */
 export class QuotationController implements DocumentController<QuotationData> {
   readonly doctype = "Quotation";
-  private readonly salesOrder = new SalesOrderController();
+  private readonly salesOrder = new CommercialSalesOrderController();
 
   async buildPlan(context: ControllerContext<QuotationData>): Promise<MutationPlan<QuotationData>> {
     const data = context.command.action === "cancel" ? structuredClone(requireExisting(context).data) : await this.normalize(context);
@@ -109,7 +109,7 @@ function asSalesOrderContext(context: ControllerContext<QuotationData>, input: Q
     ...(input.customer_group ? { customer_group: input.customer_group } : {}),
     ...(input.apply_discount_on ? { apply_discount_on: input.apply_discount_on } : {}),
     ...(input.additional_discount_percentage !== undefined ? { additional_discount_percentage: input.additional_discount_percentage } : {}),
-    ...(input.discount_amount !== undefined ? { discount_amount: input.discount_amount } : {}),
+    // Header discount_amount is deliberately not an authority for policy-derived line discounts.
     items: structuredClone(input.items),
     taxes: structuredClone(input.taxes ?? []),
   };

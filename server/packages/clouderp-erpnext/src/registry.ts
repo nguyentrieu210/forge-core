@@ -66,13 +66,17 @@ import {
   Review360Controller, SuccessionPlanController, TalentPoolController, TrainingAssessmentController, TrainingCourseController,
 } from "./hrm-talent-controllers.js";
 import { HrmSalarySlipController } from "./hrm-salary-slip.js";
-import { CutOrderController } from "./alumdoor-inventory.js";
 import { AlumDoorAttendanceDayController } from "./alumdoor-attendance.js";
 import { AlumDoorPayProfileController } from "./alumdoor-payroll.js";
 import { AlumDoorAwarePayrollEntryController } from "./alumdoor-payroll-entry.js";
+import { CutOrderReservationIntegrityController } from "./cut-order-reservation-integrity.js";
 import { StockReservationIntegrityController } from "./stock-reservation-integrity.js";
 import { StockReconciliationIntegrityController } from "./stock-reconciliation-integrity.js";
 import { StockReturnIntegrityController } from "./stock-return-integrity.js";
+import {
+  WarehouseScopedDeliveryNoteController,
+  WarehouseScopedPurchaseReceiptController,
+} from "./stock-document-warehouse-integrity.js";
 import {
   ManufacturingDowntimeController, ManufacturingRoutingController, WorkstationCapacityCalendarController,
 } from "./manufacturing-capacity.js";
@@ -94,6 +98,8 @@ export function registerErpNextCoreControllers(registry: ControllerRegistry): Co
     .register(new CreditNoteController())
     .register(new DebitNoteController())
     .register(new StockReturnIntegrityController())
+    .register(new WarehouseScopedDeliveryNoteController())
+    .register(new WarehouseScopedPurchaseReceiptController())
     .register(new VersionedBillOfMaterialsController())
     .register(new StockUomSnapshotWorkOrderController())
     .register(new StockEntryIntegrityController())
@@ -193,7 +199,7 @@ export function registerErpNextCoreControllers(registry: ControllerRegistry): Co
     .register(new WarehouseCashCountController())
     .register(new AlumDoorPayProfileController())
     .register(new AlumDoorAttendanceDayController())
-    .register(new CutOrderController())
+    .register(new CutOrderReservationIntegrityController())
     .register(new StockReservationIntegrityController())
     .register(new StockReconciliationIntegrityController());
 }
