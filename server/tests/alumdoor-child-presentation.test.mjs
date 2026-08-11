@@ -27,9 +27,12 @@ function names(view) {
 }
 
 function expectedQuick(golden, doctype) {
-  const existing = new Set(doctype.fields.map((field) => field.fieldname));
-  const inForm = new Set(names(doctype.viewPolicy.form));
-  return golden.filter((fieldname) => existing.has(fieldname) && inForm.has(fieldname));
+  const inForm = names(doctype.viewPolicy.form);
+  const preferred = new Set(golden);
+  for (const field of doctype.fields) {
+    if (field.required && !field.read_only && !field.hidden) preferred.add(field.fieldname);
+  }
+  return inForm.filter((fieldname) => preferred.has(fieldname));
 }
 
 function expectedFull(golden, doctype) {
@@ -81,4 +84,11 @@ test("all 28 child doctypes explicitly own form and quick-entry presentation aft
     .filter((doctype) => !doctype.viewPolicy?.form?.enabled || !doctype.viewPolicy?.quickEntry?.enabled)
     .map((doctype) => doctype.name);
   assert.deepEqual(missing, [], `children without explicit presentation ownership: ${missing.join(", ")}`);
+  const hiddenRequired = children.flatMap((doctype) => {
+    const quick = new Set(names(doctype.viewPolicy.quickEntry));
+    return doctype.fields
+      .filter((field) => field.required && !field.read_only && !field.hidden && !quick.has(field.fieldname))
+      .map((field) => `${doctype.name}.${field.fieldname}`);
+  });
+  assert.deepEqual(hiddenRequired, [], `required editable fields missing from quick entry: ${hiddenRequired.join(", ")}`);
 });
