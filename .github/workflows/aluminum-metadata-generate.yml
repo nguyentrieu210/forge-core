@@ -9,7 +9,7 @@ on:
       - ".github/workflows/aluminum-metadata-generate.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   generate:
@@ -19,6 +19,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
       - name: Apply effective V2 metadata overlay
@@ -37,6 +38,20 @@ jobs:
           if (profile?.data?.stock_uom !== 'Cây') throw new Error('aluminum profile stock_uom must be Cây');
           console.log('ALUMDOOR_EFFECTIVE_METADATA_PASS');
           NODE
+      - name: Commit generated V2 metadata to source branch
+        env:
+          HEAD_BRANCH: ${{ github.head_ref }}
+        run: |
+          cp "$RUNNER_TEMP/alumdoor-v2.json" server/briefs/alumdoor-v2.json
+          if git diff --quiet -- server/briefs/alumdoor-v2.json; then
+            echo "Generated metadata already committed"
+            exit 0
+          fi
+          git config user.name "forge-ci"
+          git config user.email "forge-ci@users.noreply.github.com"
+          git add server/briefs/alumdoor-v2.json
+          git commit -m "chore(alumdoor): materialize aluminum V2 inventory metadata"
+          git push origin "HEAD:${HEAD_BRANCH}"
       - uses: actions/upload-artifact@v4
         with:
           name: effective-alumdoor-v2-${{ github.run_id }}
