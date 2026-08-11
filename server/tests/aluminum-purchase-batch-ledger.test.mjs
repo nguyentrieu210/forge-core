@@ -137,8 +137,8 @@ test("Purchase Receipt posts counted bars + actual Kg + Kg-priced value to one B
   await createAndSubmit(kernel, { doctype: "Purchase Receipt", name: "PR-AL-001", document: receipt });
 
   let snapshot = store.snapshot();
-  const posted = snapshot.stock_entries.filter((row) => row.voucher_no === "PR-AL-001" || row.batch_no === "LO-AL71-001");
-  const inward = posted.find((row) => row.batch_no === "LO-AL71-001" && row.actual_qty_micros > 0);
+  const posted = snapshot.stock_entries.filter((row) => row.batch_no === "LO-AL71-001");
+  const inward = posted.find((row) => row.actual_qty_micros > 0);
   assert.ok(inward);
   assert.equal(inward.actual_qty_micros, 200_000_000, "stock authority is counted bars");
   assert.equal(inward.actual_weight_micros, 568_700_000, "catch weight keeps the actual scale reading");
@@ -151,9 +151,14 @@ test("Purchase Receipt posts counted bars + actual Kg + Kg-priced value to one B
   assert.equal(receiptDoc.data.items[0].priced_qty_micros, 568_700_000);
   assert.equal(receiptDoc.data.items[0].conversion_factor, "0.351679");
 
-  const receiptGl = snapshot.gl_entries.filter((row) => row.voucher_no === "PR-AL-001");
-  assert.equal(receiptGl.reduce((sum, row) => sum + row.debit_minor, 0), 5_687_000_000);
-  assert.equal(receiptGl.reduce((sum, row) => sum + row.credit_minor, 0), 5_687_000_000);
+  const inventoryDebit = snapshot.gl_entries
+    .filter((row) => row.account === "HANG-TON-KHO")
+    .reduce((sum, row) => sum + row.debit_minor, 0);
+  const receivedCredit = snapshot.gl_entries
+    .filter((row) => row.account === "HANG-NHAN-CHO-HOA-DON")
+    .reduce((sum, row) => sum + row.credit_minor, 0);
+  assert.equal(inventoryDebit, inward.stock_value_difference_minor, "Inventory GL must equal the canonical stock value");
+  assert.equal(receivedCredit, inward.stock_value_difference_minor, "SRBNB credit must equal the canonical stock value");
 
   await mutate(kernel, {
     commandId: "PR-AL-001-cancel",
@@ -171,6 +176,8 @@ test("Purchase Receipt posts counted bars + actual Kg + Kg-priced value to one B
   assert.equal(batchLedger.reduce((sum, row) => sum + row.stock_value_difference_minor, 0), 0);
   assert.equal(await store.isStockBundleUsed("demo", "SABB-AL-001"), false, "cancel releases exact bundle usage");
 
-  const glAfterCancel = snapshot.gl_entries.filter((row) => row.voucher_no === "PR-AL-001");
-  assert.equal(glAfterCancel.reduce((sum, row) => sum + row.debit_minor - row.credit_minor, 0), 0);
+  const glNet = snapshot.gl_entries
+    .filter((row) => row.account === "HANG-TON-KHO" || row.account === "HANG-NHAN-CHO-HOA-DON")
+    .reduce((sum, row) => sum + row.debit_minor - row.credit_minor, 0);
+  assert.equal(glNet, 0, "Receipt cancellation must reverse the two GL legs exactly");
 });
