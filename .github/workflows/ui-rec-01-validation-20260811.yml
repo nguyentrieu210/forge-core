@@ -1,0 +1,35 @@
+name: UI REC 01 Exact Branch Validation 2026-08-11
+
+on:
+  push:
+    branches:
+      - agent/ui-rec-01-backend-meta-20260811
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ui-rec-01-validation-20260811
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Syntax check auditor
+        run: node --check server/scripts/audit-backend-ui-surfaces.mjs
+      - name: Run UI-REC-01 focused regressions
+        run: node --test server/tests/backend-ui-reconciliation.test.mjs
+      - name: Validate committed matrix JSON
+        run: node -e "JSON.parse(require('node:fs').readFileSync('docs/agents/backend-ui-reconciliation/BACKEND_UI_SURFACE_MATRIX.json','utf8')); console.log('BACKEND_UI_SURFACE_MATRIX_JSON_PASS')"
+      - name: Diff hygiene
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          test -s docs/agents/backend-ui-reconciliation/BACKEND_UI_SURFACE_MATRIX_SUMMARY.md
