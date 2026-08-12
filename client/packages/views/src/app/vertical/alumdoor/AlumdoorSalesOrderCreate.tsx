@@ -782,13 +782,13 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
 
             <div className="hidden xl:grid xl:grid-cols-[42px_minmax(360px,2.5fr)_150px_150px_130px_130px_130px_130px_84px] items-center gap-2 rounded-t-md border border-b-0 bg-muted/45 px-2 py-1.5 text-[11px] font-semibold text-muted-foreground">
               <div>#</div>
-              <div>M???t h??ng</div>
-              <div>??VT</div>
-              <div>SL / Kh???i l?????ng</div>
-              <div className="text-right">????n gi??</div>
+              <div>Mặt hàng</div>
+              <div>ĐVT</div>
+              <div>SL / Khối lượng</div>
+              <div className="text-right">Đơn giá</div>
               <div className="text-right">CK</div>
-              <div className="text-right">Ph??? thu</div>
-              <div className="text-right">Th??nh ti???n</div>
+              <div className="text-right">Phụ thu</div>
+              <div className="text-right">Thành tiền</div>
               <div></div>
             </div>
 
@@ -863,7 +863,8 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                   </div>
 
                   <div className="space-y-1.5 p-2">
-                    <div className="grid items-end gap-1.5 md:grid-cols-2 xl:grid-cols-12">
+                    <div className="grid items-end gap-1.5 md:grid-cols-2 xl:grid-cols-[42px_minmax(360px,2.5fr)_150px_150px_130px_130px_130px_130px_84px]">
+                      <div className="hidden xl:grid h-9 place-items-center text-xs font-semibold text-muted-foreground">{index + 1}</div>
             <StandardField
               id={`sales-line-${index}-item`}
               field={lineBaseField("item_code", "M\u1eb7t h\u00e0ng", "Link", "Item")}
@@ -891,9 +892,67 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
               required
               compact
               label="Mặt hàng"
-              className={text(line.item_code) ? "md:col-span-2 xl:col-span-4" : "md:col-span-2 xl:col-span-6"}
+              className="md:col-span-2 xl:col-span-1"
             />
 
+
+            {uoms.length ? (
+              <StandardField
+                id={`sales-line-${index}-uom`}
+                field={selectField(childField("uom"), "uom", "\u0110VT", uoms)}
+                value={line.uom}
+                onChange={(value) => commitLine(line._key, "uom", text(value) || undefined)}
+                registry={registry}
+                services={services}
+                parentDoctype="Sales Order Item"
+                docValues={line}
+                roles={roles}
+                label="ĐVT"
+                className="xl:col-span-1"
+              />
+            ) : text(line.uom) ? (
+              <StandardField
+                id={`sales-line-${index}-uom`}
+                field={fallbackField("uom", "\u0110VT")}
+                value={line.uom}
+                onChange={() => undefined}
+                registry={registry}
+                services={services}
+                parentDoctype="Sales Order Item"
+                docValues={line}
+                roles={roles}
+                readOnly
+                label="ĐVT"
+                className="xl:col-span-1"
+              />
+            ) : null}
+
+            {showPlainQty ? (
+              <StandardField
+                id={`sales-line-${index}-qty`}
+                field={lineBaseField("qty", "Kh\u1ed1i l\u01b0\u1ee3ng", "Float")}
+                value={line.qty}
+                onChange={(value) => patchLine(line._key, { qty: value == null || value === "" ? undefined : Number(value) })}
+                onCommit={() => commitLine(line._key, "qty", line.qty)}
+                registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
+                required readOnly={fieldReadonly(line, "qty")}
+                label="Khối lượng"
+                className="xl:col-span-2"
+              />
+            ) : null}
+
+            <div className="hidden xl:block text-right text-xs tabular-nums">{money(line.rate)} ₫</div>
+            <div className="hidden xl:block text-right text-xs tabular-nums">{Number(line.discount_amount) > 0 ? `-${money(line.discount_amount)} ₫` : "—"}</div>
+            <div className="hidden xl:block text-right text-xs tabular-nums">{Number.isFinite(Number(line.adjustment_amount)) && Number(line.adjustment_amount) !== 0 ? `${money(line.adjustment_amount)} ₫` : "—"}</div>
+            <div className="hidden xl:block text-right text-xs font-semibold tabular-nums">{money(lineTotal(line))} ₫</div>
+            <div className="hidden xl:flex items-center justify-end gap-0.5">
+              <Button type="button" variant="ghost" size="icon" className="size-7" title="Nhân dòng" onClick={() => setLines((current) => [...current, { ...line, _key: newLine(current.length)._key, _loading: false, _error: "" }])}><Copy className="size-3.5" /></Button>
+              <Button type="button" variant="ghost" size="icon" className="size-7" title="Xoá dòng" disabled={lines.length === 1} onClick={() => setLines((current) => current.filter((entry) => entry._key !== line._key))}><Trash2 className="size-3.5" /></Button>
+            </div>
+          </div>
+
+          {text(line.item_code) && (salesOptions.length > 0 || colors.length > 0 || showWidth || showHeight || showSets || showSalesMode || showLeafVariant || kind === "mesh" || fieldVisible(line, "has_butterfly_bracket") || showLength || showBars) ? (
+            <div className="grid items-end gap-1.5 border-t bg-muted/10 px-2 py-1.5 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
             {salesOptions.length ? (
               <StandardField
                 id={`sales-line-${index}-sales-option`}
@@ -928,67 +987,10 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                 docValues={line}
                 roles={roles}
                 label="Màu"
-                className="xl:col-span-2"
+                className="xl:col-span-1"
               />
             ) : null}
 
-            {uoms.length ? (
-              <StandardField
-                id={`sales-line-${index}-uom`}
-                field={selectField(childField("uom"), "uom", "\u0110VT", uoms)}
-                value={line.uom}
-                onChange={(value) => commitLine(line._key, "uom", text(value) || undefined)}
-                registry={registry}
-                services={services}
-                parentDoctype="Sales Order Item"
-                docValues={line}
-                roles={roles}
-                label="ĐVT"
-                className="xl:col-span-2"
-              />
-            ) : text(line.uom) ? (
-              <StandardField
-                id={`sales-line-${index}-uom`}
-                field={fallbackField("uom", "\u0110VT")}
-                value={line.uom}
-                onChange={() => undefined}
-                registry={registry}
-                services={services}
-                parentDoctype="Sales Order Item"
-                docValues={line}
-                roles={roles}
-                readOnly
-                label="ĐVT"
-                className="xl:col-span-2"
-              />
-            ) : null}
-
-            {showPlainQty ? (
-              <StandardField
-                id={`sales-line-${index}-qty`}
-                field={lineBaseField("qty", "Kh\u1ed1i l\u01b0\u1ee3ng", "Float")}
-                value={line.qty}
-                onChange={(value) => patchLine(line._key, { qty: value == null || value === "" ? undefined : Number(value) })}
-                onCommit={() => commitLine(line._key, "qty", line.qty)}
-                registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
-                required readOnly={fieldReadonly(line, "qty")}
-                label="Khối lượng"
-                className="xl:col-span-2"
-              />
-            ) : null}
-
-            <div className="hidden xl:block text-right text-xs tabular-nums">{money(line.rate)} ???</div>
-            <div className="hidden xl:block text-right text-xs tabular-nums">{Number(line.discount_amount) > 0 ? `-${money(line.discount_amount)} ???` : "???"}</div>
-            <div className="hidden xl:block text-right text-xs tabular-nums">{Number.isFinite(Number(line.adjustment_amount)) && Number(line.adjustment_amount) !== 0 ? `${money(line.adjustment_amount)} ???` : "???"}</div>
-            <div className="hidden xl:block text-right text-xs font-semibold tabular-nums">{money(lineTotal(line))} ???</div>
-            <div className="hidden xl:flex items-center justify-end gap-0.5">
-              <Button type="button" variant="ghost" size="icon" className="size-7" title="Nh??n d??ng" onClick={() => setLines((current) => [...current, { ...line, _key: newLine(current.length)._key, _loading: false, _error: "" }])}><Copy className="size-3.5" /></Button>
-              <Button type="button" variant="ghost" size="icon" className="size-7" title="Xo?? d??ng" disabled={lines.length === 1} onClick={() => setLines((current) => current.filter((entry) => entry._key !== line._key))}><Trash2 className="size-3.5" /></Button>
-            </div>
-          </div>
-
-          {text(line.item_code) && (showWidth || showHeight || showSets || showSalesMode || showLeafVariant || kind === "mesh" || fieldVisible(line, "has_butterfly_bracket") || showLength || showBars) ? (
-            <div className="grid items-end gap-1.5 border-t bg-muted/10 px-2 py-1.5 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
               {showWidth ? (
                 <StandardField
                   id={`sales-line-${index}-width`}
@@ -1115,7 +1117,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                     ) : null}
 
                     {text(line.item_code) ? (
-                      <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 border-t px-2 py-1 text-[10px] tabular-nums">
+                      <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 border-t px-2 py-1 text-[10px] tabular-nums xl:hidden">
                         <span className="text-muted-foreground">
                           {Number.isFinite(Number(line.qty)) ? Number(line.qty).toLocaleString("vi-VN", { maximumFractionDigits: 6 }) : "—"} {text(line.uom)}
                         </span>
