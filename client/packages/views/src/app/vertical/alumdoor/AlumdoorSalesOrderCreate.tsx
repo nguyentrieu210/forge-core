@@ -1,18 +1,17 @@
 /** @jsxImportSource react */
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Copy, Eye, Loader2, Plus, RefreshCw, Save, Trash2 } from "lucide-react";
 import {
   applyContextPolicy,
-  linkDisplay,
   mapError,
   serializeCreateDocument,
   type Doc,
   type DocField,
   type DocTypeMeta,
-  type LinkResult,
 } from "@metaforge/core";
-import { Button, Input, toast } from "@metaforge/ui";
+import type { ControlRegistry, FieldServices } from "@metaforge/controls";
+import { Button, toast } from "@metaforge/ui";
 import { useMetaForge } from "../../../container/provider.js";
 
 interface AlumdoorSalesOrderCreateProps {
@@ -116,22 +115,11 @@ function optionList(meta: DocTypeMeta | null, fieldname: string, fallback: strin
   return values.length ? values : fallback;
 }
 
-function numeric(value: string): number | undefined {
-  if (!value.trim()) return undefined;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : undefined;
-}
-
 function money(value: unknown): string {
   const parsed = Number(value);
   return Number.isFinite(parsed)
     ? parsed.toLocaleString("vi-VN", { maximumFractionDigits: 0 })
     : "—";
-}
-
-function openLinkedCreate(doctype: string) {
-  const route = `/list/${encodeURIComponent(doctype)}/new`;
-  window.open(route, "_blank", "noopener,noreferrer");
 }
 
 function newLine(index: number): SalesLine {
@@ -184,156 +172,103 @@ function fieldLabel(line: SalesLine, fieldname: string, fallback: string): strin
   return text(line._overrides?.[fieldname]?.label).replace("\n", " ") || fallback;
 }
 
-function Label({ children, required }: { children: ReactNode; required?: boolean }) {
-  return (
-    <div className="mb-1 text-[11px] font-medium leading-4 text-muted-foreground">
-      {children}
-      {required ? <span className="ml-1 text-destructive">*</span> : null}
-    </div>
-  );
+function fallbackField(
+  fieldname: string,
+  label: string,
+  fieldtype: DocField["fieldtype"] = "Data",
+  options?: string,
+): DocField {
+  return { fieldname, label, fieldtype, ...(options ? { options } : {}) } as DocField;
 }
 
-function LinkPicker(props: {
-  doctype: string;
-  value?: string;
+function selectField(
+  base: DocField | undefined,
+  fieldname: string,
+  label: string,
+  options: string[],
+  optionLabels?: Record<string, string>,
+): DocField {
+  const unique = [...new Set(options.map(text).filter(Boolean))];
+  return {
+    ...(base ?? fallbackField(fieldname, label)),
+    fieldname,
+    label,
+    fieldtype: "Select",
+    options: ["", ...unique].join("\n"),
+    ...(optionLabels ? { optionLabels } : {}),
+  } as DocField;
+}
+
+function StandardField(props: {
+  id: string;
+  field: DocField;
+  value: unknown;
+  onChange: (value: unknown) => void;
+  registry: ControlRegistry;
+  services: FieldServices;
+  parentDoctype: string;
+  docValues: Json;
+  roles: string[];
   label?: string;
-  placeholder?: string;
-  filters?: Record<string, unknown>;
-  referenceDoctype?: string;
-  onChange: (value: string, label: string) => void;
-}) {
-  const { adapter } = useMetaForge();
-  const [query, setQuery] = useState(props.label || props.value || "");
-  const [rows, setRows] = useState<LinkResult[]>([]);
-  const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const seq = useRef(0);
-
-  useEffect(() => setQuery(props.label || props.value || ""), [props.label, props.value]);
-
-  const search = useCallback(async (value: string) => {
-    const current = ++seq.current;
-    setLoading(true);
-    try {
-      const result = await adapter.searchLink(props.doctype, value, {
-        filters: props.filters,
-        referenceDoctype: props.referenceDoctype,
-        pageLength: 20,
-      });
-      if (seq.current === current) setRows(result);
-    } catch {
-      if (seq.current === current) setRows([]);
-    } finally {
-      if (seq.current === current) setLoading(false);
-    }
-  }, [adapter, props.doctype, props.filters, props.referenceDoctype]);
-
-  return (
-    <div className="relative">
-      <Input
-        value={query}
-        placeholder={props.placeholder}
-        onFocus={() => {
-          setOpen(true);
-          void search(query);
-        }}
-        onChange={(event) => {
-          const next = event.target.value;
-          setQuery(next);
-          if (props.value) props.onChange("", next);
-          setOpen(true);
-          void search(next);
-        }}
-        onBlur={() => window.setTimeout(() => setOpen(false), 120)}
-      />
-      {open ? (
-        <div className="absolute z-50 mt-1 max-h-64 w-full overflow-auto rounded-md border bg-popover p-1 shadow-xl">
-          {loading ? (
-            <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
-              <Loader2 className="size-3 animate-spin" /> Đang tìm…
-            </div>
-          ) : null}
-          {!loading && !rows.length ? (
-            <div className="px-3 py-2 text-xs text-muted-foreground">Không có kết quả</div>
-          ) : null}
-          {rows.map((row) => {
-            const display = linkDisplay(row);
-            return (
-              <button
-                key={row.value}
-                type="button"
-                className="flex w-full flex-col rounded px-3 py-2 text-left hover:bg-accent"
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => {
-                  setQuery(display.primary);
-                  props.onChange(row.value, display.primary);
-                  setOpen(false);
-                }}
-              >
-                <span className="text-sm font-medium">{display.primary}</span>
-                {display.secondary ? (
-                  <span className="text-[11px] text-muted-foreground">{display.secondary}</span>
-                ) : null}
-              </button>
-            );
-          })}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function SelectBox(props: {
-  value?: unknown;
-  options: string[];
-  onChange: (value: string) => void;
-}) {
-  return (
-    <select
-      className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-      value={text(props.value)}
-      onChange={(event) => props.onChange(event.target.value)}
-    >
-      <option value="">— Chọn —</option>
-      {props.options.map((option) => (
-        <option key={option} value={option}>{option}</option>
-      ))}
-    </select>
-  );
-}
-
-function NumberBox(props: {
-  value?: unknown;
-  disabled?: boolean;
-  step?: number;
-  min?: number;
-  onChange: (value?: number) => void;
+  required?: boolean;
+  readOnly?: boolean;
+  compact?: boolean;
+  className?: string;
   onCommit?: () => void;
 }) {
-  return (
-    <Input
-      type="number"
-      value={props.value == null ? "" : String(props.value)}
-      disabled={props.disabled}
-      step={props.step ?? 0.001}
-      min={props.min ?? 0}
-      onChange={(event) => props.onChange(numeric(event.target.value))}
-      onBlur={() => props.onCommit?.()}
-      onKeyDown={(event) => {
-        if (event.key === "Enter") props.onCommit?.();
-      }}
+  const Control = props.registry.resolve(props.field.fieldtype);
+  const displayLabel = props.label || text(props.field.label) || props.field.fieldname;
+  if (!Control) {
+    return <div className={props.className}><div className="text-xs text-destructive">Ch??a c?? control cho {props.field.fieldtype}</div></div>;
+  }
+  const control = (
+    <Control
+      field={props.field}
+      id={props.id}
+      value={props.value}
+      onChange={props.onChange}
+      readOnly={props.readOnly}
+      required={props.required}
+      label={displayLabel}
+      services={props.services}
+      parentDoctype={props.parentDoctype}
+      docValues={props.docValues}
+      roles={props.roles}
+      compact={props.compact}
     />
+  );
+  if (props.field.fieldtype === "Check") {
+    return (
+      <div className={"min-w-0 " + (props.className ?? "")}>
+        <div className="flex h-9 items-center gap-2">
+          {control}
+          <label htmlFor={props.id} className="cursor-pointer text-[13px] font-medium text-foreground">
+            {displayLabel}{props.required ? <span className="ml-0.5 text-destructive">*</span> : null}
+          </label>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div
+      className={"min-w-0 " + (props.className ?? "")}
+      onBlurCapture={() => props.onCommit?.()}
+      onKeyDownCapture={(event) => { if (event.key === "Enter") props.onCommit?.(); }}
+    >
+      <label htmlFor={props.id} className="mb-1 block text-[13px] font-medium leading-tight text-foreground">
+        {displayLabel}{props.required ? <span className="ml-0.5 text-destructive">*</span> : null}
+      </label>
+      {control}
+    </div>
   );
 }
 
 export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
-  const { adapter, scopeKey, businessContext, contextPolicies } = useMetaForge();
+  const { adapter, scopeKey, businessContext, contextPolicies, registry, services, roles } = useMetaForge();
   const queryClient = useQueryClient();
   const [meta, setMeta] = useState<DocTypeMeta | null>(null);
   const [childMeta, setChildMeta] = useState<DocTypeMeta | null>(null);
   const [header, setHeader] = useState<Json>({});
-  const [customerLabel, setCustomerLabel] = useState("");
-  const [employeeLabel, setEmployeeLabel] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [lines, setLines] = useState<SalesLine[]>([newLine(0)]);
   const [loading, setLoading] = useState(true);
@@ -393,7 +328,6 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
         setChildMeta(itemMeta);
         setCanCreate(Boolean(caps.create));
         setHeader(defaults);
-        setEmployeeLabel(text(defaults.responsible_person));
       } catch (error) {
         if (active) setFatal(mapError(error).message);
       } finally {
@@ -478,12 +412,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
     setHeader(next);
     if (!preview) return;
     void previewDocument(next, field)
-      .then((resolved) => {
-        setHeader(resolved);
-        if (field === "customer") {
-          setEmployeeLabel(text(resolved.responsible_person));
-        }
-      })
+      .then((resolved) => setHeader(resolved))
       .catch((error) => toast.error(mapError(error).message));
   }, [header, previewDocument]);
 
@@ -717,7 +646,11 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
   }
 
   const metaField = (fieldname: string) => meta.fields.find((field) => field.fieldname === fieldname);
-  const metaLabel = (fieldname: string, fallback: string) => text(metaField(fieldname)?.label) || fallback;
+  const childField = (fieldname: string) => childMeta.fields.find((field) => field.fieldname === fieldname);
+  const headerField = (fieldname: string, label: string, fieldtype: DocField["fieldtype"] = "Data", options?: string) =>
+    metaField(fieldname) ?? fallbackField(fieldname, label, fieldtype, options);
+  const lineBaseField = (fieldname: string, label: string, fieldtype: DocField["fieldtype"] = "Data", options?: string) =>
+    childField(fieldname) ?? fallbackField(fieldname, label, fieldtype, options);
   const metaRequired = (fieldname: string) => Boolean(metaField(fieldname)?.reqd);
   const phoneValue = salesPhoneField ? text(header[salesPhoneField]) || customerPhone : customerPhone;
 
@@ -731,115 +664,107 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
       <div className="min-h-0 flex-1 overflow-auto">
         <div className="mx-auto w-full max-w-[1760px] space-y-3 px-4 py-3">
           <section className="rounded-lg border bg-card p-3" data-section="sales-customer-meta-header">
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <h2 className="text-sm font-semibold">Thông tin khách hàng</h2>
-              <span className="text-[11px] text-muted-foreground">Đơn bán hàng mới</span>
-            </div>
+  <div className="mb-2 flex items-center justify-between gap-3">
+    <h2 className="text-sm font-semibold">Th??ng tin kh??ch h??ng</h2>
+    <span className="text-[11px] text-muted-foreground">????n b??n h??ng m???i</span>
+  </div>
 
-            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(320px,2.2fr)_minmax(150px,.8fr)_minmax(260px,1.5fr)_150px_150px]">
-              <div className="xl:order-1">
-                <Label required={metaRequired("customer")}>{metaLabel("customer", "Khách hàng")}</Label>
-                <div className="flex gap-1.5">
-                  <div className="min-w-0 flex-1">
-                    <LinkPicker
-                      doctype={text(metaField("customer")?.options) || "Customer"}
-                      value={text(header.customer)}
-                      label={customerLabel}
-                      referenceDoctype="Sales Order"
-                      placeholder="Tìm tên, mã hoặc SĐT khách hàng…"
-                      onChange={(value, shown) => {
-                        setCustomerLabel(shown);
-                        setHeaderField("customer", value || undefined, true);
-                      }}
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="size-9 shrink-0"
-                    title="Thêm khách hàng"
-                    onClick={() => openLinkedCreate("Customer")}
-                  >
-                    <Plus className="size-4" />
-                  </Button>
-                </div>
-              </div>
+  <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(320px,2.2fr)_minmax(150px,.8fr)_minmax(260px,1.5fr)_150px_150px]">
+    <StandardField
+      id="sales-customer"
+      field={headerField("customer", "Kh??ch h??ng", "Link", "Customer")}
+      value={header.customer}
+      onChange={(value) => setHeaderField("customer", text(value) || undefined, true)}
+      registry={registry}
+      services={services}
+      parentDoctype="Sales Order"
+      docValues={header}
+      roles={roles}
+      required={metaRequired("customer")}
+      className="xl:order-1"
+    />
 
-              <div className="xl:order-2">
-                <Label>SĐT</Label>
-                <Input
-                  value={phoneValue}
-                  placeholder="Số điện thoại"
-                  onChange={(event) => {
-                    const value = event.target.value;
-                    setCustomerPhone(value);
-                    if (salesPhoneField) setHeaderField(salesPhoneField, value || undefined);
-                  }}
-                  readOnly={!salesPhoneField}
-                  className={!salesPhoneField ? "bg-muted/20" : undefined}
-                />
-              </div>
+    <StandardField
+      id="sales-phone"
+      field={salesPhoneField ? headerField(salesPhoneField, "S??T") : fallbackField("__customer_phone", "S??T")}
+      value={phoneValue}
+      onChange={(value) => {
+        const phone = text(value);
+        setCustomerPhone(phone);
+        if (salesPhoneField) setHeaderField(salesPhoneField, phone || undefined);
+      }}
+      registry={registry}
+      services={services}
+      parentDoctype="Sales Order"
+      docValues={header}
+      roles={roles}
+      readOnly={!salesPhoneField}
+      className="xl:order-2"
+    />
 
-              <div className="md:col-span-2 xl:order-6 xl:col-span-5">
-                <Label required={metaRequired("install_address")}>{metaLabel("install_address", "Địa chỉ giao / lắp đặt")}</Label>
-                <Input
-                  value={text(header.install_address)}
-                  placeholder="Nhập địa chỉ giao hàng hoặc lắp đặt"
-                  onChange={(event) => setHeaderField("install_address", event.target.value || undefined)}
-                />
-              </div>
+    <StandardField
+      id="sales-address"
+      field={headerField("install_address", "?????a ch??? giao / l???p ?????t")}
+      value={header.install_address}
+      onChange={(value) => setHeaderField("install_address", text(value) || undefined)}
+      registry={registry}
+      services={services}
+      parentDoctype="Sales Order"
+      docValues={header}
+      roles={roles}
+      required={metaRequired("install_address")}
+      label="?????a ch??? giao / l???p ?????t"
+      className="md:col-span-2 xl:order-6 xl:col-span-5"
+    />
 
-              <div className="xl:order-4">
-                <Label required={metaRequired("transaction_date")}>Ngày đặt hàng</Label>
-                <Input
-                  type="date"
-                  value={text(header.transaction_date)}
-                  onChange={(event) => setHeaderField("transaction_date", event.target.value, true)}
-                />
-              </div>
+    <StandardField
+      id="sales-order-date"
+      field={headerField("transaction_date", "Ng??y ?????t h??ng", "Date")}
+      value={header.transaction_date}
+      onChange={(value) => setHeaderField("transaction_date", text(value), true)}
+      registry={registry}
+      services={services}
+      parentDoctype="Sales Order"
+      docValues={header}
+      roles={roles}
+      required={metaRequired("transaction_date")}
+      label="Ng??y ?????t h??ng"
+      className="xl:order-4"
+    />
 
-              <div className="xl:order-5">
-                <Label required={metaRequired("delivery_date")}>{metaLabel("delivery_date", "Ngày giao")}</Label>
-                <Input
-                  type="date"
-                  value={text(header.delivery_date)}
-                  onChange={(event) => setHeaderField("delivery_date", event.target.value)}
-                />
-              </div>
+    <StandardField
+      id="sales-delivery-date"
+      field={headerField("delivery_date", "Ng??y giao", "Date")}
+      value={header.delivery_date}
+      onChange={(value) => setHeaderField("delivery_date", text(value))}
+      registry={registry}
+      services={services}
+      parentDoctype="Sales Order"
+      docValues={header}
+      roles={roles}
+      required={metaRequired("delivery_date")}
+      label="Ng??y giao"
+      className="xl:order-5"
+    />
 
-              <div className="md:col-span-2 xl:order-3 xl:col-span-1">
-                <Label required={metaRequired("responsible_person")}>Nhân viên bán hàng</Label>
-                <div className="flex gap-1.5">
-                  <div className="min-w-0 flex-1">
-                    <LinkPicker
-                      doctype={text(metaField("responsible_person")?.options) || "Employee"}
-                      value={text(header.responsible_person)}
-                      label={employeeLabel || text(header.responsible_person)}
-                      referenceDoctype="Sales Order"
-                      placeholder="Chọn nhân viên…"
-                      onChange={(value, shown) => {
-                        setEmployeeLabel(shown);
-                        setHeaderField("responsible_person", value || undefined);
-                      }}
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="size-9 shrink-0"
-                    title="Thêm nhân viên"
-                    onClick={() => openLinkedCreate("Employee")}
-                  >
-                    <Plus className="size-4" />
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </section>
+    <StandardField
+      id="sales-responsible-person"
+      field={headerField("responsible_person", "Nh??n vi??n b??n h??ng", "Link", "Employee")}
+      value={header.responsible_person}
+      onChange={(value) => setHeaderField("responsible_person", text(value) || undefined)}
+      registry={registry}
+      services={services}
+      parentDoctype="Sales Order"
+      docValues={header}
+      roles={roles}
+      required={metaRequired("responsible_person")}
+      label="Nh??n vi??n b??n h??ng"
+      className="md:col-span-2 xl:order-3 xl:col-span-1"
+    />
+  </div>
+</section>
 
-          <section className="space-y-2" data-section="hardcoded-sales-lines">
+<section className="space-y-2" data-section="hardcoded-sales-lines">
             <div className="flex min-h-8 items-center justify-between gap-2">
               <h2 className="text-sm font-semibold">Chi tiết bán hàng</h2>
               <Button
@@ -924,222 +849,235 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
 
                   <div className="space-y-2 p-2.5">
                     <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-12">
-                      <div className={text(line.item_code) ? "md:col-span-2 xl:col-span-5" : "md:col-span-2 xl:col-span-8"}>
-                        <Label required>Mặt hàng</Label>
-                        <LinkPicker
-                          doctype="Item"
-                          value={text(line.item_code)}
-                          label={line._itemLabel}
-                          filters={{ is_sales_item: 1, disabled: 0 }}
-                          referenceDoctype="Sales Order"
-                          placeholder="Tìm cửa, ray, trục, phụ kiện…"
-                          onChange={(value, shown) => {
-                            const reset: Partial<SalesLine> = {
-                              item_code: value || undefined,
-                              _itemLabel: shown,
-                              sales_option: undefined,
-                              _context: undefined,
-                              _salesOptions: [],
-                              _allowedColors: [],
-                              _overrides: {},
-                              _error: "",
-                            };
-                            patchLine(line._key, reset);
-                            if (value) {
-                              void previewLine(
-                                { ...line, ...reset } as SalesLine,
-                                "item_code",
-                                reset,
-                              );
-                            }
-                          }}
-                        />
-                      </div>
+            <StandardField
+              id={\`sales-line-\${index}-item\`}
+              field={lineBaseField("item_code", "M???t h??ng", "Link", "Item")}
+              value={line.item_code}
+              onChange={(value) => {
+                const itemCode = text(value);
+                const reset: Partial<SalesLine> = {
+                  item_code: itemCode || undefined,
+                  _itemLabel: undefined,
+                  sales_option: undefined,
+                  _context: undefined,
+                  _salesOptions: [],
+                  _allowedColors: [],
+                  _overrides: {},
+                  _error: "",
+                };
+                patchLine(line._key, reset);
+                if (itemCode) void previewLine({ ...line, ...reset } as SalesLine, "item_code", reset);
+              }}
+              registry={registry}
+              services={services}
+              parentDoctype="Sales Order"
+              docValues={{ ...header, ...line }}
+              roles={roles}
+              required
+              compact
+              label="M???t h??ng"
+              className={text(line.item_code) ? "md:col-span-2 xl:col-span-5" : "md:col-span-2 xl:col-span-8"}
+            />
 
-                      {salesOptions.length ? (
-                        <div className="md:col-span-2 xl:col-span-3">
-                          <Label>Phương án bán</Label>
-                          <select
-                            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                            value={text(line.sales_option)}
-                            onChange={(event) => commitLine(
-                              line._key,
-                              "sales_option",
-                              event.target.value || undefined,
-                            )}
-                          >
-                            <option value="">— Giá / cách bán chuẩn —</option>
-                            {salesOptions.map((option) => (
-                              <option key={String(option.name)} value={String(option.name)}>
-                                {text(option.option_label) || String(option.name)}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      ) : null}
+            {salesOptions.length ? (
+              <StandardField
+                id={\`sales-line-\${index}-sales-option\`}
+                field={selectField(
+                  childField("sales_option"),
+                  "sales_option",
+                  "Ph????ng ??n b??n",
+                  salesOptions.map((option) => String(option.name)),
+                  Object.fromEntries(salesOptions.map((option) => [String(option.name), text(option.option_label) || String(option.name)])),
+                )}
+                value={line.sales_option}
+                onChange={(value) => commitLine(line._key, "sales_option", text(value) || undefined)}
+                registry={registry}
+                services={services}
+                parentDoctype="Sales Order Item"
+                docValues={line}
+                roles={roles}
+                label="Ph????ng ??n b??n"
+                className="md:col-span-2 xl:col-span-3"
+              />
+            ) : null}
 
-                      {colors.length ? (
-                        <div className="xl:col-span-2">
-                          <Label>Màu</Label>
-                          <SelectBox
-                            value={line.color}
-                            options={colors}
-                            onChange={(value) => patchLine(line._key, { color: value || undefined })}
-                          />
-                        </div>
-                      ) : null}
+            {colors.length ? (
+              <StandardField
+                id={\`sales-line-\${index}-color\`}
+                field={selectField(childField("color"), "color", "M??u", colors)}
+                value={line.color}
+                onChange={(value) => commitLine(line._key, "color", text(value) || undefined)}
+                registry={registry}
+                services={services}
+                parentDoctype="Sales Order Item"
+                docValues={line}
+                roles={roles}
+                label="M??u"
+                className="xl:col-span-2"
+              />
+            ) : null}
 
-                      {uoms.length > 1 ? (
-                        <div className="xl:col-span-2">
-                          <Label>ĐVT</Label>
-                          <SelectBox
-                            value={line.uom}
-                            options={uoms}
-                            onChange={(value) => commitLine(line._key, "uom", value || undefined)}
-                          />
-                        </div>
-                      ) : text(line.uom) ? (
-                        <div className="xl:col-span-2">
-                          <Label>ĐVT</Label>
-                          <Input value={text(line.uom)} readOnly className="bg-muted/30" />
-                        </div>
-                      ) : null}
-                    </div>
+            {uoms.length ? (
+              <StandardField
+                id={\`sales-line-\${index}-uom\`}
+                field={selectField(childField("uom"), "uom", "??VT", uoms)}
+                value={line.uom}
+                onChange={(value) => commitLine(line._key, "uom", text(value) || undefined)}
+                registry={registry}
+                services={services}
+                parentDoctype="Sales Order Item"
+                docValues={line}
+                roles={roles}
+                label="??VT"
+                className="xl:col-span-2"
+              />
+            ) : text(line.uom) ? (
+              <StandardField
+                id={\`sales-line-\${index}-uom\`}
+                field={fallbackField("uom", "??VT")}
+                value={line.uom}
+                onChange={() => undefined}
+                registry={registry}
+                services={services}
+                parentDoctype="Sales Order Item"
+                docValues={line}
+                roles={roles}
+                readOnly
+                label="??VT"
+                className="xl:col-span-2"
+              />
+            ) : null}
+          </div>
 
-                    {text(line.item_code) ? (
-                      <div className="grid gap-2 rounded-md border bg-muted/10 p-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
-                        {showWidth ? (
-                          <div>
-                            <Label required={area || fieldRequired(line, "width_m")}>
-                              {fieldLabel(line, "width_m", "Rộng (m)")}
-                            </Label>
-                            <NumberBox
-                              value={line.width_m}
-                              onChange={(value) => patchLine(line._key, { width_m: value })}
-                              onCommit={() => commitLine(line._key, "width_m", line.width_m)}
-                            />
-                          </div>
-                        ) : null}
+          {text(line.item_code) ? (
+            <div className="grid gap-2 rounded-md border bg-muted/10 p-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+              {showWidth ? (
+                <StandardField
+                  id={\`sales-line-\${index}-width\`}
+                  field={lineBaseField("width_m", fieldLabel(line, "width_m", "R???ng (m)"), "Float")}
+                  value={line.width_m}
+                  onChange={(value) => patchLine(line._key, { width_m: value == null || value === "" ? undefined : Number(value) })}
+                  onCommit={() => commitLine(line._key, "width_m", line.width_m)}
+                  registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
+                  required={area || fieldRequired(line, "width_m")} readOnly={fieldReadonly(line, "width_m")}
+                  label={fieldLabel(line, "width_m", "R???ng (m)")}
+                />
+              ) : null}
 
-                        {showHeight ? (
-                          <div>
-                            <Label required={area || fieldRequired(line, "height_m")}>
-                              {fieldLabel(line, "height_m", "Cao (m)")}
-                            </Label>
-                            <NumberBox
-                              value={line.height_m}
-                              onChange={(value) => patchLine(line._key, { height_m: value })}
-                              onCommit={() => commitLine(line._key, "height_m", line.height_m)}
-                            />
-                          </div>
-                        ) : null}
+              {showHeight ? (
+                <StandardField
+                  id={\`sales-line-\${index}-height\`}
+                  field={lineBaseField("height_m", fieldLabel(line, "height_m", "Cao (m)"), "Float")}
+                  value={line.height_m}
+                  onChange={(value) => patchLine(line._key, { height_m: value == null || value === "" ? undefined : Number(value) })}
+                  onCommit={() => commitLine(line._key, "height_m", line.height_m)}
+                  registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
+                  required={area || fieldRequired(line, "height_m")} readOnly={fieldReadonly(line, "height_m")}
+                  label={fieldLabel(line, "height_m", "Cao (m)")}
+                />
+              ) : null}
 
-                        {showSets ? (
-                          <div>
-                            <Label required={area || fieldRequired(line, "set_count")}>
-                              {fieldLabel(line, "set_count", area ? "Số bộ" : "Số lượng")}
-                            </Label>
-                            <NumberBox
-                              value={line.set_count}
-                              min={1}
-                              step={1}
-                              onChange={(value) => patchLine(line._key, { set_count: value })}
-                              onCommit={() => commitLine(line._key, "set_count", line.set_count)}
-                            />
-                          </div>
-                        ) : null}
+              {showSets ? (
+                <StandardField
+                  id={\`sales-line-\${index}-sets\`}
+                  field={lineBaseField("set_count", fieldLabel(line, "set_count", area ? "S??? b???" : "S??? l?????ng"), "Int")}
+                  value={line.set_count}
+                  onChange={(value) => patchLine(line._key, { set_count: value == null || value === "" ? undefined : Number(value) })}
+                  onCommit={() => commitLine(line._key, "set_count", line.set_count)}
+                  registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
+                  required={area || fieldRequired(line, "set_count")} readOnly={fieldReadonly(line, "set_count")}
+                  label={fieldLabel(line, "set_count", area ? "S??? b???" : "S??? l?????ng")}
+                />
+              ) : null}
 
-                        {showSalesMode ? (
-                          <div>
-                            <Label>Cách bán</Label>
-                            <SelectBox
-                              value={line.sales_mode || "Trọn bộ"}
-                              options={salesModes}
-                              onChange={(value) => commitLine(line._key, "sales_mode", value || undefined)}
-                            />
-                          </div>
-                        ) : null}
+              {showSalesMode ? (
+                <StandardField
+                  id={\`sales-line-\${index}-sales-mode\`}
+                  field={selectField(childField("sales_mode"), "sales_mode", "C??ch b??n", salesModes)}
+                  value={line.sales_mode || "Tr???n b???"}
+                  onChange={(value) => commitLine(line._key, "sales_mode", text(value) || undefined)}
+                  registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
+                  label="C??ch b??n"
+                />
+              ) : null}
 
-                        {showLeafVariant ? (
-                          <div>
-                            <Label>Kiểu kéo / motor</Label>
-                            <SelectBox
-                              value={line.leaf_variant}
-                              options={leafVariants}
-                              onChange={(value) => commitLine(line._key, "leaf_variant", value || undefined)}
-                            />
-                          </div>
-                        ) : null}
+              {showLeafVariant ? (
+                <StandardField
+                  id={\`sales-line-\${index}-leaf-variant\`}
+                  field={selectField(childField("leaf_variant"), "leaf_variant", "Ki???u k??o / motor", leafVariants)}
+                  value={line.leaf_variant}
+                  onChange={(value) => commitLine(line._key, "leaf_variant", text(value) || undefined)}
+                  registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
+                  label="Ki???u k??o / motor"
+                />
+              ) : null}
 
-                        {kind === "mesh" ? (
-                          <div>
-                            <Label>Cao lưới (m)</Label>
-                            <NumberBox
-                              value={line.mesh_height_m}
-                              onChange={(value) => patchLine(line._key, { mesh_height_m: value })}
-                              onCommit={() => commitLine(line._key, "mesh_height_m", line.mesh_height_m)}
-                            />
-                          </div>
-                        ) : null}
+              {kind === "mesh" ? (
+                <StandardField
+                  id={\`sales-line-\${index}-mesh-height\`}
+                  field={lineBaseField("mesh_height_m", "Cao l?????i (m)", "Float")}
+                  value={line.mesh_height_m}
+                  onChange={(value) => patchLine(line._key, { mesh_height_m: value == null || value === "" ? undefined : Number(value) })}
+                  onCommit={() => commitLine(line._key, "mesh_height_m", line.mesh_height_m)}
+                  registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
+                  label="Cao l?????i (m)"
+                />
+              ) : null}
 
-                        {fieldVisible(line, "has_butterfly_bracket") ? (
-                          <label className="flex h-9 items-center gap-2 self-end rounded-md border bg-background px-3 text-xs">
-                            <input
-                              type="checkbox"
-                              checked={Boolean(line.has_butterfly_bracket)}
-                              onChange={(event) => commitLine(
-                                line._key,
-                                "has_butterfly_bracket",
-                                event.target.checked ? 1 : 0,
-                              )}
-                            />
-                            Có bản bướm
-                          </label>
-                        ) : null}
+              {fieldVisible(line, "has_butterfly_bracket") ? (
+                <StandardField
+                  id={\`sales-line-\${index}-butterfly\`}
+                  field={lineBaseField("has_butterfly_bracket", "C?? b???n b?????m", "Check")}
+                  value={line.has_butterfly_bracket}
+                  onChange={(value) => commitLine(line._key, "has_butterfly_bracket", value ? 1 : 0)}
+                  registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
+                  readOnly={fieldReadonly(line, "has_butterfly_bracket")}
+                  label="C?? b???n b?????m"
+                />
+              ) : null}
 
-                        {showLength ? (
-                          <div>
-                            <Label required={fieldRequired(line, "length_m")}>
-                              {fieldLabel(line, "length_m", "Dài một cây/đoạn (m)")}
-                            </Label>
-                            <NumberBox
-                              value={line.length_m}
-                              onChange={(value) => patchLine(line._key, { length_m: value })}
-                              onCommit={() => commitLine(line._key, "length_m", line.length_m)}
-                            />
-                          </div>
-                        ) : null}
+              {showLength ? (
+                <StandardField
+                  id={\`sales-line-\${index}-length\`}
+                  field={lineBaseField("length_m", fieldLabel(line, "length_m", "D??i m???t c??y/??o???n (m)"), "Float")}
+                  value={line.length_m}
+                  onChange={(value) => patchLine(line._key, { length_m: value == null || value === "" ? undefined : Number(value) })}
+                  onCommit={() => commitLine(line._key, "length_m", line.length_m)}
+                  registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
+                  required={fieldRequired(line, "length_m")} readOnly={fieldReadonly(line, "length_m")}
+                  label={fieldLabel(line, "length_m", "D??i m???t c??y/??o???n (m)")}
+                />
+              ) : null}
 
-                        {showBars ? (
-                          <div>
-                            <Label required={fieldRequired(line, "qty_bar")}>
-                              {fieldLabel(line, "qty_bar", "Số cây/đoạn")}
-                            </Label>
-                            <NumberBox
-                              value={line.qty_bar}
-                              min={1}
-                              step={1}
-                              onChange={(value) => patchLine(line._key, { qty_bar: value })}
-                              onCommit={() => commitLine(line._key, "qty_bar", line.qty_bar)}
-                            />
-                          </div>
-                        ) : null}
+              {showBars ? (
+                <StandardField
+                  id={\`sales-line-\${index}-bars\`}
+                  field={lineBaseField("qty_bar", fieldLabel(line, "qty_bar", "S??? c??y/??o???n"), "Int")}
+                  value={line.qty_bar}
+                  onChange={(value) => patchLine(line._key, { qty_bar: value == null || value === "" ? undefined : Number(value) })}
+                  onCommit={() => commitLine(line._key, "qty_bar", line.qty_bar)}
+                  registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
+                  required={fieldRequired(line, "qty_bar")} readOnly={fieldReadonly(line, "qty_bar")}
+                  label={fieldLabel(line, "qty_bar", "S??? c??y/??o???n")}
+                />
+              ) : null}
 
-                        {!area && !showSets && !showBars ? (
-                          <div>
-                            <Label required>Khối lượng</Label>
-                            <NumberBox
-                              value={line.qty}
-                              disabled={fieldReadonly(line, "qty")}
-                              onChange={(value) => patchLine(line._key, { qty: value })}
-                              onCommit={() => commitLine(line._key, "qty", line.qty)}
-                            />
-                          </div>
-                        ) : null}
-                      </div>
-                    ) : null}
+              {!area && !showSets && !showBars ? (
+                <StandardField
+                  id={\`sales-line-\${index}-qty\`}
+                  field={lineBaseField("qty", "Kh???i l?????ng", "Float")}
+                  value={line.qty}
+                  onChange={(value) => patchLine(line._key, { qty: value == null || value === "" ? undefined : Number(value) })}
+                  onCommit={() => commitLine(line._key, "qty", line.qty)}
+                  registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
+                  required readOnly={fieldReadonly(line, "qty")}
+                  label="Kh???i l?????ng"
+                />
+              ) : null}
+            </div>
+          ) : null}
 
-                    {line._error ? (
+          {line._error ? (
                       <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-1.5 text-xs text-destructive">
                         {line._error}
                       </div>
