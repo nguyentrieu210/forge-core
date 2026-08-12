@@ -1,3 +1,16 @@
+﻿// __FORGE_GLIDE_REACT_BRIDGE__
+import * as __forgeReactModule from "react";
+import * as __forgeReactDomModule from "react-dom";
+import * as __forgeJsxRuntimeModule from "react/jsx-runtime";
+const __forgeReact = __forgeReactModule.default ?? __forgeReactModule;
+const __forgeReactDom = __forgeReactDomModule.default ?? __forgeReactDomModule;
+const __forgeRequire = (id) => {
+  if (id === "react") return __forgeReact;
+  if (id === "react-dom") return __forgeReactDom;
+  if (id === "react/jsx-runtime") return __forgeJsxRuntimeModule;
+  throw new Error(`Unsupported Glide runtime require: ${id}`);
+};
+var require = __forgeRequire;
 var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -19674,3 +19687,4 @@ classnames/index.js:
   	http://jedwatson.github.io/classnames
   *)
 */
+
