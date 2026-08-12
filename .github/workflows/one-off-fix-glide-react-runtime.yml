@@ -16,55 +16,43 @@ jobs:
           fetch-depth: 1
 
       - name: Probe patched bundle on live preview
-        shell: bash
+        shell: powershell
         run: |
-          set -euo pipefail
-          preview='/c/alumdoor-hardcode-preview'
-          target="$preview/client/vendor/glide-data-grid/forge-bundle/index.js"
-          backup="$RUNNER_TEMP/glide-index-main-backup.js"
-          runtime="$preview/client/apps/runtime"
-          html="$runtime/diag-glide.html"
-          tsx="$runtime/src/diag-glide.tsx"
-          cp "$target" "$backup"
-          cleanup() {
-            cp "$backup" "$target" || true
-            rm -f "$html" "$tsx"
+          $ErrorActionPreference = 'Stop'
+          $preview = 'C:\alumdoor-hardcode-preview'
+          $target = Join-Path $preview 'client\vendor\glide-data-grid\forge-bundle\index.js'
+          $backup = Join-Path $env:RUNNER_TEMP 'glide-index-main-backup.js'
+          $runtime = Join-Path $preview 'client\apps\runtime'
+          $html = Join-Path $runtime 'diag-glide.html'
+          $tsx = Join-Path $runtime 'src\diag-glide.tsx'
+          Copy-Item $target $backup -Force
+          try {
+            Copy-Item 'client\vendor\glide-data-grid\forge-bundle\index.js' $target -Force
+            Start-Sleep -Milliseconds 1200
+            [IO.File]::WriteAllBytes($html, [Convert]::FromBase64String('PCFkb2N0eXBlIGh0bWw+PGh0bWw+PGhlYWQ+PG1ldGEgY2hhcnNldD0idXRmLTgiPjx0aXRsZT5HbGlkZSBwcm9iZTwvdGl0bGU+PC9oZWFkPjxib2R5PjxkaXYgaWQ9InJvb3QiIHN0eWxlPSJ3aWR0aDoxMjAwcHg7aGVpZ2h0OjUwMHB4Ij48L2Rpdj48c2NyaXB0IHR5cGU9Im1vZHVsZSIgc3JjPSIvc3JjL2RpYWctZ2xpZGUudHN4Ij48L3NjcmlwdD48L2JvZHk+PC9odG1sPg=='))
+            [IO.File]::WriteAllBytes($tsx, [Convert]::FromBase64String('aW1wb3J0IFJlYWN0IGZyb20gInJlYWN0IjsKaW1wb3J0IHsgY3JlYXRlUm9vdCB9IGZyb20gInJlYWN0LWRvbS9jbGllbnQiOwppbXBvcnQgeyBBbHVtZG9vclNhbGVzTGluZXNHcmlkIH0gZnJvbSAiLi4vLi4vLi4vcGFja2FnZXMvdmlld3Mvc3JjL2FwcC92ZXJ0aWNhbC9hbHVtZG9vci9BbHVtZG9vclNhbGVzTGluZXNHcmlkIjsKd2luZG93LmFkZEV2ZW50TGlzdGVuZXIoImVycm9yIiwgKGV2ZW50KSA9PiBjb25zb2xlLmVycm9yKCJHTElERV9QUk9CRV9FUlJPUiIsIGV2ZW50LmVycm9yID8/IGV2ZW50Lm1lc3NhZ2UpKTsKd2luZG93LmFkZEV2ZW50TGlzdGVuZXIoInVuaGFuZGxlZHJlamVjdGlvbiIsIChldmVudCkgPT4gY29uc29sZS5lcnJvcigiR0xJREVfUFJPQkVfRVJST1IiLCBldmVudC5yZWFzb24pKTsKY29uc3Qgcm93czphbnkgPSBbewogIGtleToicm93LTEiLCBpdGVtQ29kZToiIiwgaXRlbUxhYmVsOiIiLCBhdmFpbGFiaWxpdHk6IiIsCiAgc2FsZXNPcHRpb246IiIsIHNhbGVzT3B0aW9uTGFiZWw6IiIsIHNhbGVzT3B0aW9uQ2hvaWNlczpbXSwKICBwcmljZUlkOiIiLCBwcmljZUxhYmVsOiIiLCBwcmljZUNob2ljZXM6W10sCiAgdW9tOiIiLCB1b21DaG9pY2VzOltdLCBxdWFudGl0eToxLCBxdWFudGl0eUZpZWxkOiJxdHkiLAogIHF1YW50aXR5RWRpdGFibGU6dHJ1ZSwgZGlzY291bnRMYWJlbDoiLSIsIGFkanVzdG1lbnRMYWJlbDoiLSIsIGFtb3VudExhYmVsOiIwIiwKICBkb2NWYWx1ZXM6e30KfV07CmNyZWF0ZVJvb3QoZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoInJvb3QiKSEpLnJlbmRlcigKICA8QWx1bWRvb3JTYWxlc0xpbmVzR3JpZAogICAgcm93cz17cm93c30gc2VsZWN0ZWRLZXk9InJvdy0xIgogICAgb25TZWxlY3RlZEtleUNoYW5nZT17KCk9Pnt9fSBvbkNoYW5nZT17KCk9Pnt9fQogICAgb25BZGQ9eygpPT57fX0gb25EdXBsaWNhdGU9eygpPT57fX0gb25EZWxldGU9eygpPT57fX0KICAgIHJlZ2lzdHJ5PXt7cmVzb2x2ZTooKT0+bnVsbH0gYXMgYW55fQogICAgc2VydmljZXM9e3t9IGFzIGFueX0gcm9sZXM9e1tdfSBwYXJlbnREb2NWYWx1ZXM9e3t9fQogIC8+Cik7CnNldFRpbWVvdXQoKCkgPT4gewogIGRvY3VtZW50LmJvZHkuc2V0QXR0cmlidXRlKCJkYXRhLWdsaWRlLXByb2JlIiwibW91bnRlZCIpOwogIGNvbnNvbGUubG9nKCJHTElERV9QUk9CRV9NT1VOVEVEIik7Cn0sIDE1MDApOwo='))
+
+            $chromeCandidates = @('C:\Program Files\Google\Chrome\Application\chrome.exe','C:\Program Files (x86)\Google\Chrome\Application\chrome.exe','C:\Program Files\Microsoft\Edge\Application\msedge.exe')
+            $chrome = $chromeCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+            if (-not $chrome) { throw 'Chrome or Edge not found' }
+            $profile = Join-Path $env:RUNNER_TEMP 'forge-glide-fix-profile'
+            Remove-Item -Recurse -Force $profile -ErrorAction SilentlyContinue
+            $out = Join-Path $env:RUNNER_TEMP 'glide-fix-out.txt'
+            $err = Join-Path $env:RUNNER_TEMP 'glide-fix-err.txt'
+            $args = @('--headless=new','--disable-gpu','--no-sandbox','--disable-dev-shm-usage',("--user-data-dir=" + $profile),'--enable-logging=stderr','--v=1','--virtual-time-budget=8000','--dump-dom','http://localhost:5173/diag-glide.html?bridge=3')
+            $proc = Start-Process -FilePath $chrome -ArgumentList $args -Wait -PassThru -RedirectStandardOutput $out -RedirectStandardError $err
+            Write-Host ('CHROME_EXIT=' + $proc.ExitCode)
+            $console = Get-Content -Raw $err
+            $dom = Get-Content -Raw $out
+            Write-Host '=== CONSOLE MATCHES ==='
+            ($console -split "`r?`n") | Select-String -Pattern 'GLIDE_PROBE|Uncaught|TypeError|ReferenceError|SyntaxError|Dynamic require|Invalid hook|Unsupported Glide runtime require|ERR_' -CaseSensitive:$false | Select-Object -First 120 | ForEach-Object { Write-Host $_.Line }
+            Write-Host '=== DOM FLAGS ==='
+            Write-Host ('MOUNTED=' + [bool]($dom -match 'data-glide-probe="mounted"'))
+            Write-Host ('CANVAS=' + [bool]($dom -match '<canvas'))
+            if ($dom -notmatch 'data-glide-probe="mounted"') { throw 'Glide probe did not mount' }
+            if ($console -match 'GLIDE_PROBE_ERROR|Dynamic require|Invalid hook|Unsupported Glide runtime require|Uncaught (Error|TypeError|ReferenceError|SyntaxError)') { throw 'Glide probe emitted runtime error' }
           }
-          trap cleanup EXIT
-
-          cp client/vendor/glide-data-grid/forge-bundle/index.js "$target"
-          sleep 1
-
-          cat > "$html" <<'EOF'
-          <!doctype html><html><head><meta charset="utf-8"><title>Glide probe</title></head><body><div id="root" style="width:1200px;height:500px"></div><script type="module" src="/src/diag-glide.tsx"></script></body></html>
-          EOF
-          cat > "$tsx" <<'EOF'
-          import React from "react";
-          import { createRoot } from "react-dom/client";
-          import { AlumdoorSalesLinesGrid } from "../../../packages/views/src/app/vertical/alumdoor/AlumdoorSalesLinesGrid";
-          window.addEventListener("error", (event) => console.error("GLIDE_PROBE_ERROR", event.error ?? event.message));
-          window.addEventListener("unhandledrejection", (event) => console.error("GLIDE_PROBE_ERROR", event.reason));
-          const rows:any = [{ key:"row-1", itemCode:"", itemLabel:"", availability:"", salesOption:"", salesOptionLabel:"", salesOptionChoices:[], priceId:"", priceLabel:"", priceChoices:[], uom:"", uomChoices:[], quantity:1, quantityField:"qty", quantityEditable:true, discountLabel:"-", adjustmentLabel:"-", amountLabel:"0", docValues:{} }];
-          createRoot(document.getElementById("root")!).render(<AlumdoorSalesLinesGrid rows={rows} selectedKey="row-1" onSelectedKeyChange={()=>{}} onChange={()=>{}} onAdd={()=>{}} onDuplicate={()=>{}} onDelete={()=>{}} registry={{resolve:()=>null} as any} services={{} as any} roles={[]} parentDocValues={{}} />);
-          setTimeout(() => { document.body.setAttribute("data-glide-probe", "mounted"); console.log("GLIDE_PROBE_MOUNTED"); }, 1500);
-          EOF
-
-          chrome='/c/Program Files/Google/Chrome/Application/chrome.exe'
-          if [ ! -f "$chrome" ]; then chrome='/c/Program Files (x86)/Google/Chrome/Application/chrome.exe'; fi
-          if [ ! -f "$chrome" ]; then chrome='/c/Program Files/Microsoft/Edge/Application/msedge.exe'; fi
-          test -f "$chrome"
-          profile="$RUNNER_TEMP/forge-glide-fix-profile"
-          out="$RUNNER_TEMP/glide-fix-out.txt"
-          err="$RUNNER_TEMP/glide-fix-err.txt"
-          rm -rf "$profile" "$out" "$err"
-          "$chrome" --headless=new --disable-gpu --no-sandbox --disable-dev-shm-usage --user-data-dir="$profile" --enable-logging=stderr --v=1 --virtual-time-budget=8000 --dump-dom 'http://localhost:5173/diag-glide.html?bridge=2' >"$out" 2>"$err"
-
-          echo '=== CONSOLE ==='
-          grep -Ei 'GLIDE_PROBE|Uncaught|TypeError|ReferenceError|SyntaxError|Dynamic require|Invalid hook|Unsupported Glide runtime require|ERR_' "$err" | head -160 || true
-          echo '=== DOM PROBE ==='
-          grep -Eio 'data-glide-probe="mounted"|<canvas[^>]*>' "$out" | head -40 || true
-          grep -q 'data-glide-probe="mounted"' "$out"
-          if grep -Eqi 'GLIDE_PROBE_ERROR|Dynamic require|Invalid hook|Unsupported Glide runtime require|Uncaught (Error|TypeError|ReferenceError|SyntaxError)' "$err"; then
-            echo 'Glide probe emitted runtime error'
-            exit 1
-          fi
+          finally {
+            Copy-Item $backup $target -Force
+            Remove-Item -Force $html,$tsx -ErrorAction SilentlyContinue
+          }
