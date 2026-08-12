@@ -186,7 +186,7 @@ function fieldLabel(line: SalesLine, fieldname: string, fallback: string): strin
 
 function Label({ children, required }: { children: ReactNode; required?: boolean }) {
   return (
-    <div className="mb-1 text-xs font-medium text-muted-foreground">
+    <div className="mb-1 text-[11px] font-medium leading-4 text-muted-foreground">
       {children}
       {required ? <span className="ml-1 text-destructive">*</span> : null}
     </div>
@@ -727,15 +727,17 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
     : lines.reduce((sum, line) => sum + lineTotal(line), 0);
 
   return (
-    <div className="flex h-full min-h-0 flex-col" data-surface="alumdoor-sales-order-create">
+    <div className="flex h-full min-h-0 flex-col bg-background" data-surface="alumdoor-sales-order-create">
       <div className="min-h-0 flex-1 overflow-auto">
-        <div className="mx-auto max-w-[1560px] space-y-4 p-4 lg:p-5">
-          <section className="rounded-xl border bg-card px-4 py-3 shadow-sm" data-section="sales-customer-meta-header">
-            <div className="mb-3">
-              <h2 className="text-base font-semibold">Thông tin khách hàng</h2>
+        <div className="mx-auto w-full max-w-[1760px] space-y-3 px-4 py-3">
+          <section className="rounded-lg border bg-card p-3" data-section="sales-customer-meta-header">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <h2 className="text-sm font-semibold">Thông tin khách hàng</h2>
+              <span className="text-[11px] text-muted-foreground">Đơn bán hàng mới</span>
             </div>
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-12">
-              <div className="xl:col-span-4">
+
+            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(320px,2.2fr)_minmax(150px,.8fr)_minmax(260px,1.5fr)_150px_150px]">
+              <div className="xl:order-1">
                 <Label required={metaRequired("customer")}>{metaLabel("customer", "Khách hàng")}</Label>
                 <div className="flex gap-1.5">
                   <div className="min-w-0 flex-1">
@@ -764,7 +766,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                 </div>
               </div>
 
-              <div className="xl:col-span-2">
+              <div className="xl:order-2">
                 <Label>SĐT</Label>
                 <Input
                   value={phoneValue}
@@ -779,16 +781,16 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                 />
               </div>
 
-              <div className="md:col-span-2 xl:col-span-6">
-                <Label required={metaRequired("install_address")}>{metaLabel("install_address", "Địa chỉ")}</Label>
+              <div className="md:col-span-2 xl:order-6 xl:col-span-5">
+                <Label required={metaRequired("install_address")}>{metaLabel("install_address", "Địa chỉ giao / lắp đặt")}</Label>
                 <Input
                   value={text(header.install_address)}
-                  placeholder="Địa chỉ giao / lắp đặt"
+                  placeholder="Nhập địa chỉ giao hàng hoặc lắp đặt"
                   onChange={(event) => setHeaderField("install_address", event.target.value || undefined)}
                 />
               </div>
 
-              <div className="xl:col-span-2">
+              <div className="xl:order-4">
                 <Label required={metaRequired("transaction_date")}>Ngày đặt hàng</Label>
                 <Input
                   type="date"
@@ -797,8 +799,8 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                 />
               </div>
 
-              <div className="xl:col-span-2">
-                <Label required={metaRequired("delivery_date")}>{metaLabel("delivery_date", "Ngày giao hàng")}</Label>
+              <div className="xl:order-5">
+                <Label required={metaRequired("delivery_date")}>{metaLabel("delivery_date", "Ngày giao")}</Label>
                 <Input
                   type="date"
                   value={text(header.delivery_date)}
@@ -806,8 +808,8 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                 />
               </div>
 
-              <div className="md:col-span-2 xl:col-span-4">
-                <Label required={metaRequired("responsible_person")}>Nhân viên bán hàng phụ trách</Label>
+              <div className="md:col-span-2 xl:order-3 xl:col-span-1">
+                <Label required={metaRequired("responsible_person")}>Nhân viên bán hàng</Label>
                 <div className="flex gap-1.5">
                   <div className="min-w-0 flex-1">
                     <LinkPicker
@@ -815,7 +817,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                       value={text(header.responsible_person)}
                       label={employeeLabel || text(header.responsible_person)}
                       referenceDoctype="Sales Order"
-                      placeholder="Chọn nhân viên bán hàng…"
+                      placeholder="Chọn nhân viên…"
                       onChange={(value, shown) => {
                         setEmployeeLabel(shown);
                         setHeaderField("responsible_person", value || undefined);
@@ -838,12 +840,13 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
           </section>
 
           <section className="space-y-2" data-section="hardcoded-sales-lines">
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="text-base font-semibold">Chi tiết bán hàng</h2>
+            <div className="flex min-h-8 items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold">Chi tiết bán hàng</h2>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
+                className="h-8"
                 onClick={() => setLines((current) => [...current, newLine(current.length)])}
               >
                 <Plus className="mr-1 size-4" /> Thêm sản phẩm
@@ -874,54 +877,54 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
 
               return (
                 <article key={line._key} className="overflow-hidden rounded-lg border bg-card">
-                  <div className="flex items-center justify-between gap-2 border-b bg-muted/15 px-3 py-2">
+                  <div className="flex min-h-9 items-center justify-between gap-2 border-b bg-muted/25 px-2.5 py-1.5">
                     <div className="flex min-w-0 items-center gap-2">
-                      <span className="grid size-7 shrink-0 place-items-center rounded-full bg-foreground text-xs font-semibold text-background">
+                      <span className="grid size-6 shrink-0 place-items-center rounded-full bg-foreground text-[11px] font-semibold text-background">
                         {index + 1}
                       </span>
                       <div className="min-w-0">
-                        <div className="truncate text-sm font-semibold">
+                        <div className="truncate text-xs font-semibold">
                           {line._itemLabel || text(line.item_code) || "Chọn mặt hàng"}
                         </div>
                         {text(line._context?.availability_status) ? (
-                          <div className="truncate text-[11px] text-muted-foreground">
+                          <div className="truncate text-[10px] text-muted-foreground">
                             {text(line._context?.availability_status)}
                           </div>
                         ) : null}
                       </div>
                     </div>
-                    <div className="flex items-center gap-1">
-                      {line._loading ? <Loader2 className="mr-1 size-4 animate-spin text-muted-foreground" /> : null}
+                    <div className="flex items-center gap-0.5">
+                      {line._loading ? <Loader2 className="mr-1 size-3.5 animate-spin text-muted-foreground" /> : null}
                       <Button
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="size-8"
+                        className="size-7"
                         title="Nhân dòng"
                         onClick={() => setLines((current) => [
                           ...current,
                           { ...line, _key: newLine(current.length)._key, _loading: false, _error: "" },
                         ])}
                       >
-                        <Copy className="size-4" />
+                        <Copy className="size-3.5" />
                       </Button>
                       <Button
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="size-8"
+                        className="size-7"
                         title="Xoá dòng"
                         disabled={lines.length === 1}
                         onClick={() => setLines((current) => current.filter((entry) => entry._key !== line._key))}
                       >
-                        <Trash2 className="size-4" />
+                        <Trash2 className="size-3.5" />
                       </Button>
                     </div>
                   </div>
 
-                  <div className="space-y-2.5 p-3">
-                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
-                      <div className="md:col-span-2 xl:col-span-2">
+                  <div className="space-y-2 p-2.5">
+                    <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-12">
+                      <div className={text(line.item_code) ? "md:col-span-2 xl:col-span-5" : "md:col-span-2 xl:col-span-8"}>
                         <Label required>Mặt hàng</Label>
                         <LinkPicker
                           doctype="Item"
@@ -954,7 +957,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                       </div>
 
                       {salesOptions.length ? (
-                        <div className="xl:col-span-2">
+                        <div className="md:col-span-2 xl:col-span-3">
                           <Label>Phương án bán</Label>
                           <select
                             className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
@@ -976,7 +979,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                       ) : null}
 
                       {colors.length ? (
-                        <div>
+                        <div className="xl:col-span-2">
                           <Label>Màu</Label>
                           <SelectBox
                             value={line.color}
@@ -987,7 +990,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                       ) : null}
 
                       {uoms.length > 1 ? (
-                        <div>
+                        <div className="xl:col-span-2">
                           <Label>ĐVT</Label>
                           <SelectBox
                             value={line.uom}
@@ -996,7 +999,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                           />
                         </div>
                       ) : text(line.uom) ? (
-                        <div>
+                        <div className="xl:col-span-2">
                           <Label>ĐVT</Label>
                           <Input value={text(line.uom)} readOnly className="bg-muted/30" />
                         </div>
@@ -1004,29 +1007,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                     </div>
 
                     {text(line.item_code) ? (
-                      <div className="grid gap-2.5 rounded-md bg-muted/10 p-2.5 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
-                        {showSalesMode ? (
-                          <div>
-                            <Label>Cách bán</Label>
-                            <SelectBox
-                              value={line.sales_mode || "Trọn bộ"}
-                              options={salesModes}
-                              onChange={(value) => commitLine(line._key, "sales_mode", value || undefined)}
-                            />
-                          </div>
-                        ) : null}
-
-                        {showLeafVariant ? (
-                          <div>
-                            <Label>Kiểu kéo / motor</Label>
-                            <SelectBox
-                              value={line.leaf_variant}
-                              options={leafVariants}
-                              onChange={(value) => commitLine(line._key, "leaf_variant", value || undefined)}
-                            />
-                          </div>
-                        ) : null}
-
+                      <div className="grid gap-2 rounded-md border bg-muted/10 p-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
                         {showWidth ? (
                           <div>
                             <Label required={area || fieldRequired(line, "width_m")}>
@@ -1053,17 +1034,6 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                           </div>
                         ) : null}
 
-                        {kind === "mesh" ? (
-                          <div>
-                            <Label>Cao lưới (m)</Label>
-                            <NumberBox
-                              value={line.mesh_height_m}
-                              onChange={(value) => patchLine(line._key, { mesh_height_m: value })}
-                              onCommit={() => commitLine(line._key, "mesh_height_m", line.mesh_height_m)}
-                            />
-                          </div>
-                        ) : null}
-
                         {showSets ? (
                           <div>
                             <Label required={area || fieldRequired(line, "set_count")}>
@@ -1079,8 +1049,41 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                           </div>
                         ) : null}
 
+                        {showSalesMode ? (
+                          <div>
+                            <Label>Cách bán</Label>
+                            <SelectBox
+                              value={line.sales_mode || "Trọn bộ"}
+                              options={salesModes}
+                              onChange={(value) => commitLine(line._key, "sales_mode", value || undefined)}
+                            />
+                          </div>
+                        ) : null}
+
+                        {showLeafVariant ? (
+                          <div>
+                            <Label>Kiểu kéo / motor</Label>
+                            <SelectBox
+                              value={line.leaf_variant}
+                              options={leafVariants}
+                              onChange={(value) => commitLine(line._key, "leaf_variant", value || undefined)}
+                            />
+                          </div>
+                        ) : null}
+
+                        {kind === "mesh" ? (
+                          <div>
+                            <Label>Cao lưới (m)</Label>
+                            <NumberBox
+                              value={line.mesh_height_m}
+                              onChange={(value) => patchLine(line._key, { mesh_height_m: value })}
+                              onCommit={() => commitLine(line._key, "mesh_height_m", line.mesh_height_m)}
+                            />
+                          </div>
+                        ) : null}
+
                         {fieldVisible(line, "has_butterfly_bracket") ? (
-                          <label className="flex min-h-14 items-center gap-2 self-end rounded-md border bg-background px-3 text-sm">
+                          <label className="flex h-9 items-center gap-2 self-end rounded-md border bg-background px-3 text-xs">
                             <input
                               type="checkbox"
                               checked={Boolean(line.has_butterfly_bracket)}
@@ -1137,18 +1140,18 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                     ) : null}
 
                     {line._error ? (
-                      <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+                      <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-1.5 text-xs text-destructive">
                         {line._error}
                       </div>
                     ) : null}
                     {line._context?.price_missing ? (
-                      <div className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+                      <div className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-1.5 text-xs text-amber-700 dark:text-amber-300">
                         {text(line._context.price_error) || "Chưa khai đơn giá phù hợp."}
                       </div>
                     ) : null}
 
                     {text(line.item_code) ? (
-                      <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1 border-t pt-2 text-xs tabular-nums">
+                      <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 rounded-md bg-muted/20 px-2.5 py-1.5 text-[11px] tabular-nums">
                         <span className="text-muted-foreground">
                           {Number.isFinite(Number(line.qty)) ? Number(line.qty).toLocaleString("vi-VN", { maximumFractionDigits: 6 }) : "—"} {text(line.uom)}
                         </span>
@@ -1159,7 +1162,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                         {Number(line.adjustment_amount) !== 0 ? (
                           <span>Phụ thu +{money(line.adjustment_amount)} ₫</span>
                         ) : null}
-                        <span className="text-sm font-semibold">Thành tiền <strong className="text-base">{money(lineTotal(line))} ₫</strong></span>
+                        <span className="ml-1 text-xs font-semibold">Thành tiền <strong className="text-sm">{money(lineTotal(line))} ₫</strong></span>
                       </div>
                     ) : null}
                   </div>
@@ -1170,20 +1173,18 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
         </div>
       </div>
 
-      <div className="shrink-0 border-t bg-card px-4 py-3 shadow-[0_-8px_24px_rgba(0,0,0,0.04)]">
-        <div className="mx-auto flex max-w-[1560px] flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="text-[11px] text-muted-foreground">Tạm tính theo backend preview</div>
-            <div className="text-xl font-bold tabular-nums">{money(displayedTotal)} ₫</div>
-            <div className="text-xs text-muted-foreground">
-              Khi lưu, Sales controller vẫn tính lại giá, chiết khấu, phụ thu, UOM và công thức cửa.
-            </div>
+      <div className="shrink-0 border-t bg-card px-4 py-2 shadow-[0_-4px_14px_rgba(0,0,0,0.035)]">
+        <div className="mx-auto flex w-full max-w-[1760px] flex-wrap items-center justify-between gap-2">
+          <div className="flex items-baseline gap-2">
+            <span className="text-[11px] text-muted-foreground">Tạm tính</span>
+            <strong className="text-xl font-bold tabular-nums">{money(displayedTotal)} ₫</strong>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="ghost" onClick={props.onCancel}>Huỷ</Button>
+          <div className="flex flex-wrap gap-1.5">
+            <Button type="button" variant="ghost" size="sm" onClick={props.onCancel}>Huỷ</Button>
             <Button
               type="button"
               variant="outline"
+              size="sm"
               disabled={saving}
               onClick={() => {
                 for (const line of lines) {
@@ -1191,22 +1192,24 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                 }
               }}
             >
-              <RefreshCw className="mr-1 size-4" /> Tính lại
+              <RefreshCw className="mr-1 size-3.5" /> Tính lại
             </Button>
             <Button
               type="button"
               variant="outline"
+              size="sm"
               disabled={saving || !canCreate}
               onClick={() => void save(true)}
             >
-              <Eye className="mr-1 size-4" /> Lưu & xem thử
+              <Eye className="mr-1 size-3.5" /> Lưu & xem
             </Button>
             <Button
               type="button"
+              size="sm"
               disabled={saving || !canCreate}
               onClick={() => void save(false)}
             >
-              {saving ? <Loader2 className="mr-1 size-4 animate-spin" /> : <Save className="mr-1 size-4" />}
+              {saving ? <Loader2 className="mr-1 size-3.5 animate-spin" /> : <Save className="mr-1 size-3.5" />}
               Lưu đơn hàng
             </Button>
           </div>
