@@ -58,6 +58,13 @@ export function ListContainer(props: ListContainerProps) {
   const queryClient = useQueryClient();
   const metaQ = useMeta(doctype);
   const meta = metaQ.data ?? EMPTY_META;
+  // Older tenant metadata may not yet expose the server-only approval flag. Do
+  // not ask the list API for a field it cannot legally return; the normal order
+  // list must remain usable while that metadata is upgraded.
+  const hasSalesApprovalField = useMemo(
+    () => doctype === "Sales Order" && meta.fields.some((field) => field.fieldname === "discount_requires_approval"),
+    [doctype, meta.fields],
+  );
   // P1-PERM-01: caps DOCTYPE-level (không name) fail-closed — đang tải/lỗi ⇒ NO_CAPS (ẩn Tạo mới/Xoá
   // hàng loạt cho tới khi server trả quyền thật, giống FormContainer/NewFormContainer).
   // Field ảnh của doctype — nơi ghi file_url sau khi tải ảnh lên từ avatar trên danh sách.
@@ -146,7 +153,7 @@ export function ListContainer(props: ListContainerProps) {
       .replace(/^_delivery_status(?=:|$)/, "delivered_percentage")
       .replace(/^_approval_status(?=:|$)/, "docstatus");
     const query = buildServerQuery(meta, { ...state, sort: serverSort, filters: serverFilters }, baseColumns);
-    if (doctype === "Sales Order" && approvalFilter) {
+    if (hasSalesApprovalField && approvalFilter) {
       const approvalFilters: Array<[string, "=", unknown]> = approvalFilter === "Cần duyệt"
         ? [["discount_requires_approval", "=", 1], ["docstatus", "=", 0]]
         : approvalFilter === "Đã duyệt"
@@ -161,9 +168,9 @@ export function ListContainer(props: ListContainerProps) {
      * người dùng xem/chỉnh, nhưng cần có trên từng dòng để tô cảnh báo và mở nút
      * Duyệt. `queryFields` chủ động bỏ field hidden, nên phải nạp riêng ở đây.
      */
-    if (doctype !== "Sales Order") return query;
+    if (!hasSalesApprovalField) return query;
     return { ...query, fields: [...new Set([...(query.fields ?? []), "discount_requires_approval"])] };
-  }, [doctype, meta, state, baseColumns]);
+  }, [doctype, meta, state, baseColumns, hasSalesApprovalField]);
   const ready = Boolean(metaQ.data) && !isSingle;
   const viewQ = useListView(doctype, listOpts, ready);
   const rows = useMemo(() => (viewQ.data?.rows ?? []).map((row) => {

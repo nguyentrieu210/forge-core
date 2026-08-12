@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { resolveCommercialPricingPolicy } from "../dist/packages/clouderp-pricing/src/commercial-policy.js";
 
-function context(rules, versions = {}) {
+function context(rules, versions = {}, scopes = {}) {
   return {
     command: { tenant_id: "demo" },
     reader: {
@@ -12,6 +12,10 @@ function context(rules, versions = {}) {
       async getDocument(_tenant, doctype, name) {
         if (doctype !== "Pricing Rule" || versions[name] === undefined) return null;
         return { name, version: versions[name], data: rules.find((row) => row.name === name)?.data ?? {} };
+      },
+      async getMasterRecordData(_tenant, doctype, name) {
+        if (doctype !== "Pricing Scope") return null;
+        return scopes[name] ?? null;
       },
     },
   };
@@ -94,4 +98,17 @@ test("exclusive adjustment group chooses the deterministic higher priority rule"
   const result = await resolveCommercialPricingPolicy(context(rules), baseInput);
   assert.deepEqual(result.adjustments.map((row) => row.rule_name), ["HIGH"]);
   assert.equal(result.adjustments[0].amount_minor, 300000);
+});
+
+test("a pricing scope matches its item groups and safely rejects an inactive scope", async () => {
+  const rules = [
+    { name: "WOOD-GRAIN", data: { effect_type: "ADJUSTMENT", adjustment_basis: "AREA_SQM", adjustment_rate: 465000, pricing_scope: "DOOR-WOOD" } },
+    { name: "INACTIVE", data: { effect_type: "ADJUSTMENT", adjustment_basis: "FIXED", adjustment_rate: 1, pricing_scope: "INACTIVE-SCOPE" } },
+  ];
+  const result = await resolveCommercialPricingPolicy(context(rules, {}, {
+    "DOOR-WOOD": { members: [{ member_type: "Item Group", item_group: "Cửa CN Đức" }] },
+    "INACTIVE-SCOPE": { disabled: true, members: [{ member_type: "Item", item_code: "DOOR-1" }] },
+  }), baseInput);
+  assert.deepEqual(result.adjustments.map((row) => row.rule_name), ["WOOD-GRAIN"]);
+  assert.equal(result.adjustments[0].amount_minor, 2_418_000);
 });

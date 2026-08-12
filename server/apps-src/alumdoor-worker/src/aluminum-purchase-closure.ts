@@ -1,5 +1,6 @@
 import { handlePurchaseFifoRequest, type PurchaseFifoEnv } from "./purchase-fifo-receipt.js";
 import { handleBulkPurchaseFifoRequest } from "./bulk-purchase-fifo-receipt.js";
+import { allowedColorNamesForGroup } from "./color-scopes.js";
 
 type Json = Record<string, unknown>;
 type PlatformCall = ((path: string, init?: RequestInit) => Promise<Response>) & { via?: string };
@@ -405,9 +406,16 @@ function lineArray(doc: Json): Json[] {
 async function validateAllowedColor(call: PlatformCall, item: Json, line: Json, label: string): Promise<void> {
   const color = text(line.color);
   if (!color) throw new Error(`${label}: phải chọn Màu.`);
-  const allowed = Array.isArray(item.allowed_colors) ? item.allowed_colors.map((row) => text((row as Json)?.color)).filter(Boolean) : [];
-  if (allowed.length && !allowed.includes(color)) throw new Error(`${label}: màu ${color} không nằm trong danh sách màu của Item.`);
-  if (!await readDoc<Json>(call, "Item Color", color).catch(() => null)) throw new Error(`${label}: màu ${color} không tồn tại.`);
+  const colorMaster = await readDoc<Json>(call, "Item Color", color).catch(() => null);
+  if (!colorMaster) throw new Error(`${label}: màu ${color} không tồn tại.`);
+  if (checked(colorMaster.disabled)) throw new Error(`${label}: màu ${color} đã ngừng dùng.`);
+  const itemGroup = text(item.item_group);
+  const allowed = await allowedColorNamesForGroup(call, itemGroup, "purchase");
+  if (!allowed.includes(color)) {
+    const allowedInternally = await allowedColorNamesForGroup(call, itemGroup, "internal");
+    if (allowedInternally.includes(color)) throw new Error(`${label}: màu ${color} chỉ dùng khi bán hàng, không dùng trên chứng từ mua.`);
+    throw new Error(`${label}: màu ${color} không áp dụng cho Nhóm hàng ${itemGroup}.`);
+  }
 }
 
 async function validatePurchaseOrderBarem(call: PlatformCall, item: Json, line: Json, label: string): Promise<void> {

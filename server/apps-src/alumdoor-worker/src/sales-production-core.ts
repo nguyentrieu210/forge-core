@@ -684,6 +684,9 @@ export async function calculateSalesProductionLine(
       estimated_weight_kg: formula.purchase_kg == null ? null : round(Number(formula.purchase_kg), 3),
       estimated_minutes: round(standard.minutes * sets, 2),
       schedule_warning: standard.warning ?? null,
+      // UI chỉ hiện chọn "Có bản bướm" khi chính sách đang áp có số trừ riêng.
+      // Không bật checkbox chung cho các loại cửa/ray mà thao tác này không có tác dụng.
+      supports_butterfly_bracket: chosen.parsed.butterfly_cut_deduction_m != null,
       formula_version: policyVersion(chosen.raw),
       formula_explanation: `${formula.explanation}${leaf ? ` ${leaf.explanation}` : ""}`.trim(),
     });

@@ -86,9 +86,10 @@ export async function resolveCommercialPricingPolicy(
   input: CommercialPricingPolicyInput,
 ): Promise<ResolvedCommercialPolicy> {
   const records = await context.reader.listMasterRecordData(context.command.tenant_id, "Pricing Rule");
+  const scopes = new Map<string, JsonObject | null>();
   const candidates: Candidate[] = [];
   for (const record of records) {
-    if (!matchesBuiltIn(record.data, input)) continue;
+    if (!await matchesBuiltIn(context, record.data, input, scopes)) continue;
     const conditions = parseConditions(record.data.conditions);
     if (!conditions.every((condition) => conditionMatches(input.facts, condition))) continue;
     const effect = inferEffect(record.data);
@@ -181,10 +182,24 @@ export async function resolveCommercialPricingPolicy(
   return result;
 }
 
-function matchesBuiltIn(rule: JsonObject, input: CommercialPricingPolicyInput): boolean {
+async function matchesBuiltIn(
+  context: ControllerContext<JsonObject>,
+  rule: JsonObject,
+  input: CommercialPricingPolicyInput,
+  scopes: Map<string, JsonObject | null>,
+): Promise<boolean> {
   if (disabled(rule.disabled)) return false;
   if (text(rule.currency) && text(rule.currency) !== input.currency) return false;
   if (text(rule.price_list) && text(rule.price_list) !== input.priceList) return false;
+  const scopeName = text(rule.pricing_scope);
+  if (scopeName) {
+    let scope = scopes.get(scopeName);
+    if (scope === undefined) {
+      scope = await context.reader.getMasterRecordData(context.command.tenant_id, "Pricing Scope", scopeName);
+      scopes.set(scopeName, scope);
+    }
+    if (!scope || disabled(scope.disabled) || !scopeIncludes(scope, input)) return false;
+  }
   if (text(rule.item_code) && text(rule.item_code) !== input.itemCode) return false;
   if (text(rule.item_group) && normalized(rule.item_group) !== normalized(input.facts.item_group)) return false;
   if (text(rule.party_type) && text(rule.party_type) !== text(input.partyType)) return false;
@@ -199,6 +214,24 @@ function matchesBuiltIn(rule: JsonObject, input: CommercialPricingPolicyInput): 
   const max = rule.max_qty === undefined || rule.max_qty === null || rule.max_qty === ""
     ? Number.MAX_SAFE_INTEGER : toScaledInt(numeric(rule.max_qty, "Pricing Rule.max_qty"), 6);
   return input.qtyMicros >= min && input.qtyMicros <= max;
+}
+
+function scopeIncludes(scope: JsonObject, input: CommercialPricingPolicyInput): boolean {
+  return tableRows(scope.members).some((row) => {
+    const memberType = text(row.member_type) || (text(row.item_code) ? "Item" : "Item Group");
+    if (memberType === "Item") return text(row.item_code) === input.itemCode;
+    if (memberType === "Item Group") return normalized(row.item_group) === normalized(input.facts.item_group);
+    return false;
+  });
+}
+
+function tableRows(value: unknown): JsonObject[] {
+  let rows = value;
+  if (typeof rows === "string" && rows.trim()) {
+    try { rows = JSON.parse(rows); } catch { return []; }
+  }
+  if (!Array.isArray(rows)) return [];
+  return rows.filter((row): row is JsonObject => Boolean(row) && typeof row === "object" && !Array.isArray(row));
 }
 
 function parseConditions(value: unknown): PricingRuleCondition[] {
@@ -258,6 +291,7 @@ function inferEffect(rule: JsonObject): PricingRuleEffect | null {
 
 function specificity(rule: JsonObject, conditions: PricingRuleCondition[]): number {
   return (text(rule.party) ? 32 : 0)
+    + (text(rule.pricing_scope) ? 24 : 0)
     + (text(rule.item_code) ? 16 : 0)
     + (text(rule.item_group) ? 8 : 0)
     + (text(rule.customer_group) || text(rule.supplier_group) ? 4 : 0)

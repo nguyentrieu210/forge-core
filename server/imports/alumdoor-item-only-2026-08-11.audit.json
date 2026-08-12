@@ -1,0 +1,206 @@
+{
+  "scope": {
+    "tenant": "demo",
+    "imported_doctypes": [
+      "Item"
+    ],
+    "explicitly_not_imported": [
+      "Item Price",
+      "Price List",
+      "Material Specification",
+      "Supplier",
+      "Supplier Item",
+      "Stock Ledger Entry",
+      "Warehouse",
+      "Item Group",
+      "UOM"
+    ]
+  },
+  "sources": {
+    "catalog": "catalog-new.tsv",
+    "catalog_rows": 292,
+    "old_items": "items-old.tsv",
+    "old_item_rows": 277
+  },
+  "counts": {
+    "imported_items": 278,
+    "matched_old_backup": 275,
+    "new_or_renamed_vs_old_backup": 3,
+    "excluded_adjustments": 9,
+    "excluded_composites": 2,
+    "filled_missing_codes": 3,
+    "merged_duplicate_rows": 3,
+    "remapped_duplicate_codes": 9
+  },
+  "filled_missing_codes": [
+    {
+      "excel_row": 291,
+      "item_name": "LONG ĐỀN",
+      "assigned_code": "NVL_Longden"
+    },
+    {
+      "excel_row": 292,
+      "item_name": "HOA KHẾ",
+      "assigned_code": "NVL_Hoakhe"
+    },
+    {
+      "excel_row": 293,
+      "item_name": "CỐT TRỤC 140",
+      "assigned_code": "NVL_Cottruc140"
+    }
+  ],
+  "excluded_composites": [
+    {
+      "source_code": "TP-BO3LADAY",
+      "source_name": "BỘ BA LÁ ĐÁY",
+      "children": [
+        "TP-TD325",
+        "TP-TD326",
+        "TP-TD327"
+      ]
+    },
+    {
+      "source_code": "RONNHUA_INOX",
+      "source_name": "RON NHỰA + INOX",
+      "children": [
+        "RNHUA-DR",
+        "RNINOX-DR"
+      ]
+    }
+  ],
+  "excluded_adjustments": [
+    {
+      "source_code": "TRU-TP_KHONGLAC_TANKER-ALUMAX",
+      "source_name": "TANKER_ALUMAX KHÔNG LẮC 33"
+    },
+    {
+      "source_code": "TRU-TP_KHONGBDK_TANKER-ALUMAX",
+      "source_name": "TANKER_ALUMAX KHÔNG BỘ ĐIỀU KHIỂN"
+    },
+    {
+      "source_code": "TRU-TP_KHONGBDK_TANKER-ALUMAX",
+      "source_name": "TANKER_ALUMAX KHÔNG BỘ ĐIỀU KHIỂN,KHÔNG LẮC"
+    },
+    {
+      "source_code": "TRU-TP_KHONGLAC_YHLD",
+      "source_name": "YHLD KHÔNG LẮC"
+    },
+    {
+      "source_code": "TRU-TP_KHONGBDK_TANKER-ALUMAX",
+      "source_name": "YHLD KHÔNG BỘ ĐIỀU KHIỂN"
+    },
+    {
+      "source_code": "TRU-TP_KHONGBDK_KHONGLAC_YHLD",
+      "source_name": "YHLD KHÔNG BỘ ĐIỀU KHIỂN,KHÔNG LẮC"
+    },
+    {
+      "source_code": "TRU-TP_KHONGLAC_JG",
+      "source_name": "JG_KHÔNG LẮC"
+    },
+    {
+      "source_code": "TRU-TP_KHONGBDK_JG",
+      "source_name": "JG_KHÔNG BỘ ĐIỀU KHIỂN"
+    },
+    {
+      "source_code": "TRU-TP_KHONGBDK_KHONGLAC_JG",
+      "source_name": "JG_KHÔNG BỘ ĐIỀU KHIỂN+KHÔNG LẮC"
+    }
+  ],
+  "merged_duplicate_rows": [
+    {
+      "source_code": "TP-YHLD_TayDK",
+      "source_name": "YHLD TAY ĐIỀU KHIỂN",
+      "occurrence": 2
+    },
+    {
+      "source_code": "NVL_Longden",
+      "source_name": "LÔNG ĐỀN",
+      "occurrence": 2
+    },
+    {
+      "source_code": "NVL_Hoakhe",
+      "source_name": "HOA KHẾ (3 CHẤU)",
+      "occurrence": 2
+    }
+  ],
+  "remapped_duplicate_codes": [
+    {
+      "source_code": "TP-BUOMSAT",
+      "imported_code": "TP-BUOMSAT-02",
+      "source_name": "BẮN BƯỚM SẮT"
+    },
+    {
+      "source_code": "RNHUA/LONG-CR",
+      "imported_code": "RNHUA/LONG-CR-02",
+      "source_name": "RON LÔNG CẠNH RAY"
+    },
+    {
+      "source_code": "NVL-V5_KEM_STD",
+      "imported_code": "NVL-V5_KEM_STD-02",
+      "source_name": "V4_STĐ"
+    },
+    {
+      "source_code": "TP-CUAST8-9D_MM",
+      "imported_code": "TP-CUAST1.1LY_MM",
+      "source_name": "CỬA SIÊU TRƯỜNG STD 1.1LY"
+    },
+    {
+      "source_code": "TP-CUAST1LY_MM",
+      "imported_code": "TP-CUAST1.2LY_MM",
+      "source_name": "CỬA SIÊU TRƯỜNG STD 1.2LY"
+    },
+    {
+      "source_code": "TP-CUAST1LY_MM",
+      "imported_code": "TP-CUAST1.3LY_MM",
+      "source_name": "CỬA SIÊU TRƯỜNG STD 1.3LY"
+    },
+    {
+      "source_code": "TP-CUAST1.2LY_MM",
+      "imported_code": "TP-CUAST1.4LY_MM",
+      "source_name": "CỬA SIÊU TRƯỜNG STD 1.4LY"
+    },
+    {
+      "source_code": "TP-CUAST1.2LY_MM",
+      "imported_code": "TP-CUAST1.5LY_MM",
+      "source_name": "CỬA SIÊU TRƯỜNG STD 1.5LY"
+    },
+    {
+      "source_code": "TP-CUAST1.3LY_MM",
+      "imported_code": "TP-CUAST1.6LY_MM",
+      "source_name": "CỬA SIÊU TRƯỜNG STD 1.6LY"
+    }
+  ],
+  "item_groups": [
+    "Bình lưu điện",
+    "Cửa CN Đức",
+    "Cửa Đài Loan",
+    "Cửa Đài Loan Inox",
+    "Cửa kéo Đài Loan",
+    "Cửa Lưới",
+    "Cửa siêu trường",
+    "Cửa tấm liền Úc",
+    "Điều khiển & phụ kiện điện",
+    "Linh kiện motor",
+    "Motor",
+    "Phụ kiện chung",
+    "Phụ kiện CN Đức",
+    "Ray và trục"
+  ],
+  "new_or_renamed_items": [
+    {
+      "item_code": "TP-PULYDEN 114N",
+      "item_name": "PULY ĐEN 114N",
+      "item_group": "Phụ kiện chung"
+    },
+    {
+      "item_code": "TP-PULYDEN 114L",
+      "item_name": "PULY ĐEN 114L",
+      "item_group": "Phụ kiện chung"
+    },
+    {
+      "item_code": "NVL_Cottruc140",
+      "item_name": "CỐT TRỤC 140",
+      "item_group": "Linh kiện motor"
+    }
+  ]
+}

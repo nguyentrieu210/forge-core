@@ -48,9 +48,30 @@ const replaceField = (dt, name, next) => {
   dt.fields[i] = next;
   note(`${dt.name}: thay "${name}"`);
 };
+const patchField = (dt, name, patch) => {
+  const i = dt.fields.findIndex((f) => nameOf(f) === name);
+  if (i < 0) throw new Error(`${dt.name}: không thấy trường "${name}"`);
+  const current = typeof dt.fields[i] === "string"
+    ? parseField(dt.fields[i], i, `doctype ${dt.name}`)
+    : dt.fields[i];
+  dt.fields[i] = { ...current, ...patch };
+  note(`${dt.name}: cập nhật "${name}"`);
+};
+const moveFieldsAfter = (dt, names, anchor) => {
+  const moving = names.map((name) => {
+    const field = dt.fields.find((entry) => nameOf(entry) === name);
+    if (!field) throw new Error(`${dt.name}: không thấy trường "${name}" để chuyển`);
+    return field;
+  });
+  dt.fields = dt.fields.filter((entry) => !names.includes(nameOf(entry)));
+  const anchorIndex = dt.fields.findIndex((entry) => nameOf(entry) === anchor);
+  if (anchorIndex < 0) throw new Error(`${dt.name}: không thấy neo "${anchor}"`);
+  dt.fields.splice(anchorIndex + 1, 0, ...moving);
+  note(`${dt.name}: chuyển ${names.join(", ")} sau "${anchor}"`);
+};
 
 // ─────────────────────────── HEADER ───────────────────────────
-brief.version = "2.0.36";
+brief.version = "2.0.42";
 brief.locale.dateFormat = "dd/mm/yyyy"; // Q11 — chủ xưởng chốt gạch chéo
 for (const role of ["General Accountant", "Chief Accountant", "Director", "Kế toán tổng hợp", "Kế toán trưởng", "Giám đốc"]) {
   if (!brief.roles.includes(role)) brief.roles.push(role);
@@ -133,9 +154,11 @@ const operationalSalesOrder = doctype("Sales Order");
 addAfter(operationalSalesOrder, "delivery_date",
   {
     fieldname: "responsible_person",
-    fieldtype: "Data",
+    fieldtype: "Link",
+    options: "Employee",
     label: "Người phụ trách",
     fetch_from: "customer.account_manager",
+    link_filters: JSON.stringify({ employee_status: "Đang làm việc" }),
   },
   "manual_note:Small Text Ghi chú vận hành",
   "operational_change_reason:Small Text- Lý do đổi vận hành",
@@ -230,6 +253,11 @@ brief.validators.push(
 // ─────────────────────────── ITEM ───────────────────────────
 const item = doctype("Item");
 
+// Hai giá trị hệ thống cố định của Alumdoor vẫn nằm trong metadata để filter,
+// validator và dữ liệu cũ dùng, nhưng người nhập không phải nhìn hoặc sửa chúng.
+patchField(item, "item_nature", { hidden: true });
+patchField(item, "is_stock_item", { hidden: true });
+
 // QĐ-3 — khai tử biến thể. Để im là chờ người sau dùng cho màu:
 // 1 mã × 24 màu × n khổ là mớ 477 mã quay lại.
 dropFields(item, ["variant_of", "variant_attributes"]);
@@ -244,11 +272,12 @@ dropFields(item, ["variant_of", "variant_attributes"]);
 // Cách đúng: giữ trường nhưng biến thành GƯƠNG — read_only + fetch_from. Một nguồn sự thật
 // (Measurement Profile), một bản sao chỉ-đọc để depends_on và bộ lọc dùng. Không phải hai nguồn.
 replaceField(item, "inventory_mode", {
-  "//": "GƯƠNG của Measurement Profile.inventory_mode — KHÔNG sửa tay được. Nguồn sự thật là bộ quy cách.",
+  "//": "GƯƠNG của Measurement Profile.inventory_mode — KHÔNG sửa tay được. Nguồn sự thật là bộ theo dõi vật tư.",
   fieldname: "inventory_mode",
   fieldtype: "Data",
   label: "Kiểu quản lý tồn",
   read_only: true,
+  hidden: true,
   fetch_from: "measurement_profile.inventory_mode",
   in_standard_filter: true,
 });
@@ -257,7 +286,7 @@ replaceField(item, "measurement_profile", {
   fieldname: "measurement_profile",
   fieldtype: "Link",
   options: "Measurement Profile",
-  label: "Bộ quy cách",
+  label: "Bộ theo dõi vật tư",
   required: true,
 });
 
@@ -283,13 +312,12 @@ addAfter(item, "stock_uom",
 // Hệ số quy đổi TĨNH không diễn tả được nhôm: 1 cây = khổ × kg/m, mà khổ đổi từng lô
 // (đo thật 6,57 → 8,61 m/cây). Hệ số thật bắt tại dòng phiếu nhập.
 replaceField(item, "uom_conversions", {
-  "//": "CẤM khai cho mặt hàng catch weight — xem docs/brd-v2/brd-entities/item.md §2.2.",
   fieldname: "uom_conversions",
   fieldtype: "Table",
   options: "UOM Conversion",
   label: "Đơn vị quy đổi khác",
-  depends_on: "eval:!doc.has_catch_weight && (doc.default_purchase_uom != doc.stock_uom || doc.default_sales_uom != doc.stock_uom)",
-  description: "Chỉ khai khi đơn vị mua/bán khác đơn vị tồn. Mặt hàng cân theo kiện KHÔNG dùng bảng này.",
+  depends_on: "eval:doc.default_purchase_uom != doc.stock_uom || doc.default_sales_uom != doc.stock_uom",
+  description: "Chỉ khai khi đơn vị mua/bán khác đơn vị tồn.",
 });
 
 // Nhóm SP thứ 6 — có trong tờ đối chiếu (CỬA ĐỨC KÉO TAY AL70, CỬA ÚC KT/MTN)
@@ -314,25 +342,116 @@ replaceField(item, "valuation_method", {
   description: "TT99/2025 cho phép mỗi nhóm hàng một phương pháp. Đổi giữa chừng phải ghi audit — thông tư đòi nhất quán giữa các kỳ.",
 });
 
+// Alumdoor không vận hành kế toán và tính giá thành trên hồ sơ mặt hàng. Kho được
+// chọn trên chứng từ thực tế; đơn vị và cách theo dõi vật tư vẫn phải nằm trên Item.
+// Bỏ cả Tab Break để form không sinh tab rỗng.
+dropFields(item, [
+  "tab_item_accounts",
+  "section_accounts",
+  "reorder_levels",
+  "default_warehouse",
+  "inventory_account",
+  "cogs_account",
+  "income_account",
+  "expense_account",
+  "standard_rate",
+  "valuation_method",
+]);
+replaceField(item, "section_inventory", {
+  fieldname: "section_inventory",
+  fieldtype: "Section Break",
+  label: "Đơn vị và theo dõi",
+});
+
+// Hồ sơ vật tư chỉ còn hai lớp thông tin người dùng thực sự phải nhập. Các cờ kỹ
+// thuật như lô/serial và dữ liệu nhận diện hãng vẫn có thể tồn tại trên bản ghi cũ,
+// nhưng không còn là ô nhập trên form Alumdoor.
+dropFields(item, [
+  "brand",
+  "manufacturer",
+  "manufacturer_part_no",
+  "default_color",
+  "allowed_colors",
+  "barcodes",
+  "tab_item_identity",
+  "tab_item_tracking",
+  "section_tracking",
+  "has_batch_no",
+  "has_serial_no",
+  "allow_negative_stock",
+  "shelf_life_in_days",
+  "has_catch_weight",
+  "weight_uom",
+]);
+replaceField(item, "section_identity", {
+  fieldname: "section_identity",
+  fieldtype: "Section Break",
+  label: "Chi tiết vật tư",
+});
+moveFieldsAfter(item, ["door_type", "purchase_kg_per_m2", "leaf_divisor_m"], "material_specification");
+
 // ────────────────── MEASUREMENT PROFILE ──────────────────
 const profile = doctype("Measurement Profile");
-addAfter(profile, "scrap_threshold_m",
-  {
-    "//": "Bề rộng lưỡi cắt. Cửa 51 lá là 51 nhát — bản cũ không tính, mất ~15 cm mỗi bộ.",
-    fieldname: "kerf_mm",
-    fieldtype: "Float",
-    label: "Bề rộng lưỡi cắt (mm)",
-    default: 3,
-    description: "Chuẩn ngành 2–4 mm. Trừ kerf × số nhát khỏi chiều dài dùng được.",
-  },
-  {
+profile.label = "Bộ theo dõi vật tư";
+profile["//"] = "Bộ theo dõi chỉ quyết định kho cần ghi nhận gì; thông số cố định nằm ở Quy cách kỹ thuật vật tư.";
+dropFields(profile, ["theoretical_kg_per_m", "effective_width_m", "scrap_threshold_m", "kerf_mm", "require_bundle_qty"]);
+if (!profile.fields.some((field) => nameOf(field) === "track_bundle_qty")) {
+  addAfter(profile, "require_piece_qty", "track_bundle_qty:Check Theo dõi số bó");
+}
+if (!profile.fields.some((field) => nameOf(field) === "weight_tolerance_pct")) {
+  addAfter(profile, "track_bundle_qty", {
     fieldname: "weight_tolerance_pct",
     fieldtype: "Float",
     label: "Ngưỡng cảnh báo lệch cân (%)",
     default: 13,
-    description: "Lấy từ sai số đo thật 6,57→8,61 m/cây. Vượt ngưỡng thì cảnh báo lúc nhập, KHÔNG chặn.",
-  },
-);
+    description: "Vượt ngưỡng thì cảnh báo lúc nhập, KHÔNG chặn ghi sổ.",
+  });
+}
+
+const materialSpecification = doctype("Material Specification");
+if (!materialSpecification.fields.some((field) => nameOf(field) === "item_group")) {
+  addAfter(materialSpecification, "spec_name", "item_group:Link(Item Group)! Nhóm sản phẩm áp dụng");
+}
+if (!materialSpecification.fields.some((field) => nameOf(field) === "spec_type")) {
+  addAfter(materialSpecification, "item_group", "spec_type:Select(Nhôm cây/lá,Ống/trục,Tấm/Kính,Cuộn,Khác)! Loại quy cách");
+}
+if (!materialSpecification.fields.some((field) => nameOf(field) === "effective_width_m")) {
+  addAfter(materialSpecification, "width_m", "effective_width_m:Float Bản rộng hữu dụng (m)");
+}
+replaceField(materialSpecification, "profile_system", {
+  fieldname: "profile_system", fieldtype: "Data", label: "Hệ / dòng profile",
+  depends_on: "eval:doc.spec_type == 'Nhôm cây/lá' || doc.spec_type == 'Ống/trục'",
+});
+replaceField(materialSpecification, "section_code", {
+  fieldname: "section_code", fieldtype: "Data", label: "Phi / mã tiết diện",
+  depends_on: "eval:doc.spec_type == 'Nhôm cây/lá' || doc.spec_type == 'Ống/trục'",
+});
+replaceField(materialSpecification, "theoretical_kg_per_m", {
+  fieldname: "theoretical_kg_per_m", fieldtype: "Float", label: "Kg/m lý thuyết",
+  depends_on: "eval:doc.spec_type == 'Nhôm cây/lá' || doc.spec_type == 'Ống/trục'",
+});
+replaceField(materialSpecification, "standard_length_m", {
+  fieldname: "standard_length_m", fieldtype: "Float", label: "Chiều dài chuẩn (m)",
+  depends_on: "eval:doc.spec_type == 'Nhôm cây/lá' || doc.spec_type == 'Ống/trục' || doc.spec_type == 'Tấm/Kính'",
+});
+replaceField(materialSpecification, "width_m", {
+  fieldname: "width_m", fieldtype: "Float", label: "Khổ rộng (m)",
+  depends_on: "eval:doc.spec_type == 'Tấm/Kính' || doc.spec_type == 'Cuộn'",
+});
+replaceField(materialSpecification, "effective_width_m", {
+  fieldname: "effective_width_m", fieldtype: "Float", label: "Bản rộng hữu dụng (m)",
+  depends_on: "eval:doc.spec_type == 'Tấm/Kính' || doc.spec_type == 'Cuộn'",
+});
+replaceField(materialSpecification, "thickness_mm", {
+  fieldname: "thickness_mm", fieldtype: "Float", label: "Độ dày (mm)",
+  depends_on: "eval:doc.spec_type == 'Nhôm cây/lá' || doc.spec_type == 'Ống/trục' || doc.spec_type == 'Tấm/Kính' || doc.spec_type == 'Cuộn'",
+});
+replaceField(materialSpecification, "scrap_threshold_m", {
+  fieldname: "scrap_threshold_m", fieldtype: "Float", label: "Ngưỡng phế liệu (m)",
+  depends_on: "eval:doc.spec_type == 'Nhôm cây/lá' || doc.spec_type == 'Ống/trục' || doc.spec_type == 'Cuộn'",
+});
+materialSpecification.list = ["spec_code", "spec_name", "item_group", "spec_type", "theoretical_kg_per_m", "standard_length_m"];
+materialSpecification.search = ["spec_code", "spec_name", "item_group", "profile_system"];
 
 // ────────────────── PURCHASE RECEIPT ──────────────────
 const pr = doctype("Purchase Receipt");
@@ -436,7 +555,7 @@ addAfter(pri, "warehouse",
     label: "Kg lý thuyết (barem)",
     read_only: true,
     depends_on: "eval:doc.inventory_mode == 'Nhôm cây/lá'",
-    description: "khổ × kg/m của bộ quy cách × số cây. Dùng để đối chiếu cân, không vào sổ.",
+    description: "khổ × kg/m của quy cách kỹ thuật × số cây. Dùng để đối chiếu cân, không vào sổ.",
   },
   {
     fieldname: "weight_variance_pct",
@@ -444,7 +563,7 @@ addAfter(pri, "warehouse",
     label: "Lệch cân (%)",
     read_only: true,
     depends_on: "eval:doc.inventory_mode == 'Nhôm cây/lá'",
-    description: "Vượt ngưỡng của bộ quy cách thì cảnh báo, KHÔNG chặn ghi sổ.",
+    description: "Vượt ngưỡng của bộ theo dõi thì cảnh báo, KHÔNG chặn ghi sổ.",
   },
 );
 
@@ -600,7 +719,7 @@ addAfter(doctype("Item Group"), "default_expense_account",
   // TT99/2025 cho phép mỗi nhóm hàng một phương pháp giá. Không có trường này thì câu
   // "Item kế thừa phương pháp từ nhóm" trong ledger là nói suông.
   "default_valuation_method:Select(FIFO,Bình quân di động) Phương pháp giá vốn mặc định",
-  "default_measurement_profile:Link(Measurement Profile) Bộ quy cách mặc định",
+  "default_measurement_profile:Link(Measurement Profile) Bộ theo dõi mặc định",
 );
 
 // ────────────────── CUTTING POLICY ──────────────────
@@ -608,6 +727,16 @@ addAfter(doctype("Item Group"), "default_expense_account",
 // manual_pull, purchase_formula + 2 basis, priority, disabled) — GIỮ NGUYÊN HẾT.
 // Thiếu đúng hai chiều: LOẠI RAY và CHIA LÁ.
 const cp = doctype("Cutting Policy");
+if (!cp.fields.some((field) => nameOf(field) === "kerf_mm")) {
+  addAfter(cp, "butterfly_cut_deduction_m", {
+    "//": "Bề rộng đường cắt thuộc công thức cắt, không thuộc cách theo dõi tồn.",
+    fieldname: "kerf_mm",
+    fieldtype: "Float",
+    label: "Bề rộng lưỡi cắt (mm)",
+    default: 3,
+    description: "Trừ bề rộng lưỡi cắt × số nhát khỏi chiều dài dùng được.",
+  });
+}
 
 // Sheet GHI CHÚ cho hai bộ hằng số theo ray: Đức U75 `RCL=RPBR−0,08` vs U100 `−0,09`;
 // ĐL+Lưới `RLL+0,11` vs `+0,17`. Một `retail_cut_deduction_m` không diễn tả được cả hai.
@@ -735,10 +864,11 @@ brief.doctypes.push(
 // Sơn tĩnh điện áp 6 nhóm; mạ màu CHỈ Cửa Úc và Đài Loan.
 const ic = doctype("Item Color");
 replaceField(ic, "applies_to", "applies_to_groups:Table(Item Color Scope) Nhóm SP áp dụng");
+addAfter(ic, "finish", "usage_scope:Select(Mua hàng,Bán hàng,Mua & bán)!=(Mua & bán) Phạm vi giao dịch");
 // `list` phải bỏ theo: Table không hiện được trên cột danh sách, và tên cũ đã biến mất.
 // Compiler bắt đúng chỗ này — cùng họ lỗi với `Item.list` trỏ `inventory_mode` đã xoá.
 ic.list = ic.list.filter((c) => c !== "applies_to");
-note("D6: +3 danh mục (Lý do huỷ, Nguyên nhân chênh lệch, Item Color Scope) · applies_to → bảng con");
+note("D6: +3 danh mục (Lý do huỷ, Nguyên nhân chênh lệch, Item Color Scope) · màu theo nhóm SP và phạm vi mua/bán");
 
 // ══════════════ 3 CHỨNG TỪ MỚI ══════════════
 const perm = { "Chủ xưởng": "rwcsxa", "Thủ kho": "rwcsxa", "Sản xuất": "rwcsxa", "Kế toán": "r" };
@@ -1485,9 +1615,31 @@ const canonicalAluminumProfile = fixture("Measurement Profile", "Nhôm cây/lá"
 canonicalAluminumProfile.stock_uom = "Cây";
 canonicalAluminumProfile.track_dimension_lot = true;
 canonicalAluminumProfile.require_piece_qty = true;
-canonicalAluminumProfile._desc = "Tồn nhôm theo số cây/lá có Batch và chiều dài; Kg là catch weight/đơn vị mua-định giá, không phải số lượng tồn.";
+canonicalAluminumProfile.track_bundle_qty = true;
+canonicalAluminumProfile._desc = "Tồn nhôm theo số cây/lá có Batch và chiều dài; số bó chỉ để theo dõi; Kg là catch weight/đơn vị mua-định giá.";
+if (!brief.fixtures.some((entry) => entry.type === "Measurement Profile" && entry.name === "Ống/trục")) {
+  brief.fixtures.push({
+    type: "Measurement Profile",
+    name: "Ống/trục",
+    data: {
+      profile_name: "Ống/trục",
+      inventory_mode: "Nhôm cây/lá",
+      stock_uom: "Kg",
+      track_dimension_lot: true,
+      require_color: false,
+      require_condition: true,
+      require_length: true,
+      require_width: false,
+      require_piece_qty: true,
+      track_bundle_qty: true,
+      weight_tolerance_pct: 13,
+      note: "Mua và tồn theo Kg; bán theo Mét; số cây và số bó chỉ dùng để theo dõi giao nhận.",
+    },
+  });
+}
 for (const f of brief.fixtures) {
   if (f?.type !== "Item" || f?.data?.inventory_mode !== "Nhôm cây/lá") continue;
+  if (f.data.measurement_profile === "Ống/trục") continue;
   f.data.stock_uom = "Cây";
   f.data.default_purchase_uom = "Kg";
   f.data.has_batch_no = 1;
@@ -1500,6 +1652,41 @@ for (const f of brief.fixtures) {
   f.data.uom_conversions = [];
 }
 note('AL-INV · package canonical: Kg priced/catch-weight + Cây/Lá stock + Batch + qty_bar descriptors');
+
+// Ô Link nghiệp vụ chỉ được chọn nút lá. Kho/nhóm cha dùng để phân cấp, không phải
+// đối tượng có thể nhập-xuất-tồn hoặc gắn trực tiếp vào mặt hàng/chính sách.
+// Hai field quản trị cây `parent_warehouse` và `parent_item_group` là ngoại lệ duy nhất.
+const leafLinkFilters = JSON.stringify({ is_group: 0, disabled: 0 });
+const parentTreeFields = new Set(["parent_warehouse", "parent_item_group"]);
+let leafLinkFilterCount = 0;
+const applyLeafLinkFilters = (fields, context) => fields.map((input, index) => {
+  const field = parseField(input, index, context);
+  if (
+    field.fieldtype === "Link"
+    && ["Warehouse", "Item Group"].includes(field.options)
+    && !parentTreeFields.has(field.fieldname)
+  ) {
+    leafLinkFilterCount += 1;
+    return { ...field, link_filters: leafLinkFilters };
+  }
+  return input;
+});
+for (const dt of brief.doctypes) {
+  dt.fields = applyLeafLinkFilters(dt.fields ?? [], `doctype ${dt.name}`);
+}
+for (const action of brief.actions ?? []) {
+  action.fields = applyLeafLinkFilters(action.fields ?? [], `action ${action.name}`);
+}
+for (const [dt, entries] of Object.entries(brief.customFields ?? {})) {
+  brief.customFields[dt] = entries.map((entry, index) => {
+    const wrapped = entry && typeof entry === "object" && !Array.isArray(entry);
+    const rawField = wrapped ? entry.field : entry;
+    const [filteredField] = applyLeafLinkFilters([rawField], `customFields ${dt}[${index}]`);
+    if (filteredField === rawField) return entry;
+    return wrapped ? { ...entry, field: filteredField } : { field: filteredField };
+  });
+}
+note(`UI Link · ${leafLinkFilterCount} ô Warehouse/Item Group chỉ chọn nút lá; field cha vẫn chọn nhóm`);
 
 const childPresentation = applyAlumdoorChildPresentation(brief);
 note(`UI ?? child-grid presentation metadata: ${childPresentation.migrated} child DocType`);

@@ -172,13 +172,14 @@ function compileAction(action, index, doctypeNames) {
     const field = parseField(raw, position, `${where} (${action.name})`);
     // Compiler của doctype còn trả `unique`/`read_only`; màn thao tác không có hai khái
     // niệm đó, và gửi kèm thì parser của server từ chối cả gói.
-    const { fieldname, label, fieldtype, options, required, default: value, description } = field;
+    const { fieldname, label, fieldtype, options, required, default: value, description, link_filters } = field;
     return {
       fieldname, label, fieldtype,
       ...(options ? { options } : {}),
       ...(required ? { required: true } : {}),
       ...(value === undefined ? {} : { default: value }),
       ...(description ? { description } : {}),
+      ...(link_filters ? { link_filters } : {}),
     };
   });
   if (!fields.length) fail(`${where} (${action.name}) chưa có ô nhập nào.`);

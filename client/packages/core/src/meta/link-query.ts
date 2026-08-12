@@ -17,6 +17,19 @@ import { safeEval } from "./safe-eval.js";
 
 const EVAL_PREFIX = "eval:";
 const FORBIDDEN_FILTER_KEYS = new Set(["__proto__", "prototype", "constructor"]);
+const LEAF_ONLY_LINK_TARGETS = new Set(["Warehouse", "Item Group"]);
+const TREE_PARENT_FIELDS = new Set(["parent_warehouse", "parent_item_group"]);
+
+function applyTreeLeafDefaults(field: DocField, filters: Record<string, unknown>): Record<string, unknown> {
+  if (
+    field.fieldtype === "Link"
+    && LEAF_ONLY_LINK_TARGETS.has(String(field.options ?? ""))
+    && !TREE_PARENT_FIELDS.has(field.fieldname)
+  ) {
+    return { ...filters, is_group: 0, disabled: 0 };
+  }
+  return filters;
+}
 
 /** cảnh báo 1 lần cho mỗi input lỗi (buildLinkFilters chạy mỗi render → tránh spam) — không nuốt lỗi config. */
 const _warned = new Set<string>();
@@ -61,14 +74,18 @@ export function buildLinkFilters(
   docValues?: Record<string, unknown>,
 ): Record<string, unknown> | undefined {
   const raw = field.link_filters;
-  if (typeof raw !== "string" || raw.trim() === "") return undefined;
+  if (typeof raw !== "string" || raw.trim() === "") {
+    const defaults = applyTreeLeafDefaults(field, {});
+    return Object.keys(defaults).length ? defaults : undefined;
+  }
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch {
     warnOnce(raw, `JSON không hợp lệ, bỏ lọc: ${raw.slice(0, 80)}`);
-    return undefined; // JSON hỏng → không lọc (fail-safe) nhưng ĐÃ cảnh báo
+    const defaults = applyTreeLeafDefaults(field, {});
+    return Object.keys(defaults).length ? defaults : undefined;
   }
 
   const out: Record<string, unknown> = {};
@@ -89,10 +106,14 @@ export function buildLinkFilters(
       const resolved = resolveFilterValue(rawValue, docValues);
       if (resolved.include) out[fieldname] = resolved.value;
     }
-    return Object.keys(out).length ? out : undefined;
+    const merged = applyTreeLeafDefaults(field, out);
+    return Object.keys(merged).length ? merged : undefined;
   }
 
-  if (!Array.isArray(parsed) || parsed.length === 0) return undefined;
+  if (!Array.isArray(parsed) || parsed.length === 0) {
+    const defaults = applyTreeLeafDefaults(field, {});
+    return Object.keys(defaults).length ? defaults : undefined;
+  }
   for (const cond of parsed) {
     if (!Array.isArray(cond) || cond.length < 4) continue;
     const fieldname = cond[1];
@@ -102,5 +123,6 @@ export function buildLinkFilters(
     if (!resolved.include) continue;
     out[fieldname] = op === "=" ? resolved.value : [op, resolved.value];
   }
-  return Object.keys(out).length ? out : undefined;
+  const merged = applyTreeLeafDefaults(field, out);
+  return Object.keys(merged).length ? merged : undefined;
 }

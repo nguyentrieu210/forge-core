@@ -541,6 +541,38 @@
     },
     {
       "type": "UOM",
+      "name": "Lá",
+      "data": {
+        "uom_name": "Lá",
+        "must_be_whole_number": true
+      }
+    },
+    {
+      "type": "UOM",
+      "name": "Thân",
+      "data": {
+        "uom_name": "Thân",
+        "must_be_whole_number": true
+      }
+    },
+    {
+      "type": "UOM",
+      "name": "Cặp",
+      "data": {
+        "uom_name": "Cặp",
+        "must_be_whole_number": true
+      }
+    },
+    {
+      "type": "UOM",
+      "name": "Con",
+      "data": {
+        "uom_name": "Con",
+        "must_be_whole_number": true
+      }
+    },
+    {
+      "type": "UOM",
       "name": "Thanh",
       "data": {
         "uom_name": "Thanh",
@@ -733,7 +765,7 @@
       "type": "Warehouse",
       "name": "K12",
       "data": {
-        "warehouse_name": "K12",
+        "warehouse_name": "Kho K12",
         "parent_warehouse": "Kho Alumdoor",
         "is_group": false,
         "address": "Kho vật lý K12",
@@ -918,11 +950,12 @@
       "data": {
         "profile_name": "Nhôm cây/lá",
         "inventory_mode": "Nhôm cây/lá",
-        "stock_uom": "Kg",
+        "stock_uom": "Cây",
         "track_dimension_lot": true,
         "require_color": true,
         "require_length": true,
-        "require_piece_qty": true
+        "require_piece_qty": true,
+        "track_bundle_qty": true
       }
     },
     {
@@ -1283,6 +1316,7 @@
         "theoretical_kg_per_m:Float Kg/m lý thuyết",
         "standard_length_m:Float Chiều dài chuẩn (m)",
         "width_m:Float Khổ rộng (m)",
+        "effective_width_m:Float Bản rộng hữu dụng (m)",
         "thickness_mm:Float Độ dày (mm)",
         "scrap_threshold_m:Float Ngưỡng phế liệu (m)",
         "drawing:Attach Bản vẽ kỹ thuật",
@@ -1493,9 +1527,9 @@
       }
     },
     {
-      "//": "Bộ quy cách quyết định một Item cần những đại lượng vật lý nào. Item chỉ giữ sự thật ổn định; màu, khổ và số cây của từng chuyến nằm trên lô/chứng từ.",
+      "//": "Bộ theo dõi quyết định kho cần ghi nhận những đại lượng nào của một Item. Thông số cố định nằm ở Quy cách kỹ thuật; màu, kích thước, số cây/lá và số bó của từng chuyến nằm trên lô/chứng từ.",
       "name": "Measurement Profile",
-      "label": "Bộ quy cách tồn kho",
+      "label": "Bộ theo dõi vật tư",
       "icon": "ruler",
       "group": "Danh mục",
       "naming": "field:profile_name",
@@ -1510,7 +1544,7 @@
         "profile_name"
       ],
       "fields": [
-        "profile_name:Data*! Tên bộ quy cách",
+        "profile_name:Data*! Tên bộ theo dõi",
         "inventory_mode:Select(Hàng thường,Nhôm cây/lá,Tấm/Kính,Cuộn,Lô/Serial,Thành phẩm theo m2)!=(Hàng thường) Kiểu quản lý tồn",
         "stock_uom:Link(UOM)!=(Cái) Đơn vị tồn đề xuất",
         "track_dimension_lot:Check Theo dõi lô kích thước",
@@ -1519,10 +1553,14 @@
         "require_length:Check Bắt buộc chiều dài",
         "require_width:Check Bắt buộc chiều rộng",
         "require_piece_qty:Check Bắt buộc số cây/lá/tấm",
-        "require_bundle_qty:Check Bắt buộc số bó",
-        "theoretical_kg_per_m:Float Kg/m lý thuyết",
-        "effective_width_m:Float Bản rộng hữu dụng (m)",
-        "scrap_threshold_m:Float Ngưỡng phế liệu (m)",
+        "track_bundle_qty:Check Theo dõi số bó",
+        {
+          "fieldname": "weight_tolerance_pct",
+          "fieldtype": "Float",
+          "label": "Ngưỡng cảnh báo lệch cân (%)",
+          "default": 13,
+          "description": "Vượt ngưỡng thì cảnh báo lúc nhập, không chặn ghi sổ."
+        },
         "note:Small Text Ghi chú / quy tắc áp dụng"
       ],
       "permissions": {
@@ -1663,7 +1701,7 @@
           "fieldname": "measurement_profile",
           "fieldtype": "Link",
           "options": "Measurement Profile",
-          "label": "Bộ quy cách",
+          "label": "Bộ theo dõi vật tư",
           "depends_on": "eval:doc.inventory_mode != 'Hàng thường'",
           "mandatory_depends_on": "eval:doc.inventory_mode != 'Hàng thường'"
         },
@@ -1837,25 +1875,25 @@
       "title": "customer_name",
       "list": [
         "customer_name",
-        "customer_type",
         "account_manager",
+        "contact_person",
         "phone",
         "tax_id",
         "credit_limit"
       ],
       "search": [
         "customer_name",
+        "contact_person",
         "phone",
         "tax_id"
       ],
       "fields": [
         "customer_name:Data*! Tên khách hàng",
-        "customer_type:Select(Đại lý,Khách lẻ,Khác)=(Đại lý) Phân loại (mô tả)",
         {
           "//": "NHÓM GIÁ — trường quyết định, không phải `customer_type`.",
           "//vi-sao": [
             "Hai thứ này trông giống nhau nên rất dễ nhập một chỗ rồi tưởng chỗ kia cũng đúng.",
-            "`customer_type` là nhãn mô tả có sẵn từ lúc nạp dữ liệu và KHÔNG đáng tin: 321/439",
+            "Cột phân loại cũ trong file nạp KHÔNG đáng tin: 321/439",
             "khách đang mang đúng giá trị mặc định 'Đại lý', 114 khách để 'Khác', chỉ 4 khách là",
             "'Khách lẻ'. Bốn khách lẻ trên bốn trăm ba chín là con số không thể có thật.",
             "",
@@ -1874,7 +1912,15 @@
           "in_standard_filter": true,
           "description": "Quyết định cách đo bề rộng và giá bán. Đại lý đo phủ bì nhựa, khách lẻ đo phủ bì ray. Công trình và nhà thầu tính như khách lẻ."
         },
-        "account_manager:Data Người phụ trách nội bộ",
+        {
+          "fieldname": "account_manager",
+          "fieldtype": "Link",
+          "options": "Employee",
+          "label": "Nhân viên bán hàng",
+          "link_filters": "{\"employee_status\":\"Đang làm việc\"}",
+          "description": "Nhân viên bán hàng đang phụ trách khách hàng này."
+        },
+        "contact_person:Data Người liên hệ",
         "phone:Data Điện thoại",
         "email:Data Email",
         "address:Small Text Địa chỉ",
@@ -1925,25 +1971,36 @@
       }
     },
     {
-      "//": "Đơn giá một mặt hàng theo đúng ĐVT trong một bảng giá. TÊN bản ghi là `<bảng giá>:<mã hàng>:<ĐVT>`; dữ liệu cũ hai thành phần chỉ được đọc khi ĐVT khớp tuyệt đối.",
+      "//": "Đơn giá một mặt hàng theo đúng ĐVT và phương án bán trong một bảng giá. TÊN bản ghi là `<bảng giá>:<mã hàng>:<ĐVT>:<biến thể giá>`; dữ liệu cũ vẫn được đọc như biến thể STANDARD.",
       "name": "Item Price",
       "label": "Đơn giá theo bảng giá",
       "icon": "circle-dollar-sign",
       "group": "Danh mục",
-      "naming": "format:{price_list}:{item_code}:{uom}",
+      "naming": "format:{price_list}:{item_code}:{uom}:{price_variant}",
       "title": "item_code",
       "list": [
         "price_list",
         "item_code",
         "uom",
+        "sales_option",
         "rate"
       ],
       "search": [
-        "item_code"
+        "item_code",
+        "sales_option"
       ],
       "fields": [
         "price_list:Link(Price List)! Bảng giá",
         "item_code:Link(Item)! Mã hàng",
+        {
+          "fieldname": "item_group",
+          "fieldtype": "Link",
+          "options": "Item Group",
+          "label": "Nhóm sản phẩm",
+          "fetch_from": "item_code.item_group",
+          "read_only": true,
+          "depends_on": "eval:false"
+        },
         {
           "fieldname": "uom",
           "fieldtype": "Link",
@@ -1952,6 +2009,26 @@
           "required": true,
           "fetch_from": "item_code.default_sales_uom",
           "description": "Đơn giá chỉ áp dụng khi dòng bán dùng đúng đơn vị này."
+        },
+        {
+          "fieldname": "sales_option",
+          "fieldtype": "Link",
+          "options": "Sales Option",
+          "label": "Phương án bán",
+          "in_list_view": true,
+          "in_standard_filter": true,
+          "link_filters": "[[\"Sales Option\",\"disabled\",\"=\",0],[\"Sales Option\",\"item_group\",\"=\",\"eval:doc.item_group\"]]",
+          "description": "Để trống nếu mặt hàng chỉ có một giá bán."
+        },
+        {
+          "fieldname": "price_variant",
+          "fieldtype": "Data",
+          "label": "Mã giá",
+          "default": "STANDARD",
+          "required": true,
+          "read_only": true,
+          "depends_on": "eval:false",
+          "fetch_from": "sales_option.price_variant"
         },
         "rate:Currency! Đơn giá",
         "currency:Link(Currency)-!=(VND) Tiền tệ",
@@ -2056,6 +2133,14 @@
           "label": "Có bản bướm — trừ khi cắt (m)",
           "description": "Có giá trị thì thay số trừ thường khi dòng hàng chọn Có bản bướm. Lưới, Đài Loan và Siêu Trường: 0,035 m."
         },
+        {
+          "//": "Bề rộng đường cắt thuộc công thức cắt, không thuộc cách theo dõi tồn.",
+          "fieldname": "kerf_mm",
+          "fieldtype": "Float",
+          "label": "Bề rộng lưỡi cắt (mm)",
+          "default": 3,
+          "description": "Trừ bề rộng lưỡi cắt × số nhát khỏi chiều dài dùng được."
+        },
         "dealer_split_sales_basis:Select(Phủ bì nhựa,Phủ bì ray,Rộng cắt lá)! Đại lý tách món bán theo rộng",
         "dealer_full_sales_basis:Select(Phủ bì nhựa,Phủ bì ray,Rộng cắt lá)! Đại lý trọn bộ bán theo rộng",
         "retail_sales_basis:Select(Phủ bì nhựa,Phủ bì ray,Rộng cắt lá)! Khách lẻ bán theo rộng",
@@ -2120,7 +2205,7 @@
         },
         "item_name:Data~- Tên hàng",
         "inventory_mode:Data~- Kiểu tính",
-        "measurement_profile:Link(Measurement Profile)~- Bộ quy cách",
+        "measurement_profile:Link(Measurement Profile)~- Bộ theo dõi",
         "stock_uom:Link(UOM)~- ĐVT tồn",
         "min_area_sqm:Float~- Diện tích tính tối thiểu",
         {
@@ -2448,7 +2533,7 @@
         },
         "item_name:Data~- Tên hàng",
         "inventory_mode:Data~- Kiểu tính",
-        "measurement_profile:Link(Measurement Profile)~- Bộ quy cách",
+        "measurement_profile:Link(Measurement Profile)~- Bộ theo dõi",
         "stock_uom:Link(UOM)~- ĐVT tồn",
         "min_area_sqm:Float~- Diện tích tính tối thiểu",
         {
@@ -2722,7 +2807,7 @@
           "description": "Khóa giao hàng theo đúng dòng, không cộng nhầm hai dòng cùng mã nhưng khác màu/kích thước."
         },
         "inventory_mode:Data~- Kiểu tính",
-        "measurement_profile:Link(Measurement Profile)~- Bộ quy cách",
+        "measurement_profile:Link(Measurement Profile)~- Bộ theo dõi",
         "stock_uom:Link(UOM)~- ĐVT tồn",
         "min_area_sqm:Float~- Diện tích tính tối thiểu",
         {
@@ -3115,7 +3200,7 @@
         },
         "item_name:Data~- Tên hàng",
         "inventory_mode:Data~- Kiểu tính",
-        "measurement_profile:Link(Measurement Profile)~- Bộ quy cách",
+        "measurement_profile:Link(Measurement Profile)~- Bộ theo dõi",
         "stock_uom:Link(UOM)~- ĐVT tồn",
         "min_area_sqm:Float~- Diện tích tính tối thiểu",
         "color:Link(Item Color) Màu / mã sơn",
@@ -3301,9 +3386,8 @@
       "list": [
         "supplier_name",
         "supplier_group",
-        "account_manager",
-        "phone",
         "contact_person",
+        "phone",
         "payment_terms"
       ],
       "search": [
@@ -3313,8 +3397,7 @@
       ],
       "fields": [
         "supplier_name:Data*! Tên nhà cung cấp",
-        "supplier_group:Select(Nhôm,Mô tơ,Sơn,Phụ kiện,Vận chuyển,Khác)=(Khác) Nhóm nhà cung cấp",
-        "account_manager:Data Người phụ trách nội bộ",
+        "supplier_group:Select(Nhôm,Mô tơ,Sơn,Phụ kiện,Vận chuyển,Khác)!=(Khác) Nhóm nhà cung cấp",
         "contact_person:Data Người liên hệ",
         "phone:Data Điện thoại",
         "email:Data Email",
@@ -3505,7 +3588,7 @@
           "fieldname": "measurement_profile",
           "fieldtype": "Link",
           "options": "Measurement Profile",
-          "label": "Bộ quy cách",
+          "label": "Bộ theo dõi",
           "read_only": true,
           "hidden": true
         },
@@ -3683,7 +3766,7 @@
           "fieldname": "measurement_profile",
           "fieldtype": "Link",
           "options": "Measurement Profile",
-          "label": "Bộ quy cách",
+          "label": "Bộ theo dõi",
           "read_only": true,
           "hidden": true
         },
@@ -3908,7 +3991,7 @@
           "fieldname": "measurement_profile",
           "fieldtype": "Link",
           "options": "Measurement Profile",
-          "label": "Bộ quy cách",
+          "label": "Bộ theo dõi",
           "read_only": true,
           "hidden": true
         },
@@ -4127,7 +4210,7 @@
         },
         "item_name:Data~- Tên hàng",
         "inventory_mode:Data~- Kiểu tính",
-        "measurement_profile:Link(Measurement Profile)~- Bộ quy cách",
+        "measurement_profile:Link(Measurement Profile)~- Bộ theo dõi",
         "stock_uom:Link(UOM)~- ĐVT tồn",
         "min_area_sqm:Float~- Diện tích tính tối thiểu",
         "color:Link(Item Color) Màu",

@@ -26,7 +26,7 @@ const platedColor = (code, groups) => ({
 });
 
 export const ALUMDOOR_COLOR_CATALOG = Object.freeze([
-  { code: "THÔ", name: "THÔ", finish: "Thô", groups: [] },
+  { code: "THÔ", name: "THÔ", finish: "Thô", groups: [], usageScope: "Mua hàng" },
   staticColor("CAFÉ"),
   staticColor("XANH NGỌC"),
   staticColor("MIDNIGHT BLUE"),
@@ -79,6 +79,7 @@ export function alumdoorColorPayload(color) {
     color_code: color.code,
     color_name: color.name,
     finish: color.finish,
+    usage_scope: color.usageScope ?? "Mua & bán",
     applies_to_groups: color.groups.map((itemGroup, index) => ({
       row_id: `SCOPE-${String(index + 1).padStart(2, "0")}`,
       item_group: itemGroup,

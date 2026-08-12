@@ -88,6 +88,7 @@ async function resolveItemPriceRecord(
   itemCode: string,
   selectedUom: string,
   baseUom: string,
+  salesOption = "",
 ): Promise<ItemPriceLookup> {
   const exactName = `${priceList}:${itemCode}:${selectedUom}`;
   const legacyName = `${priceList}:${itemCode}`;
@@ -113,7 +114,7 @@ async function resolveItemPriceRecord(
     rows = await listResources(
       call,
       "Item Price",
-      ["name", "price_list", "item_code", "uom", "rate", "currency", "disabled"],
+      ["name", "price_list", "item_code", "uom", "sales_option", "price_variant", "rate", "currency", "disabled"],
       [
         ["Item Price", "price_list", "=", priceList],
         ["Item Price", "item_code", "=", itemCode],
@@ -127,7 +128,12 @@ async function resolveItemPriceRecord(
     sameText(row.price_list, priceList)
     && sameText(row.item_code, itemCode)
     && sameText(row.uom, selectedUom));
-  const active = matching.filter((row) => !truthy(row.disabled));
+  // Một mặt hàng có thể có giá cơ bản và giá cho từng phương án bán. Khi chưa
+  // chọn phương án, chỉ lấy dòng cơ bản; đã chọn thì phải khớp đúng phương án.
+  const scoped = salesOption
+    ? matching.filter((row) => sameText(row.sales_option, salesOption))
+    : matching.filter((row) => !normalizedText(row.sales_option));
+  const active = scoped.filter((row) => !truthy(row.disabled));
   if (active.length > 1) {
     throw new Error(`Có nhiều đơn giá đang hoạt động cho ${itemCode} · ${selectedUom} trong bảng giá ${priceList}.`);
   }
@@ -151,7 +157,7 @@ async function resolveItemPriceRecord(
     }
   }
 
-  const disabled = exact ?? compatibleLegacy ?? matching[0] ?? null;
+  const disabled = exact ?? compatibleLegacy ?? scoped[0] ?? matching[0] ?? null;
   if (!disabled && exactReadError) throw exactReadError;
   return {
     price: disabled,
@@ -248,7 +254,14 @@ export async function salesItemContext(call: SalesPlatformCall, args: Json): Pro
   if (priceList) {
     const expectedName = `${priceList}:${itemCode}:${selectedUom}`;
     try {
-      const lookup = await resolveItemPriceRecord(call, priceList, itemCode, selectedUom, defaultSalesUom);
+      const lookup = await resolveItemPriceRecord(
+        call,
+        priceList,
+        itemCode,
+        selectedUom,
+        defaultSalesUom,
+        normalizedText(args.sales_option),
+      );
       const price = lookup.price;
       itemPrice = lookup.name;
       if (price && !truthy(price.disabled)) {

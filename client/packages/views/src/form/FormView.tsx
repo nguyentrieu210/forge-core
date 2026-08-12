@@ -113,6 +113,13 @@ export function FormView(props: FormViewProps) {
   const prevLinks = useRef<Record<string, unknown>>({}); // giá trị link lần trước → phát hiện user đổi
   const fetchDocKey = useRef<string>(""); // doc đang đồng bộ → bỏ vòng fetch của lần (re)load (L1)
 
+  // Trường đích `fetch_from` có thể là field kỹ thuật ẩn, không nằm trong form profile.
+  // React Hook Form chỉ theo dõi ổn định field đã đăng ký; thiếu bước này làm giá trị vẫn
+  // được nạp nhưng không đi vào `docValues`, nên dependent link_filters thấy rỗng.
+  useEffect(() => {
+    for (const rule of fetchRules) form.register(rule.target);
+  }, [fetchRules, form]);
+
   // reset khi đổi document (name) hoặc tải lại (modified) — RHF tự lo dirty/back-to-initial.
   useEffect(() => {
     form.reset({ ...doc });
@@ -382,6 +389,9 @@ export function FormView(props: FormViewProps) {
 
   return (
     <form className={cn("mf-form-view flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-card", props.isNew && "mf-form-create")} onSubmit={form.handleSubmit(onValid)}>
+      {[...new Set(fetchRules.map((rule) => rule.target))].map((target) => (
+        <input key={target} type="hidden" {...form.register(target)} />
+      ))}
       {/* HEADER + TABS sticky — bỏ qua khi shell cha (vd modal Create) đã tự hiện tiêu đề riêng. */}
       {!props.hideHeader ? (
         <div className="mf-form-header sticky top-0 z-20 shrink-0 border-b bg-card/95 backdrop-blur">
@@ -562,7 +572,10 @@ export function FormView(props: FormViewProps) {
                     {fullFields.length ? <div className="mf-form-grid mt-3 grid items-start gap-y-3">{renderFields(fullFields, "full")}</div> : null}
                   </>
                 ) : (
-                  <div className="mf-form-grid grid items-start gap-x-3 gap-y-3">{renderFields(sectionFields)}</div>
+                  <>
+                    <div className="mf-form-grid grid items-start gap-x-3 gap-y-3">{renderFields(mainFields, "main")}</div>
+                    {fullFields.length ? <div className="mf-form-grid mt-3 grid items-start gap-y-3">{renderFields(fullFields, "full")}</div> : null}
+                  </>
                 )}
               </section>
             );

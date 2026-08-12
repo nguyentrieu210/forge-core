@@ -11,6 +11,8 @@ client/apps/demo/.*-selfcheck.cjs
 coverage/
 *.tsbuildinfo
 local-backups/
+__pycache__/
+*.py[cod]
 
 # Bằng chứng source-exact sinh lại được từ ERPNext (GPL-3.0) / Frappe (MIT)
 server/docs/spec/source-exact/generated/

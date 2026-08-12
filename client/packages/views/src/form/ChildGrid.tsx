@@ -96,6 +96,17 @@ function isSalesTransactionGrid(meta: DocTypeMeta): boolean {
   return ["Quotation Item", "Sales Order Item", "Delivery Note Item", "Sales Invoice Item"].includes(meta.name);
 }
 
+/**
+ * Cửa thành phẩm phải nhập phủ bì ngay cả khi lượt tải Item nền chưa kịp trả
+ * `inventory_mode`. Mã của các cửa bán theo m² trong catalogue đều là TP-…;
+ * đây chỉ là cầu nối hiển thị tạm thời, Item master vẫn là nguồn cuối cùng khi
+ * server chụp công thức và tính tiền.
+ */
+function isAreaDoorSalesItem(row: Doc): boolean {
+  if (String(row.inventory_mode ?? "").normalize("NFC").trim() === "Thành phẩm theo m2") return true;
+  return /^TP-(?:TD-|ALD-|ALVIP|AL70|AL75|UC)/i.test(String(row.item_code ?? "").trim());
+}
+
 const AREA_UOMS = new Set(["m2", "m²", "sqm"]);
 const METRE_UOMS = new Set(["m", "mét", "met", "meter", "metre"]);
 const SET_UOMS = new Set(["bộ", "bo", "set"]);
@@ -307,12 +318,13 @@ function visibleColumns(
     ).visible || (meta.name === "Sales Order Item" && (() => {
       const basis = deriveLinearSalesBasis(row);
       const widthItem = isWidthQuantitySalesItem(row);
+      const areaDoor = isAreaDoorSalesItem(row);
       return column.fieldname === "set_count"
-        ? Boolean(basis || widthItem || isOrdinaryQuantitySalesItem(row))
+        ? Boolean(areaDoor || basis || widthItem || isOrdinaryQuantitySalesItem(row))
         : column.fieldname === "height_m"
-          ? basis === "RAY"
+          ? areaDoor || basis === "RAY"
           : column.fieldname === "width_m"
-            ? basis === "TRUC" || widthItem
+            ? areaDoor || basis === "TRUC" || widthItem
             : false;
     })())));
 }
@@ -791,11 +803,7 @@ export function ChildGrid(props: ChildGridProps) {
       ? preview
       : { policy: "DIRECT", derived: false, label: "SL tính tiền" };
   };
-  /**
-   * Item.allowed_colors là chiều chặn thật của màu. Link phải dùng đúng danh sách đó ngay
-   * khi tìm kiếm, nếu không người dùng vẫn thấy cả màu mạ trên một dòng STĐ rồi chỉ bị báo
-   * lỗi sau khi bấm lưu. Danh sách rỗng được lọc về một mã không tồn tại (fail closed).
-   */
+  /** Màu được lọc theo Nhóm SP áp dụng của danh mục Màu vật tư; rỗng thì fail closed. */
   const fieldForRow = (field: DocField, row: Doc): DocField => {
       const itemCode = String(row.item_code ?? "").trim();
       if (isSalesTransactionGrid(childMeta)) {
@@ -803,6 +811,16 @@ export function ChildGrid(props: ChildGridProps) {
         const linearBasis = deriveLinearSalesBasis(row);
         const widthItem = isWidthQuantitySalesItem(row);
         const ordinaryItem = isOrdinaryQuantitySalesItem(row);
+        const areaDoor = isAreaDoorSalesItem(row);
+        if (areaDoor && field.fieldname === "width_m") {
+          return { ...field, hidden: 0, depends_on: undefined, mandatory_depends_on: undefined, label: "Rộng PB\n(m)", reqd: 1 };
+        }
+        if (areaDoor && field.fieldname === "height_m") {
+          return { ...field, hidden: 0, depends_on: undefined, mandatory_depends_on: undefined, label: "Cao PB\n(m)", reqd: 1 };
+        }
+        if (areaDoor && field.fieldname === "set_count") {
+          return { ...field, hidden: 0, depends_on: undefined, mandatory_depends_on: undefined, label: "Số bộ", reqd: 1 };
+        }
         if (linearBasis && field.fieldname === "set_count") {
           return {
             ...field,
@@ -1193,6 +1211,7 @@ export function ChildGrid(props: ChildGridProps) {
     const next = currentRows.map((r, i) => {
       if (i !== rowIdx) return r;
       const changingItem = fieldname === "item_code" && value !== r.item_code;
+      const selectedAreaDoor = changingItem && isAreaDoorSalesItem({ item_code: value });
       const reset = changingItem
         ? Object.fromEntries(ITEM_DERIVED_FIELDS.filter((name) => name in r).map((name) => [name, undefined]))
         : {};
@@ -1214,6 +1233,14 @@ export function ChildGrid(props: ChildGridProps) {
         ...reset,
         ...resetDoorFormula,
         [fieldname]: value,
+        // Không đợi lượt đọc Item nền mới cho người bán nhập kích thước cửa.
+        // Lượt đọc đó vẫn ghi đè bằng snapshot master sau khi trả về.
+        ...(selectedAreaDoor ? {
+          inventory_mode: "Thành phẩm theo m2",
+          uom: "m2",
+          set_count: 1,
+          sales_mode: "Trọn bộ",
+        } : {}),
         ...(fieldname === "rate" ? { rate_requires_approval: rateApproval } : {}),
         // Hệ số thuộc về CẶP Item + UOM. Đổi một trong hai mà giữ hệ số cũ là cách tạo
         // tồn sai nhưng chứng từ vẫn hợp lệ, nên xoá để server tra lại từ master.
@@ -1224,7 +1251,7 @@ export function ChildGrid(props: ChildGridProps) {
       return COMPUTED_FROM.has(fieldname) ? withComputed(updated) : updated;
     }) as Doc[];
     emitRows(next);
-    if (COMPUTED_FROM.has(fieldname)) {
+    if (COMPUTED_FROM.has(fieldname) || (fieldname === "item_code" && isAreaDoorSalesItem(next[rowIdx] ?? {}))) {
       void fillDoorFormula(rowIdx, next, formulaKey, formulaVersion);
     }
     if (fieldname === "item_code" && value) {
@@ -1305,13 +1332,22 @@ export function ChildGrid(props: ChildGridProps) {
       if (v === undefined || v === null || v === "") return;
       for (const d of targets) patch[d] = v;
     }));
-    const allowedColors = Array.isArray(item?.allowed_colors)
-      ? item.allowed_colors
-        .map((entry) => entry && typeof entry === "object"
-          ? String((entry as Record<string, unknown>).color ?? "").trim()
-          : "")
-        .filter(Boolean)
-      : [];
+    let allowedColors: string[] = [];
+    if (services?.callPost) {
+      try {
+        const colorContext = await services.callPost<Record<string, unknown>>("alumdoor.catalog.allowed_colors", {
+          item_code: itemCode,
+          usage_scope: isPurchaseGrid(childMeta)
+            ? "purchase"
+            : isSalesTransactionGrid(childMeta) ? "sales" : "internal",
+        });
+        allowedColors = Array.isArray(colorContext.allowed_colors)
+          ? colorContext.allowed_colors.map((value) => String(value ?? "").trim()).filter(Boolean)
+          : [];
+      } catch {
+        allowedColors = [];
+      }
+    }
     setAllowedColorsByItem((current) => (
       current[itemCode]?.join("\u0000") === allowedColors.join("\u0000")
         ? current
@@ -1403,6 +1439,7 @@ export function ChildGrid(props: ChildGridProps) {
           price_list: parentDoc?.selling_price_list,
           currency: parentDoc?.currency,
           qty: base[rowIdx]?.qty,
+          sales_option: base[rowIdx]?.sales_option,
         });
         const allowedUoms = Array.isArray(salesContext.allowed_uoms)
           ? salesContext.allowed_uoms.map((value) => String(value ?? "").trim()).filter(Boolean)
@@ -1412,8 +1449,16 @@ export function ChildGrid(props: ChildGridProps) {
             ? current
             : { ...current, [itemCode]: allowedUoms }
         ));
+        // `sales.item_context` is the authoritative compact snapshot for a sales
+        // line.  It is also the fallback when the generic Item form endpoint is
+        // unavailable, so a newly selected item never stays as a blank line.
+        for (const fieldname of ["inventory_mode", "measurement_profile", "stock_uom", "min_area_sqm", "default_color"]) {
+          if (has(fieldname) && salesContext[fieldname] !== undefined && salesContext[fieldname] !== null) {
+            patch[fieldname] = salesContext[fieldname];
+          }
+        }
         const selectedUom = String(salesContext.selected_uom ?? "").trim();
-        if (has("uom") && !base[rowIdx]?.uom && selectedUom) patch.uom = selectedUom;
+        if (has("uom") && selectedUom) patch.uom = selectedUom;
         const factor = Number(salesContext.conversion_factor);
         if (has("conversion_factor") && Number.isFinite(factor) && factor > 0) patch.conversion_factor = factor;
         if (has("available_qty")) patch.available_qty = salesContext.available_qty;
@@ -1574,6 +1619,14 @@ export function ChildGrid(props: ChildGridProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, allowedColorsByItem]);
 
+  const nextSalesPackageComponentKey = (values: Doc[]) => {
+    if (childMeta.name !== "Sales Package Item") return undefined;
+    const used = new Set(values.map((row) => String(row.component_key ?? "").trim()).filter(Boolean));
+    let sequence = 1;
+    while (used.has(`MON-${String(sequence).padStart(3, "0")}`)) sequence += 1;
+    return `MON-${String(sequence).padStart(3, "0")}`;
+  };
+
   const addRow = () => {
     const seed: Doc = { name: `new-${Date.now()}`, doctype: childMeta.name } as Doc;
     for (const field of childMeta.fields ?? []) {
@@ -1585,6 +1638,8 @@ export function ChildGrid(props: ChildGridProps) {
       if (!(childMeta.fields ?? []).some((f) => f.fieldname === fieldname)) continue;
       if (seed[fieldname] == null || seed[fieldname] === "") seed[fieldname] = value;
     }
+    const componentKey = nextSalesPackageComponentKey(rows);
+    if (componentKey) seed.component_key = componentKey;
     emitRows([...rows, seed]);
   };
   const deleteRows = (indices: number[]) => {
@@ -1662,6 +1717,8 @@ export function ChildGrid(props: ChildGridProps) {
     if (!source) return;
     // Tên MỚI, không chép: hai dòng cùng `name` thì server coi là một, và dòng sau ghi đè dòng trước.
     const copy: Doc = { ...source, name: `new-${Date.now()}` };
+    const componentKey = nextSalesPackageComponentKey(rows);
+    if (componentKey) copy.component_key = componentKey;
     emitRows([...rows.slice(0, idx + 1), copy, ...rows.slice(idx + 1)]);
   };
   /**
@@ -1702,6 +1759,8 @@ export function ChildGrid(props: ChildGridProps) {
         if (!(childMeta.fields ?? []).some((f) => f.fieldname === fieldname)) continue;
         if (seed[fieldname] == null || seed[fieldname] === "") seed[fieldname] = value;
       }
+      const componentKey = nextSalesPackageComponentKey([...rows, ...seeds]);
+      if (componentKey) seed.component_key = componentKey;
       seeds.push(seed);
     }
     emitRows([...rows, ...seeds]);

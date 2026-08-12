@@ -28,11 +28,20 @@ test("Alumdoor keeps imported history outside operational ledgers", () => {
   assert.ok(doctype("Production Standard"));
 });
 
-test("party masters preserve source classification and internal ownership", () => {
-  assert.equal(field("Customer", "customer_type")?.default, "Đại lý");
-  assert.equal(field("Customer", "account_manager")?.fieldtype, "Data");
+test("party masters preserve useful source classification without supplier-only clutter", () => {
+  assert.equal(field("Customer", "customer_type"), undefined);
+  assert.equal(field("Customer", "account_manager")?.fieldtype, "Link");
+  assert.equal(field("Customer", "account_manager")?.options, "Employee");
+  assert.deepEqual(JSON.parse(field("Customer", "account_manager")?.link_filters ?? "{}"), {
+    employee_status: "Đang làm việc",
+  });
   assert.equal(field("Customer", "note")?.fieldtype, "Small Text");
-  assert.equal(field("Supplier", "account_manager")?.fieldtype, "Data");
+  assert.equal(field("Customer", "email")?.fieldtype, "Data");
+  assert.equal(field("Customer", "contact_person")?.fieldtype, "Data");
+  assert.equal(field("Supplier", "account_manager"), undefined);
+  assert.equal(field("Supplier", "supplier_group")?.required, true);
+  assert.notEqual(field("Supplier", "phone")?.required, true);
+  assert.equal(field("Supplier", "payment_terms")?.default, "Trả ngay");
 });
 
 test("aluminium lots follow the workshop stock columns and retain migration trace", () => {

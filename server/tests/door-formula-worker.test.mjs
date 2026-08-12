@@ -16,7 +16,6 @@ const item = {
   default_sales_uom: "m2",
   is_sales_item: true,
   min_area_sqm: 0,
-  allowed_colors: [{ row_id: "COLOR-01", color: "GS" }],
 };
 
 const platform = {
@@ -160,7 +159,6 @@ test("ray/trục bán Mét bắt buộc qty = chiều dài × số cây", async 
       default_sales_uom: "Mét",
       uom_conversions: [{ uom: "Mét", conversion_factor: 2.1 }],
       is_sales_item: 1,
-      allowed_colors: [{ color: "GS" }],
     },
   }) };
   const line = {

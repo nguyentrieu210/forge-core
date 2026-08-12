@@ -80,7 +80,9 @@ await login();
 await ensureResource("UOM", "Cái", { uom_name: "Cái", must_be_whole_number: 1, disabled: 0 });
 await ensureResource("UOM", "Cây", { uom_name: "Cây", must_be_whole_number: 1, disabled: 0 });
 await ensureResource("UOM", "Kg", { uom_name: "Kg", must_be_whole_number: 0, disabled: 0 });
-await ensureResource("Item Color", "THÔ", { color_code: "THÔ", color_name: "THÔ", finish: "Thô", disabled: 0 });
+await ensureResource("Item Color", "THÔ", {
+  color_code: "THÔ", color_name: "THÔ", finish: "Thô", usage_scope: "Mua hàng", disabled: 0,
+});
 await ensureResource("Warehouse", "K36", { warehouse_name: "K36", is_group: 0, disabled: 0 });
 
 // Historical local fixtures may still say stock_uom=Kg. Refresh only this disposable QA profile;

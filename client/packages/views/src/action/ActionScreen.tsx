@@ -23,7 +23,7 @@ type Values = Record<string, unknown>;
 type ResultRecord = Record<string, unknown>;
 
 type BulkTransactionColumn = Pick<AppActionField,
-  "fieldname" | "label" | "fieldtype" | "options" | "required" | "default" | "description">;
+  "fieldname" | "label" | "fieldtype" | "options" | "required" | "default" | "description" | "link_filters">;
 interface BulkTransactionSpec {
   columns: BulkTransactionColumn[];
   minRows: number;
@@ -121,6 +121,7 @@ function toDocField(field: AppActionField | BulkTransactionColumn): DocField {
     label: field.label,
     fieldtype: field.fieldtype as Fieldtype,
     ...(field.options ? { options: field.options } : {}),
+    ...(field.link_filters ? { link_filters: field.link_filters } : {}),
     ...(field.required ? { reqd: 1 as const } : {}),
     ...(field.default == null ? {} : { default: field.default }),
   };

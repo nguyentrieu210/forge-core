@@ -118,6 +118,10 @@ const SUPPLEMENTAL_KG_ITEMS = [
     itemName: "TRỤC 114_1.8LY",
     itemGroup: "Ray và trục",
     inventoryMode: "Nhôm cây/lá",
+    measurementProfile: "Ống/trục",
+    specType: "Ống/trục",
+    sectionCode: "Φ114",
+    thicknessMm: 1.8,
     isSalesItem: true,
     kgPerM: 4.4,
     evidence: "alumdoor-uom-correction-2026-07-28.sql",
@@ -127,6 +131,10 @@ const SUPPLEMENTAL_KG_ITEMS = [
     itemName: "TRỤC 114_2.1LY",
     itemGroup: "Ray và trục",
     inventoryMode: "Nhôm cây/lá",
+    measurementProfile: "Ống/trục",
+    specType: "Ống/trục",
+    sectionCode: "Φ114",
+    thicknessMm: 2.1,
     isSalesItem: true,
     kgPerM: 4.7,
     evidence: "alumdoor-uom-correction-2026-07-28.sql",
@@ -186,7 +194,7 @@ function itemPatch(target) {
     is_sales_item: target.isSalesItem,
     include_item_in_manufacturing: true,
     inventory_mode: target.inventoryMode,
-    measurement_profile: target.inventoryMode,
+    measurement_profile: target.measurementProfile ?? target.inventoryMode,
     stock_uom: "Kg",
     default_purchase_uom: "Kg",
     ...(target.isSalesItem
@@ -272,12 +280,13 @@ export async function buildStandardization(repoRoot) {
   appendPatchUpsert(sql, "Measurement Profile", "Nhôm cây/lá", {
     profile_name: "Nhôm cây/lá",
     inventory_mode: "Nhôm cây/lá",
-    stock_uom: "Kg",
+    stock_uom: "Cây",
     track_dimension_lot: true,
     require_color: true,
     require_condition: true,
     require_length: true,
     require_piece_qty: true,
+    track_bundle_qty: true,
     disabled: false,
     _migration_source: MIGRATION_SOURCE,
   });
@@ -286,7 +295,30 @@ export async function buildStandardization(repoRoot) {
     "Measurement Profile",
     "Nhôm cây/lá",
     "Nhôm cây/lá",
-    "Nhôm cây lá Kg chiều dài số cây màu tình trạng",
+    "Nhôm cây lá Cây chiều dài số bó theo dõi Kg cân màu tình trạng",
+  );
+  appendPatchUpsert(sql, "Measurement Profile", "Ống/trục", {
+    profile_name: "Ống/trục",
+    inventory_mode: "Nhôm cây/lá",
+    stock_uom: "Kg",
+    track_dimension_lot: true,
+    require_color: false,
+    require_condition: true,
+    require_length: true,
+    require_width: false,
+    require_piece_qty: true,
+    track_bundle_qty: true,
+    weight_tolerance_pct: 13,
+    note: "Mua và tồn theo Kg; bán theo Mét; số cây và số bó chỉ dùng để theo dõi giao nhận.",
+    disabled: false,
+    _migration_source: MIGRATION_SOURCE,
+  });
+  appendSearchUpsert(
+    sql,
+    "Measurement Profile",
+    "Ống/trục",
+    "Ống/trục",
+    "Ống trục Kg chiều dài số cây số bó đối chiếu barem",
   );
   appendPatchUpsert(sql, "Measurement Profile", "Hàng thường", {
     profile_name: "Hàng thường",
@@ -298,7 +330,7 @@ export async function buildStandardization(repoRoot) {
     require_length: false,
     require_width: false,
     require_piece_qty: false,
-    require_bundle_qty: false,
+    track_bundle_qty: false,
     disabled: false,
     _migration_source: MIGRATION_SOURCE,
   });
@@ -319,7 +351,7 @@ export async function buildStandardization(repoRoot) {
     require_length: true,
     require_width: true,
     require_piece_qty: true,
-    require_bundle_qty: false,
+    track_bundle_qty: false,
     disabled: false,
     _migration_source: MIGRATION_SOURCE,
   });
@@ -337,7 +369,7 @@ export async function buildStandardization(repoRoot) {
     _migration_source: MIGRATION_SOURCE,
   });
 
-  // Các bản ghi nhập cũ đã có inventory_mode nhưng chưa có Link bộ quy cách. Chỉ điền đúng
+  // Các bản ghi nhập cũ đã có inventory_mode nhưng chưa có Link bộ theo dõi. Chỉ điền đúng
   // profile cùng tên kiểu quản lý; không đổi ĐVT, giá hay bất kỳ số tồn nào.
   sql.push(`UPDATE documents
 SET payload_json=json_set(
@@ -358,9 +390,12 @@ WHERE tenant_id='alu'
     appendPatchUpsert(sql, "Material Specification", spec, {
       spec_code: spec,
       spec_name: `Định mức ${target.itemName}`,
+      item_group: target.itemGroup,
+      spec_type: target.specType ?? "Nhôm cây/lá",
       profile_system: target.supplierCode ? SUPPLIER : "Alumdoor",
-      section_code: target.supplierCode ?? target.itemCode,
+      section_code: target.sectionCode ?? target.supplierCode ?? target.itemCode,
       theoretical_kg_per_m: target.kgPerM,
+      ...(target.thicknessMm ? { thickness_mm: target.thicknessMm } : {}),
       note: `Định mức xác nhận: ${target.kgPerM} kg/m. Chỉ lưu để đối chiếu và quy đổi đơn vị; không tự sinh số kg đặt mua.`,
       disabled: false,
       _migration_source: MIGRATION_SOURCE,

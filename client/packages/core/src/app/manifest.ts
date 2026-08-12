@@ -56,6 +56,7 @@ export interface AppActionField {
   required?: boolean;
   default?: string;
   description?: string;
+  link_filters?: string;
 }
 export interface AppActionCall {
   method: string;

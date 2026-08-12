@@ -32,6 +32,12 @@ import {
   type SalesMode,
 } from "./door-formulas.js";
 import { salesItemContext } from "./sales-item-context.js";
+import {
+  allowedColorNamesForGroup,
+  colorScopeForItem,
+  colorUsageForDoctype,
+  normalizeColorUsage,
+} from "./color-scopes.js";
 import { previewChildRow } from "./ui-child-preview.js";
 import { previewDocument } from "./ui-document-preview.js";
 import {
@@ -151,8 +157,6 @@ interface InventoryItem {
   is_purchase_item?: unknown;
   is_sales_item?: unknown;
   uom_conversions?: Array<{ uom?: string; conversion_factor?: unknown }>;
-  default_color?: string;
-  allowed_colors?: Array<{ color?: string }>;
 }
 
 function positive(value: unknown): boolean {
@@ -261,14 +265,6 @@ async function readDoorPolicies(call: PlatformCall): Promise<DoorFormulaPolicy[]
   return rows.map(parseDoorPolicy);
 }
 
-function colorNames(item: Record<string, unknown>): string[] {
-  if (!Array.isArray(item.allowed_colors)) return [];
-  return item.allowed_colors
-    .filter((row): row is Record<string, unknown> => Boolean(row) && typeof row === "object" && !Array.isArray(row))
-    .map((row) => String(row.color ?? "").trim())
-    .filter(Boolean);
-}
-
 /** Ray/trục bán theo mét không mang mã màu và không được chặn khi để trống màu. */
 function isColorlessLinearItem(item: Record<string, unknown>): boolean {
   const name = String(item.item_name ?? "").normalize("NFC").trim().toLocaleLowerCase("vi");
@@ -314,22 +310,6 @@ async function validateItemMaster(call: PlatformCall, subject: ValidatorSubject)
   const group = await readMaster(call, "Item Group", groupName);
   if (!group) return refuse(`Nhóm hàng ${groupName} không tồn tại hoặc đã ngừng dùng.`);
   if (checked(group.is_group)) return refuse(`Nhóm hàng ${groupName} là nhóm chứa; hãy chọn một nhóm lá.`);
-
-  const allowedColors = colorNames(doc);
-  const duplicateColors = allowedColors.filter((color, index) => allowedColors.indexOf(color) !== index);
-  if (duplicateColors.length) {
-    return refuse(`${code}: mã màu ${[...new Set(duplicateColors)].join(", ")} đang bị khai lặp trong Các màu được phép.`);
-  }
-  const defaultColor = String(doc.default_color ?? "").trim();
-  const invalidColor = await assertActiveColors(
-    call,
-    [...allowedColors, defaultColor].filter(Boolean),
-    code,
-  );
-  if (invalidColor) return invalidColor;
-  if (defaultColor && allowedColors.length && !allowedColors.includes(defaultColor)) {
-    return refuse(`${code}: Màu mặc định ${defaultColor} chưa nằm trong Các màu được phép.`);
-  }
 
   if (!["Hàng tồn kho", "Dịch vụ", "Tài sản"].includes(nature)) {
     return refuse(`${code}: cần chọn đúng Bản chất mặt hàng.`);
@@ -863,7 +843,7 @@ async function validateTransactionLines(
 /**
  * Màu là một chiều của hàng thật, không phải ghi chú.
  *
- * - Item quyết định màu nào được dùng. Danh sách rỗng là lỗi cấu hình, không được mở toàn bộ màu.
+ * - Màu vật tư quyết định nhóm hàng nào được dùng; phạm vi rỗng là màu dùng chung.
  * - Measurement Profile quyết định chứng từ có bắt buộc chọn màu hay không.
  * - Mọi chứng từ giữ MÃ màu chuẩn; không cho "ghi gần giống" thành một vị trí tồn khác.
  */
@@ -918,12 +898,24 @@ async function validateDocumentColors(
 
     if (required && !color) return refuse(`${line}: cần chọn Mã màu.`);
     if (!color) continue;
-    const allowed = colorNames(item);
+    const usage = colorUsageForDoctype(subject.doctype);
+    const allowed = await allowedColorNamesForGroup(
+      call,
+      String(item.item_group ?? ""),
+      usage,
+    );
     if (!allowed.length) {
-      return refuse(`${line}: mặt hàng chưa được cấu hình Các màu được phép.`);
+      return refuse(`${line}: Nhóm hàng chưa có màu vật tư nào được phép.`);
     }
     if (!allowed.includes(color)) {
-      return refuse(`${line}: màu ${color} không nằm trong Các màu được phép của mặt hàng.`);
+      const allowedInternally = await allowedColorNamesForGroup(call, String(item.item_group ?? ""), "internal");
+      if (allowedInternally.includes(color) && usage === "sales") {
+        return refuse(`${line}: màu ${color} chỉ dùng khi mua hàng, không dùng trên chứng từ bán.`);
+      }
+      if (allowedInternally.includes(color) && usage === "purchase") {
+        return refuse(`${line}: màu ${color} chỉ dùng khi bán hàng, không dùng trên chứng từ mua.`);
+      }
+      return refuse(`${line}: màu ${color} không áp dụng cho Nhóm hàng ${String(item.item_group ?? "").trim()}.`);
     }
   }
   return accept();
@@ -1379,9 +1371,15 @@ async function draftCutV2(call: PlatformCall, args: Record<string, unknown>): Pr
   const item = await readMaster(call, "Item", proposal.item_code);
   const profileName = String(item?.measurement_profile ?? "");
   const profile = profileName ? await readMaster(call, "Measurement Profile", profileName) : null;
-  if (!profile) return refuse(`Mặt hàng ${proposal.item_code} chưa có bộ quy cách.`);
-  const kerfM = Number(profile.kerf_mm ?? 0) / 1000;
-  const threshold = Number(profile.scrap_threshold_m ?? 0);
+  if (!profile) return refuse(`Mặt hàng ${proposal.item_code} chưa có bộ theo dõi vật tư.`);
+  const policy = await readMaster(call, "Cutting Policy", cuttingPolicy);
+  if (!policy) return refuse(`Công thức cửa ${cuttingPolicy} không tồn tại hoặc đã ngừng dùng.`);
+  const specificationName = String(item?.material_specification ?? "");
+  const specification = specificationName
+    ? await readMaster(call, "Material Specification", specificationName)
+    : null;
+  const kerfM = Number(policy.kerf_mm ?? 0) / 1000;
+  const threshold = Number(specification?.scrap_threshold_m ?? 0);
   const items: V2CutOrderItem[] = [];
   const createdBundles: string[] = [];
   const createdBatches: string[] = [];
@@ -3188,6 +3186,17 @@ export default {
         if (method === "alumdoor.payroll.period_slips") return await payrollPeriodSlips({ call, args });
         if (method === "alumdoor.payroll.my_slips") return await payrollMySlips({ call, args, actorUser: platformActorUser(request) });
         if (method === "alumdoor.sales.item_context") return await salesItemContext(call, args);
+        if (method === "alumdoor.catalog.allowed_colors") {
+          try {
+            return answer(await colorScopeForItem(
+              call,
+              String(args.item_code ?? ""),
+              normalizeColorUsage(args.usage_scope),
+            ));
+          } catch (error) {
+            return refuse(error instanceof Error ? error.message : "Không lấy được danh sách màu theo Nhóm hàng.");
+          }
+        }
     if (method === "alumdoor.ui.preview_child_row") return await previewChildRow(call, args);
         if (method === "alumdoor.ui.preview_document") return await previewDocument(call, args);
         if (method === "alumdoor.sales.production_line_context") return await calculateSalesProductionLine(call, args);

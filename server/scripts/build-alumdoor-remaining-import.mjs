@@ -12,6 +12,8 @@
  *     --stock "C:/Users/Admin/Downloads/TỒN NHÔM 2026 NEW.xlsx" \
  *     --ledger "C:/Users/Admin/Downloads/CTY SÁU HỒNG.xlsx" \
  *     --warehouse K36 \
+ *     [--customer-only] \
+ *     [--supplier-only] \
  *     [--lot-columns-only] \
  *     --sql imports/alumdoor-remaining-2026-07-29.sql \
  *     --audit imports/alumdoor-remaining-2026-07-29.audit.json
@@ -40,6 +42,8 @@ const SQL_FILE = argOf("sql");
 const AUDIT_FILE = argOf("audit");
 const MAX_PART_BYTES = Number(argOf("max-part-bytes", "80000"));
 const LOT_COLUMNS_ONLY = args.includes("--lot-columns-only");
+const CUSTOMER_ONLY = args.includes("--customer-only");
+const SUPPLIER_ONLY = args.includes("--supplier-only");
 const WAREHOUSE = argOf("warehouse", "K36");
 const TENANT = argOf("tenant", "alu");
 const IMPORTED_AT = "2026-07-29T00:00:00.000Z";
@@ -49,12 +53,19 @@ if (!ORDERS_FILE || !STOCK_FILE || !LEDGER_FILE || !SQL_FILE || !AUDIT_FILE) {
 if (!Number.isInteger(MAX_PART_BYTES) || MAX_PART_BYTES < 10_000) {
   throw new Error("--max-part-bytes must be an integer of at least 10000");
 }
+if ([LOT_COLUMNS_ONLY, CUSTOMER_ONLY, SUPPLIER_ONLY].filter(Boolean).length > 1) {
+  throw new Error("--lot-columns-only, --customer-only and --supplier-only cannot be used together");
+}
 for (const file of [ORDERS_FILE, STOCK_FILE, LEDGER_FILE]) {
   if (!existsSync(file)) throw new Error(`Source workbook does not exist: ${file}`);
 }
 if (!/^[a-z][a-z0-9-]*$/.test(TENANT)) throw new Error(`Invalid tenant id: ${TENANT}`);
 
-const xlsxStore = path.resolve(import.meta.dirname, "../../client/node_modules/.pnpm");
+const xlsxStore = [
+  path.resolve(import.meta.dirname, "../../client/node_modules/.pnpm"),
+  path.resolve(import.meta.dirname, "../../node_modules/.pnpm"),
+].find(existsSync);
+if (!xlsxStore) throw new Error("Cannot find a pnpm dependency store; run pnpm install first");
 const xlsxFile = readdirSync(xlsxStore)
   .filter((name) => name.startsWith("xlsx@"))
   .sort()
@@ -165,7 +176,7 @@ function sha256(file) {
 function supplierGroup(name) {
   const value = upper(name);
   if (/MOTOR|MÔ TƠ|YHLD|TANKER|QUANG HÀ NỘI/.test(value)) return "Mô tơ";
-  if (/SƠN|BỘT|HÓA CHẤT/.test(value)) return "Sơn";
+  if (/BỘT SƠN|SƠN TĨNH ĐIỆN|SƠN NƯỚC|SƠN DẦU|HÓA CHẤT/.test(value)) return "Sơn";
   if (/NHÔM|TIẾN ĐẠT|NAM PHÁT/.test(value)) return "Nhôm";
   if (/XE|VẬN CHUYỂN|CHÀNH/.test(value)) return "Vận chuyển";
   if (/NHỰA|BẠC ĐẠN|PHỤ KIỆN|ỐC|VÍT/.test(value)) return "Phụ kiện";
@@ -174,8 +185,9 @@ function supplierGroup(name) {
 
 const customers = new Map();
 const suppliers = new Map();
-const mergeParty = (map, input) => {
-  const key = normalizedName(input.name);
+const supplierKey = (name) => normalizedName(name).replace(/^(CTY|CÔNG TY)\s+/, "");
+const mergeParty = (map, input, keyForName = normalizedName) => {
+  const key = keyForName(input.name);
   if (!key) return null;
   const existing = map.get(key);
   if (!existing) {
@@ -205,7 +217,7 @@ const addSupplier = (name, details = {}) => mergeParty(suppliers, {
   address: details.address ?? "",
   note: details.note ?? "",
   sources: details.sources ?? [],
-});
+}, supplierKey);
 
 // ── 1. Party master ──────────────────────────────────────────────────────────
 const partyRows = rowsOf(ordersBook, "DS KH-NCC").slice(2);
@@ -464,7 +476,7 @@ for (let index = 0; index < intakeRows.length; index += 1) {
   if (isPurchase) linkedSupplier = addSupplier(party, { sources: [`NHẬP:${index + 3}`] })?.name ?? "";
   else if (isReturn) linkedCustomer = addCustomer(party, { sources: [`NHẬP:${index + 3}`] })?.name ?? "";
   else {
-    const knownSupplier = suppliers.get(normalizedName(party));
+    const knownSupplier = suppliers.get(supplierKey(party));
     const knownCustomer = customers.get(normalizedName(party));
     linkedSupplier = knownSupplier?.name ?? "";
     linkedCustomer = knownSupplier ? "" : knownCustomer?.name ?? "";
@@ -760,13 +772,21 @@ const customerRecords = [...customers.values()]
     name: party.name,
     payload: {
       customer_name: party.name,
-      customer_type: party.customer_type || "Khác",
-      account_manager: party.account_manager || "",
+      price_group: party.customer_type === "Đại lý"
+        ? "Đại lý"
+        : party.customer_type === "Khách lẻ" ? "Lẻ" : "Đại lý",
+      account_manager: "",
+      contact_person: "",
       phone: party.phone || "",
+      email: "",
       address: party.address || "",
       credit_limit: 0,
       payment_terms: "Trả ngay",
-      note: unique([party.note, `Nguồn: ${(party.sources ?? []).slice(0, 4).join(", ")}`]).join(" | "),
+      note: unique([
+        party.note,
+        party.account_manager ? `Người phụ trách trong file cũ: ${party.account_manager}` : "",
+        `Nguồn: ${(party.sources ?? []).slice(0, 4).join(", ")}`,
+      ]).join(" | "),
       disabled: false,
       _migration_source: "alumdoor-legacy-2026",
     },
@@ -778,7 +798,6 @@ const supplierRecords = [...suppliers.values()]
     payload: {
       supplier_name: party.name,
       supplier_group: party.supplier_group || supplierGroup(party.name),
-      account_manager: party.account_manager || "",
       phone: party.phone || "",
       address: party.address || "",
       payment_terms: "Trả ngay",
@@ -861,6 +880,14 @@ WHERE tenant_id=${sqlText(TENANT)} AND doc_key=${sqlText(`Aluminium Lot:${record
   AND json_extract(payload_json,'$._migration_source')='alumdoor-current-lots-2026'
   AND json_patch(payload_json,json(${sqlText(JSON.stringify(patch))}))<>payload_json;`);
   }
+} else if (CUSTOMER_ONLY) {
+  appendDocumentUpserts("Customer", customerRecords);
+  appendSearchUpserts("Customer", customerRecords, (record) => record.payload.customer_name, (record) =>
+    [record.payload.customer_name, record.payload.contact_person, record.payload.phone, record.payload.email, record.payload.address].join(" "));
+} else if (SUPPLIER_ONLY) {
+  appendDocumentUpserts("Supplier", supplierRecords);
+  appendSearchUpserts("Supplier", supplierRecords, (record) => record.payload.supplier_name, (record) =>
+    [record.payload.supplier_name, record.payload.phone, record.payload.address, record.payload.supplier_group].join(" "));
 } else {
   appendDocumentUpserts("Item", profileItems, { overwrite: false });
   appendSearchUpserts("Item", profileItems, (record) => record.payload.item_name, (record) =>
@@ -870,7 +897,7 @@ WHERE tenant_id=${sqlText(TENANT)} AND doc_key=${sqlText(`Aluminium Lot:${record
     [record.payload.color_code, record.payload.color_name, record.payload.finish].join(" "));
   appendDocumentUpserts("Customer", customerRecords);
   appendSearchUpserts("Customer", customerRecords, (record) => record.payload.customer_name, (record) =>
-    [record.payload.customer_name, record.payload.phone, record.payload.address, record.payload.account_manager].join(" "));
+    [record.payload.customer_name, record.payload.contact_person, record.payload.phone, record.payload.address, record.payload.account_manager].join(" "));
   appendDocumentUpserts("Supplier", supplierRecords);
   appendSearchUpserts("Supplier", supplierRecords, (record) => record.payload.supplier_name, (record) =>
     [record.payload.supplier_name, record.payload.phone, record.payload.address, record.payload.supplier_group].join(" "));
@@ -894,6 +921,7 @@ WHERE tenant_id=${sqlText(TENANT)} AND doc_key=${sqlText(`Aluminium Lot:${record
 
 const audit = {
   format: "cloudforge-alumdoor-remaining-import/v1",
+  scope: CUSTOMER_ONLY ? "customer-only" : SUPPLIER_ONLY ? "supplier-only" : LOT_COLUMNS_ONLY ? "lot-columns-only" : "remaining-data",
   generated_at: IMPORTED_AT,
   tenant: TENANT,
   warehouse_assumption: WAREHOUSE,
@@ -924,11 +952,30 @@ const audit = {
     warranty_claims: warrantyClaims.length,
     production_standards: productionStandards.length,
   },
+  supplier_preview: supplierRecords.map((record) => ({
+    name: record.name,
+    supplier_group: record.payload.supplier_group,
+    phone: record.payload.phone,
+    address: record.payload.address,
+    note: record.payload.note,
+  })),
+  customer_preview: customerRecords.map((record) => ({
+    name: record.name,
+    price_group: record.payload.price_group ?? "",
+    account_manager: record.payload.account_manager,
+    contact_person: record.payload.contact_person,
+    phone: record.payload.phone,
+    email: record.payload.email ?? "",
+    address: record.payload.address,
+    note: record.payload.note,
+  })),
   source_quality: {
     blank_party_types_treated_as_customer_other: blankPartyTypes,
     unknown_aluminium_generations_defaulted_to_new: unknownGenerations,
   },
   safeguards: [
+    ...(CUSTOMER_ONLY ? ["Customer-only mode writes only Customer documents and Customer search rows."] : []),
+    ...(SUPPLIER_ONLY ? ["Supplier-only mode writes only Supplier documents and Supplier search rows."] : []),
     ...(LOT_COLUMNS_ONLY ? ["Lot-column mode patches only imported Aluminium Lot rows and leaves customer, supplier, history and operational ledgers untouched."] : []),
     "Historical orders, intake and warranty records are reference doctypes and do not post stock/accounting ledgers.",
     "Repeated monthly vouchers keep only the newest sheet copy.",
