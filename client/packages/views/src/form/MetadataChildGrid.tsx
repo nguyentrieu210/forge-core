@@ -112,6 +112,21 @@ function label(field: DocField): string {
   return field.label || field.fieldname;
 }
 
+// Bảng bán hàng là màn thao tác nhanh, không phải bản in kỹ thuật. Các số liệu
+// chiết khấu/phụ thu vẫn được Worker tính và lưu trên dòng, nhưng chỉ mở trong
+// chi tiết để bảng chính không bị tràn cột.
+const SALES_QUICK_COLUMN_FIELDS = new Set([
+  "item_code", "width_m", "height_m", "length_m", "qty_bar",
+  "set_count", "has_butterfly_bracket", "uom", "qty", "rate",
+]);
+
+function salesQuickColumns(columns: DocField[], doctype: string): DocField[] {
+  if (!["Quotation Item", "Sales Order Item", "Delivery Note Item", "Sales Invoice Item"].includes(doctype)) return columns;
+  const hasNetAmount = columns.some((field) => field.fieldname === "net_amount");
+  return columns.filter((field) => SALES_QUICK_COLUMN_FIELDS.has(field.fieldname)
+    && !(hasNetAmount && field.fieldname === "amount"));
+}
+
 function viewPreviewMethod(view: DocTypeView | undefined): string {
   return typeof view?.previewMethod === "string" ? view.previewMethod.trim() : "";
 }
@@ -173,10 +188,26 @@ function SmartMetadataChildGrid(props: ChildGridProps) {
     latestRows.current = rows;
   }, [rows]);
 
-  const compact = useMemo(() => metadataChildGridColumns(childMeta, false) ?? [], [childMeta]);
-  const full = useMemo(() => metadataChildGridColumns(childMeta, true) ?? compact, [childMeta, compact]);
+  const rawCompact = useMemo(() => metadataChildGridColumns(childMeta, false) ?? [], [childMeta]);
+  const full = useMemo(() => metadataChildGridColumns(childMeta, true) ?? rawCompact, [childMeta, rawCompact]);
+  const compact = useMemo(() => {
+    // "Có bản bướm" là đầu vào bán hàng khi policy hỗ trợ; metadata đặt nó ở
+    // phần mở rộng để không hiện đại trà, nhưng đưa vào đây để có thể tự mở ra
+    // đúng dòng ngay sau khi chọn hàng và nhập kích thước.
+    const butterflyField = full.find((field) => field.fieldname === "has_butterfly_bracket");
+    const columns = butterflyField && !rawCompact.some((field) => field.fieldname === butterflyField.fieldname)
+      ? [...rawCompact, butterflyField]
+      : rawCompact;
+    return salesQuickColumns(columns, childMeta.name);
+  }, [childMeta.name, full, rawCompact]);
   const activeView = expanded ? childMeta.viewPolicy?.form : childMeta.viewPolicy?.quickEntry ?? childMeta.viewPolicy?.form;
-  const previewMethod = viewPreviewMethod(activeView);
+  // Các dòng bán Alumdoor luôn cần Worker chụp ĐVT, giá và quy cách khi chọn mã hàng.
+  // Metadata đời cũ không có `preview_method` nên lưới thông minh từng chỉ ghi mã hàng
+  // rồi dừng lại. Lấy endpoint chuẩn làm fallback; các bảng khác vẫn hoàn toàn theo metadata.
+  const previewMethod = viewPreviewMethod(activeView)
+    || (["Quotation Item", "Sales Order Item", "Delivery Note Item", "Sales Invoice Item"].includes(childMeta.name)
+      ? "alumdoor.ui.preview_child_row"
+      : undefined);
   const previewParentFields = viewPreviewParentFields(activeView);
   const previewParentKey = useMemo(
     () => JSON.stringify(previewParentFields.map((fieldname) => [fieldname, parentDoc?.[fieldname]])),
@@ -587,17 +618,19 @@ function SmartMetadataChildGrid(props: ChildGridProps) {
   const detailDoc = detailRow === null ? undefined : rows[detailRow];
   const shellClass = fullscreen
     ? "fixed inset-3 z-50 flex min-h-0 flex-col overflow-hidden rounded-xl border bg-background shadow-2xl"
-    : "overflow-hidden rounded-md border";
+    : "flex flex-col overflow-hidden rounded-md border";
   const desktopTableClass = fullscreen ? "hidden min-h-0 flex-1 overflow-auto md:block" : "hidden overflow-x-auto md:block";
 
   return (
     <div ref={gridRef} className={shellClass} data-metadata-child-grid={childMeta.name} data-smart-child-grid="true">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/20 px-2 py-1.5">
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span>{rows.length} dòng</span>
-          {selectedRows.length ? <span>• Đã chọn {selectedRows.length}</span> : null}
-        </div>
-        <div className="flex flex-wrap items-center justify-end gap-1">
+      <div className="order-3 flex flex-wrap items-center gap-2 border-t bg-muted/20 px-2 py-1.5">
+        {!readOnly ? (
+          <div className="flex flex-wrap items-center gap-1">
+            <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs" onClick={addRow}><Plus className="size-3.5" /> Thêm dòng</Button>
+            <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs" onClick={() => setAddManyOpen(true)}><Plus className="size-3.5" /> Thêm nhiều</Button>
+          </div>
+        ) : null}
+        <div className="flex flex-wrap items-center gap-1">
           {selectedRows.length && !readOnly ? (
             <>
               <Button type="button" variant="ghost" size="icon" className="size-7" aria-label="Đưa dòng đã chọn lên" onClick={() => moveSelection(-1)}><ArrowUp className="size-3.5" /></Button>
@@ -608,19 +641,12 @@ function SmartMetadataChildGrid(props: ChildGridProps) {
           ) : null}
           {pickedCell && selectedRows.length > 1 && !readOnly ? <Button type="button" variant="ghost" size="icon" className="size-7" aria-label="Điền xuống dòng đã chọn" onClick={fillDown}><ArrowDownToLine className="size-3.5" /></Button> : null}
           {lastDeleted?.length && !readOnly ? <Button type="button" variant="ghost" size="icon" className="size-7" aria-label="Hoàn tác xóa dòng" onClick={undoDelete}><Undo2 className="size-3.5" /></Button> : null}
+        </div>
+        <div className="ml-auto flex items-center gap-1">
           <Button type="button" variant="ghost" size="icon" className="size-7" aria-label="Tùy chỉnh cột" onClick={() => setColumnSettingsOpen(true)}><Columns3 className="size-3.5" /></Button>
-          {canExpand ? (
-            <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs" onClick={() => setExpanded((value) => !value)}>
-              {expanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}{expanded ? "Thu gọn" : "Mở rộng"}
-            </Button>
-          ) : null}
+          {canExpand ? <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs" onClick={() => setExpanded((value) => !value)}>{expanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}{expanded ? "Thu gọn" : "Mở rộng"}</Button> : null}
           <Button type="button" variant="ghost" size="icon" className="size-7" aria-label={fullscreen ? "Thoát toàn màn hình" : "Mở toàn màn hình"} onClick={() => setFullscreen((value) => !value)}>{fullscreen ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}</Button>
-          {!readOnly ? (
-            <>
-              <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs" onClick={() => setAddManyOpen(true)}><Plus className="size-3.5" /> Thêm nhiều</Button>
-              <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs" onClick={addRow}><Plus className="size-3.5" /> Thêm dòng</Button>
-            </>
-          ) : null}
+          <span className="ml-2 text-xs text-muted-foreground">{rows.length} dòng{selectedRows.length ? ` · Đã chọn ${selectedRows.length}` : ""}</span>
         </div>
       </div>
 
