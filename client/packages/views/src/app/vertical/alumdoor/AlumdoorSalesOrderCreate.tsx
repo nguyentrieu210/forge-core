@@ -666,7 +666,6 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
           <section className="rounded-lg border bg-card p-3" data-section="sales-customer-meta-header">
   <div className="mb-2 flex items-center justify-between gap-3">
     <h2 className="text-sm font-semibold">{"Th\u00f4ng tin kh\u00e1ch h\u00e0ng"}</h2>
-    <span className="text-[11px] text-muted-foreground">{"\u0110\u01a1n b\u00e1n h\u00e0ng m\u1edbi"}</span>
   </div>
 
   <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(320px,2.2fr)_minmax(150px,.8fr)_minmax(260px,1.5fr)_150px_150px]">
@@ -704,7 +703,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
 
     <StandardField
       id="sales-address"
-      field={headerField("install_address", "\u0110\u1ecba ch\u1ec9 giao / l\u1eafp \u0111\u1eb7t")}
+      field={{ ...headerField("install_address", "\u0110\u1ecba ch\u1ec9 giao / l\u1eafp \u0111\u1eb7t"), fieldtype: "Data" } as DocField}
       value={header.install_address}
       onChange={(value) => setHeaderField("install_address", text(value) || undefined)}
       registry={registry}
@@ -713,7 +712,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
       docValues={header}
       roles={roles}
       required={metaRequired("install_address")}
-      label="\u0110\u1ecba ch\u1ec9 giao / l\u1eafp \u0111\u1eb7t"
+      label="Địa chỉ giao / lắp đặt"
       className="md:col-span-2 xl:order-6 xl:col-span-5"
     />
 
@@ -728,7 +727,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
       docValues={header}
       roles={roles}
       required={metaRequired("transaction_date")}
-      label="Ng\u00e0y \u0111\u1eb7t h\u00e0ng"
+      label="Ngày đặt hàng"
       className="xl:order-4"
     />
 
@@ -743,7 +742,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
       docValues={header}
       roles={roles}
       required={metaRequired("delivery_date")}
-      label="Ng\u00e0y giao"
+      label="Ngày giao"
       className="xl:order-5"
     />
 
@@ -758,7 +757,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
       docValues={header}
       roles={roles}
       required={metaRequired("responsible_person")}
-      label="Nh\u00e2n vi\u00ean b\u00e1n h\u00e0ng"
+      label="Nhân viên bán hàng"
       className="md:col-span-2 xl:order-3 xl:col-span-1"
     />
   </div>
@@ -799,6 +798,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                 && (fieldRequired(line, "length_m") || line.length_m != null);
               const showBars = fieldVisible(line, "qty_bar")
                 && (fieldRequired(line, "qty_bar") || line.qty_bar != null);
+              const showPlainQty = !area && !showSets && !showBars;
 
               return (
                 <article key={line._key} className="overflow-hidden rounded-lg border bg-card">
@@ -875,7 +875,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
               roles={roles}
               required
               compact
-              label="M\u1eb7t h\u00e0ng"
+              label="Mặt hàng"
               className={text(line.item_code) ? "md:col-span-2 xl:col-span-5" : "md:col-span-2 xl:col-span-8"}
             />
 
@@ -896,7 +896,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                 parentDoctype="Sales Order Item"
                 docValues={line}
                 roles={roles}
-                label="Ph\u01b0\u01a1ng \u00e1n b\u00e1n"
+                label="Phương án bán"
                 className="md:col-span-2 xl:col-span-3"
               />
             ) : null}
@@ -912,7 +912,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                 parentDoctype="Sales Order Item"
                 docValues={line}
                 roles={roles}
-                label="M\u00e0u"
+                label="Màu"
                 className="xl:col-span-2"
               />
             ) : null}
@@ -928,7 +928,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                 parentDoctype="Sales Order Item"
                 docValues={line}
                 roles={roles}
-                label="\u0110VT"
+                label="ĐVT"
                 className="xl:col-span-2"
               />
             ) : text(line.uom) ? (
@@ -943,13 +943,27 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                 docValues={line}
                 roles={roles}
                 readOnly
-                label="\u0110VT"
+                label="ĐVT"
+                className="xl:col-span-2"
+              />
+            ) : null}
+
+            {showPlainQty ? (
+              <StandardField
+                id={`sales-line-${index}-qty`}
+                field={lineBaseField("qty", "Kh\u1ed1i l\u01b0\u1ee3ng", "Float")}
+                value={line.qty}
+                onChange={(value) => patchLine(line._key, { qty: value == null || value === "" ? undefined : Number(value) })}
+                onCommit={() => commitLine(line._key, "qty", line.qty)}
+                registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
+                required readOnly={fieldReadonly(line, "qty")}
+                label="Khối lượng"
                 className="xl:col-span-2"
               />
             ) : null}
           </div>
 
-          {text(line.item_code) ? (
+          {text(line.item_code) && (showWidth || showHeight || showSets || showSalesMode || showLeafVariant || kind === "mesh" || fieldVisible(line, "has_butterfly_bracket") || showLength || showBars) ? (
             <div className="grid gap-2 rounded-md border bg-muted/10 p-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
               {showWidth ? (
                 <StandardField
@@ -997,7 +1011,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                   value={line.sales_mode || "Tr\u1ecdn b\u1ed9"}
                   onChange={(value) => commitLine(line._key, "sales_mode", text(value) || undefined)}
                   registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
-                  label="C\u00e1ch b\u00e1n"
+                  label="Cách bán"
                 />
               ) : null}
 
@@ -1008,7 +1022,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                   value={line.leaf_variant}
                   onChange={(value) => commitLine(line._key, "leaf_variant", text(value) || undefined)}
                   registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
-                  label="Ki\u1ec3u k\u00e9o / motor"
+                  label="Kiểu kéo / motor"
                 />
               ) : null}
 
@@ -1020,7 +1034,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                   onChange={(value) => patchLine(line._key, { mesh_height_m: value == null || value === "" ? undefined : Number(value) })}
                   onCommit={() => commitLine(line._key, "mesh_height_m", line.mesh_height_m)}
                   registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
-                  label="Cao l\u01b0\u1edbi (m)"
+                  label="Cao lưới (m)"
                 />
               ) : null}
 
@@ -1032,7 +1046,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                   onChange={(value) => commitLine(line._key, "has_butterfly_bracket", value ? 1 : 0)}
                   registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
                   readOnly={fieldReadonly(line, "has_butterfly_bracket")}
-                  label="C\u00f3 b\u1ea3n b\u01b0\u1edbm"
+                  label="Có bản bướm"
                 />
               ) : null}
 
@@ -1062,18 +1076,6 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                 />
               ) : null}
 
-              {!area && !showSets && !showBars ? (
-                <StandardField
-                  id={`sales-line-${index}-qty`}
-                  field={lineBaseField("qty", "Kh\u1ed1i l\u01b0\u1ee3ng", "Float")}
-                  value={line.qty}
-                  onChange={(value) => patchLine(line._key, { qty: value == null || value === "" ? undefined : Number(value) })}
-                  onCommit={() => commitLine(line._key, "qty", line.qty)}
-                  registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
-                  required readOnly={fieldReadonly(line, "qty")}
-                  label="Kh\u1ed1i l\u01b0\u1ee3ng"
-                />
-              ) : null}
             </div>
           ) : null}
 
@@ -1097,7 +1099,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                         {Number(line.discount_amount) > 0 ? (
                           <span className="text-emerald-700 dark:text-emerald-400">CK -{money(line.discount_amount)} ₫</span>
                         ) : null}
-                        {Number(line.adjustment_amount) !== 0 ? (
+                        {Number.isFinite(Number(line.adjustment_amount)) && Number(line.adjustment_amount) !== 0 ? (
                           <span>Phụ thu +{money(line.adjustment_amount)} ₫</span>
                         ) : null}
                         <span className="ml-1 text-xs font-semibold">Thành tiền <strong className="text-sm">{money(lineTotal(line))} ₫</strong></span>
