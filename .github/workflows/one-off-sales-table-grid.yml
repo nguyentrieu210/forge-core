@@ -1,0 +1,100 @@
+name: One-off Sales table grid
+
+on:
+  push:
+    branches:
+      - ui/sales-hardcoded-grid
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ui/sales-hardcoded-grid
+      - name: Apply table-grid presentation
+        shell: powershell
+        run: |
+          @'
+          from pathlib import Path
+
+          p = Path('client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx')
+          s = p.read_text(encoding='utf-8')
+
+          # Allow the hardcoded grid to reuse canonical controls without per-cell labels.
+          s = s.replace(
+          '''  className?: string;\n  onCommit?: () => void;\n}) {''',
+          '''  className?: string;\n  onCommit?: () => void;\n  hideLabel?: boolean;\n}) {''', 1)
+
+          s = s.replace(
+          '''      <label htmlFor={props.id} className="mb-1 block text-[13px] font-medium leading-tight text-foreground">\n        {displayLabel}{props.required ? <span className="ml-0.5 text-destructive">*</span> : null}\n      </label>\n      {control}''',
+          '''      {!props.hideLabel ? (\n        <label htmlFor={props.id} className="mb-1 block text-[13px] font-medium leading-tight text-foreground">\n          {displayLabel}{props.required ? <span className="ml-0.5 text-destructive">*</span> : null}\n        </label>\n      ) : null}\n      {control}''', 1)
+
+          # Add a fixed desktop table header above the hardcoded rows.
+          marker = '''            {lines.map((line, index) => {'''
+          header = '''            <div className="hidden xl:grid xl:grid-cols-[42px_minmax(360px,2.5fr)_150px_150px_130px_130px_130px_130px_84px] items-center gap-2 rounded-t-md border border-b-0 bg-muted/45 px-2 py-1.5 text-[11px] font-semibold text-muted-foreground">\n              <div>#</div>\n              <div>Mặt hàng</div>\n              <div>ĐVT</div>\n              <div>SL / Khối lượng</div>\n              <div className="text-right">Đơn giá</div>\n              <div className="text-right">CK</div>\n              <div className="text-right">Phụ thu</div>\n              <div className="text-right">Thành tiền</div>\n              <div></div>\n            </div>\n\n            {lines.map((line, index) => {'''
+          if marker not in s:
+              raise SystemExit('lines map marker missing')
+          s = s.replace(marker, header, 1)
+
+          # Replace card chrome with one compact table-like row. Keep detail row for complex fields.
+          old = '''                <article key={line._key} className="overflow-hidden rounded-md border bg-card">\n                  <div className="flex min-h-8 items-center justify-between gap-2 border-b bg-muted/20 px-2 py-1">'''
+          if old not in s:
+              old = '''                <article key={line._key} className="overflow-hidden rounded-lg border bg-card">\n                  <div className="flex min-h-9 items-center justify-between gap-2 border-b bg-muted/25 px-2.5 py-1.5">'''
+          if old not in s:
+              raise SystemExit('article chrome marker missing')
+          s = s.replace(old, '''                <article key={line._key} className="border-x border-b bg-card first:border-t xl:first:border-t">\n                  <div className="hidden">''', 1)
+
+          # Tighten body and use a desktop grid aligned to the fixed header.
+          s = s.replace(
+          '''                  <div className="space-y-1.5 p-2">\n                    <div className="grid items-end gap-2 md:grid-cols-2 xl:grid-cols-12">''',
+          '''                  <div className="space-y-1.5 px-2 py-1.5">\n                    <div className="grid items-end gap-2 md:grid-cols-2 xl:grid-cols-[42px_minmax(360px,2.5fr)_150px_150px_130px_130px_130px_130px_84px]">\n                      <div className="hidden xl:flex items-center justify-center text-xs font-semibold">{index + 1}</div>''', 1)
+
+          # Fall back if previous density class differs.
+          s = s.replace(
+          '''                  <div className="space-y-2 p-2.5">\n                    <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-12">''',
+          '''                  <div className="space-y-1.5 px-2 py-1.5">\n                    <div className="grid items-end gap-2 md:grid-cols-2 xl:grid-cols-[42px_minmax(360px,2.5fr)_150px_150px_130px_130px_130px_130px_84px]">\n                      <div className="hidden xl:flex items-center justify-center text-xs font-semibold">{index + 1}</div>''', 1)
+
+          # Main row cells: suppress labels and stop using old col-span layout.
+          replacements = {
+            'compact\n              label="Mặt hàng"\n              className={text(line.item_code) ? "md:col-span-2 xl:col-span-5" : "md:col-span-2 xl:col-span-8"}': 'compact\n              hideLabel\n              label="Mặt hàng"\n              className="md:col-span-2 xl:col-auto"',
+            'label="ĐVT"\n                className="xl:col-span-2"': 'hideLabel\n                label="ĐVT"\n                className="xl:col-auto"',
+            'required readOnly={fieldReadonly(line, "qty")}\n                label="Khối lượng"\n                className="xl:col-span-2"': 'required readOnly={fieldReadonly(line, "qty")}\n                hideLabel\n                label="Khối lượng"\n                className="xl:col-auto"',
+          }
+          for a,b in replacements.items():
+              s = s.replace(a,b)
+
+          # Add money cells and row actions directly in the main grid before it closes.
+          anchor = '''            {showPlainQty ? (\n              <StandardField'''
+          # Find the end of showPlainQty block and inject money cells before </div>.
+          end_marker = '''            ) : null}\n          </div>\n\n          {text(line.item_code) &&'''
+          money = '''            ) : null}\n\n            <div className="hidden xl:block text-right text-xs tabular-nums">{money(line.rate)} ₫</div>\n            <div className="hidden xl:block text-right text-xs tabular-nums">{Number(line.discount_amount) > 0 ? `-${money(line.discount_amount)} ₫` : "—"}</div>\n            <div className="hidden xl:block text-right text-xs tabular-nums">{Number.isFinite(Number(line.adjustment_amount)) && Number(line.adjustment_amount) !== 0 ? `${money(line.adjustment_amount)} ₫` : "—"}</div>\n            <div className="hidden xl:block text-right text-xs font-semibold tabular-nums">{money(lineTotal(line))} ₫</div>\n            <div className="hidden xl:flex items-center justify-end gap-0.5">\n              <Button type="button" variant="ghost" size="icon" className="size-7" title="Nhân dòng" onClick={() => setLines((current) => [...current, { ...line, _key: newLine(current.length)._key, _loading: false, _error: "" }])}><Copy className="size-3.5" /></Button>\n              <Button type="button" variant="ghost" size="icon" className="size-7" title="Xoá dòng" disabled={lines.length === 1} onClick={() => setLines((current) => current.filter((entry) => entry._key !== line._key))}><Trash2 className="size-3.5" /></Button>\n            </div>\n          </div>\n\n          {text(line.item_code) &&'''
+          if end_marker not in s:
+              raise SystemExit('main grid end marker missing')
+          s = s.replace(end_marker, money, 1)
+
+          # Detail row should read like an expanded sub-row, not a card.
+          s = s.replace(
+            'className="grid gap-2 rounded-md border bg-muted/10 p-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6"',
+            'className="ml-0 grid gap-2 border-t bg-muted/10 px-2 py-2 sm:grid-cols-2 lg:grid-cols-4 xl:ml-[42px] xl:grid-cols-6"',
+          )
+
+          # The mobile summary remains useful, desktop money is now in columns.
+          s = s.replace(
+            'className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 rounded-md bg-muted/20 px-2.5 py-1.5 text-[11px] tabular-nums"',
+            'className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 bg-muted/10 px-2 py-1 text-[11px] tabular-nums xl:hidden"',
+          )
+
+          p.write_text(s, encoding='utf-8', newline='\n')
+          '@ | python -
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx
+          git rm .github/workflows/one-off-sales-table-grid.yml
+          git commit -m "refactor(ui): render Sales Order items as hardcoded table grid"
+          git push origin HEAD:ui/sales-hardcoded-grid
