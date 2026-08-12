@@ -1,0 +1,63 @@
+name: One-off finish Sales grid row
+
+on:
+  push:
+    branches: [ui/fix-sales-grid-row]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ui/fix-sales-grid-row
+      - shell: powershell
+        run: |
+          @'
+          from pathlib import Path
+
+          p = Path("client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx")
+          s = p.read_text(encoding="utf-8")
+
+          s = s.replace(
+              '              compact\n              label="Mặt hàng"',
+              '              compact\n              hideLabel\n              label="Mặt hàng"',
+              1,
+          )
+
+          uom_marker = '''                roles={roles}\n                label="ĐVT"\n                className="xl:col-span-1"'''
+          s = s.replace(uom_marker, '''                roles={roles}\n                compact\n                hideLabel\n                label="ĐVT"\n                className="xl:col-span-1"''', 1)
+
+          uom_ro_marker = '''                roles={roles}\n                readOnly\n                label="ĐVT"\n                className="xl:col-span-1"'''
+          s = s.replace(uom_ro_marker, '''                roles={roles}\n                readOnly\n                compact\n                hideLabel\n                label="ĐVT"\n                className="xl:col-span-1"''', 1)
+
+          qty_marker = '''                required readOnly={fieldReadonly(line, "qty")}\n                label="Khối lượng"\n                className="xl:col-span-2"'''
+          if qty_marker not in s:
+              raise SystemExit("qty marker missing")
+          s = s.replace(qty_marker, '''                required readOnly={fieldReadonly(line, "qty")}\n                compact\n                hideLabel\n                label="Khối lượng"\n                className="xl:col-span-1"''', 1)
+
+          uom_end = '''            ) : null}\n\n            {showPlainQty ? ('''
+          s = s.replace(uom_end, '''            ) : null}\n\n            {!uoms.length && !text(line.uom) ? (\n              <div className="hidden h-9 items-center xl:flex text-xs text-muted-foreground">—</div>\n            ) : null}\n\n            {showPlainQty ? (''', 1)
+
+          qty_end = '''            ) : null}\n\n            <div className="hidden xl:block text-right text-xs tabular-nums">{money(line.rate)} ₫</div>'''
+          if qty_end not in s:
+              raise SystemExit("qty end marker missing")
+          s = s.replace(qty_end, '''            ) : null}\n\n            {!showPlainQty ? (\n              <div className="hidden h-9 items-center justify-end xl:flex text-xs tabular-nums">\n                {Number.isFinite(Number(area ? line.set_count : line.qty)) ? Number(area ? line.set_count : line.qty).toLocaleString("vi-VN", { maximumFractionDigits: 6 }) : "—"}\n              </div>\n            ) : null}\n\n            <div className="hidden h-9 items-center justify-end xl:flex text-right text-xs tabular-nums">{money(line.rate)} ₫</div>''', 1)
+
+          s = s.replace('className="hidden xl:block text-right text-xs tabular-nums"', 'className="hidden h-9 items-center justify-end xl:flex text-right text-xs tabular-nums"', 2)
+          s = s.replace('className="hidden xl:block text-right text-xs font-semibold tabular-nums"', 'className="hidden h-9 items-center justify-end xl:flex text-right text-xs font-semibold tabular-nums"', 1)
+          s = s.replace('className="hidden xl:flex items-center justify-end gap-0.5"', 'className="hidden h-9 xl:flex items-center justify-end gap-0.5"', 1)
+
+          p.write_text(s, encoding="utf-8", newline="\n")
+          '@ | python -
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx
+          git rm .github/workflows/one-off-finish-sales-grid-row.yml
+          git commit -m "fix(ui): keep Sales grid rows on one line"
+          git push origin HEAD:ui/fix-sales-grid-row
