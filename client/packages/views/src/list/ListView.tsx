@@ -74,6 +74,8 @@ export interface ListViewProps {
   roles?: string[];
   /** doctype::name → title đã resolve cho Link cells. */
   displayValues?: Record<string, string>;
+  /** Các giá trị lọc lấy từ toàn bộ tập bản ghi, không chỉ trang đang hiển thị. */
+  filterValues?: Record<string, string[]>;
   searchLink?: (doctype: string, text: string, opts?: { filters?: Record<string, unknown> | Array<unknown> }) => Promise<Array<{ value: string; description?: string }>>;
   /** Sửa nhanh một field ngay trên danh sách (Select). Không truyền ⇒ danh sách chỉ đọc. */
   onInlineUpdate?: (name: string, patch: Record<string, unknown>) => Promise<void>;
@@ -228,9 +230,9 @@ export function ListView(props: ListViewProps) {
   const columns = columnModel.getVisibleLeafColumns().map((column) => columnsByName.get(column.id)).filter((column): column is ListColumn => Boolean(column));
   const headerValues = useMemo(() => Object.fromEntries(columns.map((column) => [
     column.fieldname,
-    Array.from(new Set(rows.map((row) => String(row[column.fieldname] ?? "")).filter(Boolean)))
+    props.filterValues?.[column.fieldname] ?? Array.from(new Set(rows.map((row) => String(row[column.fieldname] ?? "")).filter(Boolean)))
       .sort((a, b) => a.localeCompare(b, "vi")),
-  ])), [columns, rows]);
+  ])), [columns, props.filterValues, rows]);
 
   /** Cột tiêu đề luôn có default/min width riêng; cột đệm cuối nhận phần ngang còn thừa. */
   const titleField = useMemo(() => columns.find((c) => c.isTitle)?.fieldname, [columns]);

@@ -622,8 +622,12 @@ export function ChildGrid(props: ChildGridProps) {
           hidden: colorPolicies.some((policy) => policy.visible) ? 0 as const : 1 as const,
           depends_on: undefined,
         }
-      : field)
+       : field)
     : canonicalCols;
+  const hasSalesOption = rows.some((row) => String(row.sales_option ?? "").trim().length > 0);
+  const applicableCanonicalCols = childMeta.name === "Sales Order Item" && !hasSalesOption
+    ? policyAwareCanonicalCols.filter((field) => field.fieldname !== "sales_option")
+    : policyAwareCanonicalCols;
   /**
    * Bảng bán gọn chỉ giữ hợp cột đang áp dụng cho ít nhất một dòng.
    *
@@ -632,10 +636,10 @@ export function ChildGrid(props: ChildGridProps) {
    * lớn vẫn giữ toàn bộ policy fields để nhập/dán nhiều dòng hỗn hợp.
    */
   const applicableSalesCols = !expanded && isSalesOrderGrid(childMeta)
-    ? visibleColumns(policyAwareCanonicalCols, childMeta, rows, parentDoc, roles)
-    : policyAwareCanonicalCols;
-  /** Hai chế độ dùng chung dữ liệu, nhưng có mặc định và tùy chỉnh cột riêng. */
-  const baseCols = applicableSalesCols.length ? applicableSalesCols : policyAwareCanonicalCols;
+     ? visibleColumns(applicableCanonicalCols, childMeta, rows, parentDoc, roles)
+     : applicableCanonicalCols;
+   /** Hai chế độ dùng chung dữ liệu, nhưng có mặc định và tùy chỉnh cột riêng. */
+  const baseCols = applicableSalesCols.length ? applicableSalesCols : applicableCanonicalCols;
   const defaultHidden = defaultChildGridHiddenColumns(childMeta, baseCols, expanded);
   const defaultLayout = (): GridLayout => ({
     w: {},

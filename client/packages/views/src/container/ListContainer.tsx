@@ -76,6 +76,29 @@ export function ListContainer(props: ListContainerProps) {
   }, [isSingle, props.onSingle]);
 
   const [state, patch] = useListUrlState(bridge, meta);
+  const [linkedItemSearchCodes, setLinkedItemSearchCodes] = useState<string[] | null>(null);
+
+  // Item Price stores the item code, while users search by the linked item's readable name.
+  // Resolve that link once for the global search term, then query Item Price by the matching
+  // codes instead of forcing the raw text to match the technical code column.
+  useEffect(() => {
+    const term = state.q.trim();
+    if (doctype !== "Item Price" || !term) {
+      setLinkedItemSearchCodes(null);
+      return;
+    }
+    let active = true;
+    setLinkedItemSearchCodes(null);
+    void adapter.searchLink("Item", term, { referenceDoctype: doctype, pageLength: 50 })
+      .then((matches) => {
+        if (active) setLinkedItemSearchCodes([...new Set(matches.map((match) => String(match.value ?? "").trim()).filter(Boolean))]);
+      })
+      .catch(() => {
+        // Fall back to the normal table search when link lookup is unavailable.
+        if (active) setLinkedItemSearchCodes([]);
+      });
+    return () => { active = false; };
+  }, [adapter, doctype, state.q]);
 
   const baseColumns = useMemo(() => {
     const derived = deriveColumns(meta, { roles });
@@ -142,6 +165,58 @@ export function ListContainer(props: ListContainerProps) {
     const insertAt = deliveryDateIndex < 0 ? withoutProgress.length : deliveryDateIndex;
     return [...withoutProgress.slice(0, insertAt), statusColumn, approvalColumn, deliveryProgress, ...withoutProgress.slice(insertAt)];
   }, [baseColumns, doctype]);
+  const filterValueFields = useMemo(
+    () => [...new Set(columns.map((column) => column.fieldname).filter((fieldname) => !fieldname.startsWith("_")))],
+    [columns],
+  );
+  const [allFilterValues, setAllFilterValues] = useState<Record<string, string[]>>({});
+
+  // Header filters are dataset filters, not just a filter over the current page. Load the
+  // distinct values in small server pages so a value that lives on page 8 is still selectable.
+  // We intentionally omit q/filters here: the dropdown must describe the complete doctype result
+  // set (within the same permission/business-context boundary), not the rows currently visible.
+  useEffect(() => {
+    if (!filterValueFields.length) {
+      setAllFilterValues({});
+      return;
+    }
+    let active = true;
+    setAllFilterValues({});
+    const fields = [...filterValueFields];
+    const load = async () => {
+      const values = new Map<string, Set<string>>(fields.map((field) => [field, new Set<string>()]));
+      let offset = 0;
+      let total = 0;
+      while (active) {
+        const snapshot = await adapter.getListView(doctype, {
+          fields,
+          orderBy: "name asc",
+          limitStart: offset,
+          pageLength: 100,
+        }, businessContext);
+        const page = snapshot.rows ?? [];
+        total = Number(snapshot.count ?? page.length);
+        for (const row of page) {
+          for (const field of fields) {
+            const value = String(row[field] ?? "").trim();
+            if (value) values.get(field)?.add(value);
+          }
+        }
+        offset += page.length;
+        if (!page.length || offset >= total) break;
+      }
+      if (!active) return;
+      setAllFilterValues(Object.fromEntries(fields.map((field) => [
+        field,
+        [...(values.get(field) ?? new Set<string>())].sort((a, b) => a.localeCompare(b, "vi")),
+      ])));
+    };
+    void load().catch(() => {
+      // Keep the current-page fallback if the background facet request is unavailable.
+      if (active) setAllFilterValues({});
+    });
+    return () => { active = false; };
+  }, [adapter, businessContext, doctype, filterValueFields]);
   // Global context is enforced by adapter.getContextualList/getContextualCount on the server,
   // including warehouse fields in child tables. Do not duplicate it as a parent-only filter here.
   const listOpts = useMemo<ListOpts>(() => {
@@ -152,7 +227,18 @@ export function ListContainer(props: ListContainerProps) {
     const serverSort = state.sort
       .replace(/^_delivery_status(?=:|$)/, "delivered_percentage")
       .replace(/^_approval_status(?=:|$)/, "docstatus");
-    const query = buildServerQuery(meta, { ...state, sort: serverSort, filters: serverFilters }, baseColumns);
+    const linkCodes = doctype === "Item Price" && state.q.trim() && linkedItemSearchCodes?.length
+      ? linkedItemSearchCodes
+      : undefined;
+    const query = buildServerQuery(
+      meta,
+      { ...state, q: linkCodes ? "" : state.q, sort: serverSort, filters: serverFilters },
+      baseColumns,
+    );
+    if (linkCodes) {
+      const currentFilters = Array.isArray(query.filters) ? query.filters : [];
+      query.filters = [...currentFilters, ["item_code", "in", linkCodes]];
+    }
     if (hasSalesApprovalField && approvalFilter) {
       const approvalFilters: Array<[string, "=", unknown]> = approvalFilter === "Cần duyệt"
         ? [["discount_requires_approval", "=", 1], ["docstatus", "=", 0]]
@@ -170,7 +256,7 @@ export function ListContainer(props: ListContainerProps) {
      */
     if (!hasSalesApprovalField) return query;
     return { ...query, fields: [...new Set([...(query.fields ?? []), "discount_requires_approval"])] };
-  }, [doctype, meta, state, baseColumns, hasSalesApprovalField]);
+  }, [doctype, meta, state, baseColumns, hasSalesApprovalField, linkedItemSearchCodes]);
   const ready = Boolean(metaQ.data) && !isSingle;
   const viewQ = useListView(doctype, listOpts, ready);
   const rows = useMemo(() => (viewQ.data?.rows ?? []).map((row) => {
@@ -362,6 +448,7 @@ export function ListContainer(props: ListContainerProps) {
         fmt={fmt}
         roles={roles}
         displayValues={displayValues}
+        filterValues={allFilterValues}
         searchLink={(target, text, opts) => adapter.searchLink(target, text, { referenceDoctype: doctype, pageLength: 20, filters: opts?.filters })}
         /* Sửa nhanh trên danh sách — chỉ mở khi user THỰC SỰ có quyền ghi. caps.write do server
            trả về (fail-closed), không suy đoán ở client. */

@@ -12,8 +12,6 @@ import {
   ArrowDown,
   ArrowDownToLine,
   ArrowUp,
-  ChevronDown,
-  ChevronUp,
   Columns3,
   Copy,
   Maximize2,
@@ -115,18 +113,6 @@ function label(field: DocField): string {
 // Bảng bán hàng là màn thao tác nhanh, không phải bản in kỹ thuật. Các số liệu
 // chiết khấu/phụ thu vẫn được Worker tính và lưu trên dòng, nhưng chỉ mở trong
 // chi tiết để bảng chính không bị tràn cột.
-const SALES_QUICK_COLUMN_FIELDS = new Set([
-  "item_code", "width_m", "height_m", "length_m", "qty_bar",
-  "set_count", "has_butterfly_bracket", "uom", "qty", "rate",
-]);
-
-function salesQuickColumns(columns: DocField[], doctype: string): DocField[] {
-  if (!["Quotation Item", "Sales Order Item", "Delivery Note Item", "Sales Invoice Item"].includes(doctype)) return columns;
-  const hasNetAmount = columns.some((field) => field.fieldname === "net_amount");
-  return columns.filter((field) => SALES_QUICK_COLUMN_FIELDS.has(field.fieldname)
-    && !(hasNetAmount && field.fieldname === "amount"));
-}
-
 function viewPreviewMethod(view: DocTypeView | undefined): string {
   return typeof view?.previewMethod === "string" ? view.previewMethod.trim() : "";
 }
@@ -166,7 +152,6 @@ export function MetadataChildGrid(props: ChildGridProps) {
 /** Generic interaction shell; business values stay metadata/server owned. */
 function SmartMetadataChildGrid(props: ChildGridProps) {
   const { childMeta, rows, onChange, registry, services, readOnly, parentDoc, roles, rowDefaults } = props;
-  const [expanded, setExpanded] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [detailRow, setDetailRow] = useState<number | null>(null);
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
@@ -188,19 +173,19 @@ function SmartMetadataChildGrid(props: ChildGridProps) {
     latestRows.current = rows;
   }, [rows]);
 
-  const rawCompact = useMemo(() => metadataChildGridColumns(childMeta, false) ?? [], [childMeta]);
-  const full = useMemo(() => metadataChildGridColumns(childMeta, true) ?? rawCompact, [childMeta, rawCompact]);
-  const compact = useMemo(() => {
-    // "Có bản bướm" là đầu vào bán hàng khi policy hỗ trợ; metadata đặt nó ở
-    // phần mở rộng để không hiện đại trà, nhưng đưa vào đây để có thể tự mở ra
-    // đúng dòng ngay sau khi chọn hàng và nhập kích thước.
-    const butterflyField = full.find((field) => field.fieldname === "has_butterfly_bracket");
-    const columns = butterflyField && !rawCompact.some((field) => field.fieldname === butterflyField.fieldname)
-      ? [...rawCompact, butterflyField]
-      : rawCompact;
-    return salesQuickColumns(columns, childMeta.name);
-  }, [childMeta.name, full, rawCompact]);
-  const activeView = expanded ? childMeta.viewPolicy?.form : childMeta.viewPolicy?.quickEntry ?? childMeta.viewPolicy?.form;
+  const full = useMemo(
+    () => {
+      const columns = metadataChildGridColumns(childMeta, true)
+        ?? metadataChildGridColumns(childMeta, false)
+        ?? [];
+      const hasSalesOption = rows.some((row) => String(row.sales_option ?? "").trim().length > 0);
+      return childMeta.name === "Sales Order Item" && !hasSalesOption
+        ? columns.filter((field) => field.fieldname !== "sales_option")
+        : columns;
+    },
+    [childMeta, rows],
+  );
+  const activeView = childMeta.viewPolicy?.form;
   // Các dòng bán Alumdoor luôn cần Worker chụp ĐVT, giá và quy cách khi chọn mã hàng.
   // Metadata đời cũ không có `preview_method` nên lưới thông minh từng chỉ ghi mã hàng
   // rồi dừng lại. Lấy endpoint chuẩn làm fallback; các bảng khác vẫn hoàn toàn theo metadata.
@@ -295,7 +280,7 @@ function SmartMetadataChildGrid(props: ChildGridProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [previewMethod, previewParentKey]);
 
-  const presentationColumns = expanded ? full : compact;
+  const presentationColumns = full;
   const applicableColumns = useMemo(() => applicableSmartGridColumns(
     presentationColumns,
     childMeta,
@@ -306,8 +291,8 @@ function SmartMetadataChildGrid(props: ChildGridProps) {
   ), [presentationColumns, childMeta, rows, parentDoc, roles, fieldOverridesByRow]);
   const identityFieldname = applicableColumns[0]?.fieldname ?? presentationColumns[0]?.fieldname;
   const layoutKey = useMemo(
-    () => smartGridLayoutKey(childMeta, expanded ? "full" : "compact", presentationColumns),
-    [childMeta, expanded, presentationColumns],
+    () => smartGridLayoutKey(childMeta, "full", presentationColumns),
+    [childMeta, presentationColumns],
   );
 
   useEffect(() => {
@@ -323,7 +308,6 @@ function SmartMetadataChildGrid(props: ChildGridProps) {
   };
 
   const columns = orderedSmartGridColumns(applicableColumns, layout, identityFieldname);
-  const canExpand = full.some((field) => !compact.some((compactField) => compactField.fieldname === field.fieldname));
   const selectedSet = new Set(selectedRows);
   const allSelected = rows.length > 0 && rows.every((row, index) => selectedSet.has(smartGridRowKey(row, index)));
   const previewErrors = Object.values(previewErrorByRow).filter(Boolean);
@@ -644,7 +628,6 @@ function SmartMetadataChildGrid(props: ChildGridProps) {
         </div>
         <div className="ml-auto flex items-center gap-1">
           <Button type="button" variant="ghost" size="icon" className="size-7" aria-label="Tùy chỉnh cột" onClick={() => setColumnSettingsOpen(true)}><Columns3 className="size-3.5" /></Button>
-          {canExpand ? <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs" onClick={() => setExpanded((value) => !value)}>{expanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}{expanded ? "Thu gọn" : "Mở rộng"}</Button> : null}
           <Button type="button" variant="ghost" size="icon" className="size-7" aria-label={fullscreen ? "Thoát toàn màn hình" : "Mở toàn màn hình"} onClick={() => setFullscreen((value) => !value)}>{fullscreen ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}</Button>
           <span className="ml-2 text-xs text-muted-foreground">{rows.length} dòng{selectedRows.length ? ` · Đã chọn ${selectedRows.length}` : ""}</span>
         </div>

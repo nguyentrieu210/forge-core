@@ -504,6 +504,7 @@ export function FormView(props: FormViewProps) {
             const mainFields = sectionFields.filter((field) => field.field.form_region !== "aside" && field.field.form_region !== "full");
             const asideFields = sectionFields.filter((field) => field.field.form_region === "aside");
             const fullFields = sectionFields.filter((field) => field.field.form_region === "full");
+            const isTableField = (field: ResolvedField["field"]): boolean => field.fieldtype === "Table" || field.fieldtype === "Table MultiSelect";
             const renderFields = (fields: typeof sectionFields, region?: "main" | "aside" | "full") => groupCheckFields(fields).map((entry, groupIndex) =>
               Array.isArray(entry) ? (
                 <div key={`checks-${groupIndex}`} className="mf-check-group">
@@ -512,7 +513,7 @@ export function FormView(props: FormViewProps) {
                       key={rf.field.fieldname}
                       id={fieldDomId(rf.field.fieldname)}
                       rf={rf}
-                      width={region === "aside" || region === "full" ? "full" : region === "main" && !rf.field.form_width ? "half" : "third"}
+                      width={isTableField(rf.field) || region === "aside" || region === "full" ? "full" : region === "main" && !rf.field.form_width ? "half" : "third"}
                       form={form}
                       registry={registry}
                       services={services}
@@ -528,7 +529,7 @@ export function FormView(props: FormViewProps) {
                   key={entry.field.fieldname}
                   id={fieldDomId(entry.field.fieldname)}
                   rf={entry}
-                  width={region === "aside" || region === "full" ? "full" : region === "main" && !entry.field.form_width ? "half" : resolveFormFieldWidth(entry.field, meta.title_field)}
+                  width={isTableField(entry.field) || region === "aside" || region === "full" ? "full" : region === "main" && !entry.field.form_width ? "half" : resolveFormFieldWidth(entry.field, meta.title_field)}
                   form={form}
                   registry={registry}
                   services={services}

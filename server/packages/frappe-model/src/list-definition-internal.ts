@@ -28,6 +28,9 @@ export function metadataToListDefinition(meta: DocTypeMeta): DocumentListDefinit
     ...(meta.title_field ? [meta.title_field] : []),
     ...(meta.search_fields ?? []),
     ...meta.fields.filter((field) => field.search_index).map((field) => field.fieldname),
+    // The list search box is a global table search. Include every queryable metadata field so
+    // users can find records by group, UOM, note, price, or another visible column—not only code.
+    ...meta.fields.filter((field) => listType(field) !== null).map((field) => field.fieldname),
   ])].filter((field) => Object.hasOwn(fields, field));
   // A tree's parent field is structurally filterable — walking the tree IS a
   // filter on it. Requiring the author to also flag it `in_standard_filter` turns
