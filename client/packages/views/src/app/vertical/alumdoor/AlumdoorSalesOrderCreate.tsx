@@ -666,7 +666,6 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
           <section className="rounded-lg border bg-card p-3" data-section="sales-customer-meta-header">
   <div className="mb-2 flex items-center justify-between gap-3">
     <h2 className="text-sm font-semibold">{"Th\u00f4ng tin kh\u00e1ch h\u00e0ng"}</h2>
-    <span className="text-[11px] text-muted-foreground">{"\u0110\u01a1n b\u00e1n h\u00e0ng m\u1edbi"}</span>
   </div>
 
   <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(320px,2.2fr)_minmax(150px,.8fr)_minmax(260px,1.5fr)_150px_150px]">
@@ -799,6 +798,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                 && (fieldRequired(line, "length_m") || line.length_m != null);
               const showBars = fieldVisible(line, "qty_bar")
                 && (fieldRequired(line, "qty_bar") || line.qty_bar != null);
+              const showPlainQty = !area && !showSets && !showBars;
 
               return (
                 <article key={line._key} className="overflow-hidden rounded-lg border bg-card">
@@ -947,9 +947,23 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                 className="xl:col-span-2"
               />
             ) : null}
+
+            {showPlainQty ? (
+              <StandardField
+                id={`sales-line-${index}-qty`}
+                field={lineBaseField("qty", "Kh\u1ed1i l\u01b0\u1ee3ng", "Float")}
+                value={line.qty}
+                onChange={(value) => patchLine(line._key, { qty: value == null || value === "" ? undefined : Number(value) })}
+                onCommit={() => commitLine(line._key, "qty", line.qty)}
+                registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
+                required readOnly={fieldReadonly(line, "qty")}
+                label="Khối lượng"
+                className="xl:col-span-2"
+              />
+            ) : null}
           </div>
 
-          {text(line.item_code) ? (
+          {text(line.item_code) && (showWidth || showHeight || showSets || showSalesMode || showLeafVariant || kind === "mesh" || fieldVisible(line, "has_butterfly_bracket") || showLength || showBars) ? (
             <div className="grid gap-2 rounded-md border bg-muted/10 p-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
               {showWidth ? (
                 <StandardField
@@ -1062,18 +1076,6 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                 />
               ) : null}
 
-              {!area && !showSets && !showBars ? (
-                <StandardField
-                  id={`sales-line-${index}-qty`}
-                  field={lineBaseField("qty", "Kh\u1ed1i l\u01b0\u1ee3ng", "Float")}
-                  value={line.qty}
-                  onChange={(value) => patchLine(line._key, { qty: value == null || value === "" ? undefined : Number(value) })}
-                  onCommit={() => commitLine(line._key, "qty", line.qty)}
-                  registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
-                  required readOnly={fieldReadonly(line, "qty")}
-                  label="Khối lượng"
-                />
-              ) : null}
             </div>
           ) : null}
 
@@ -1097,7 +1099,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                         {Number(line.discount_amount) > 0 ? (
                           <span className="text-emerald-700 dark:text-emerald-400">CK -{money(line.discount_amount)} ₫</span>
                         ) : null}
-                        {Number(line.adjustment_amount) !== 0 ? (
+                        {Number.isFinite(Number(line.adjustment_amount)) && Number(line.adjustment_amount) !== 0 ? (
                           <span>Phụ thu +{money(line.adjustment_amount)} ₫</span>
                         ) : null}
                         <span className="ml-1 text-xs font-semibold">Thành tiền <strong className="text-sm">{money(lineTotal(line))} ₫</strong></span>
