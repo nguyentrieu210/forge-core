@@ -6,3 +6,146 @@ body,
 #root {
   height: 100%;
 }
+
+/*
+ * AlumDoor Sales Order — operator-density pass.
+ * Presentation-only: keep server preview/pricing/create authority untouched.
+ */
+[data-surface="alumdoor-sales-order-create"] > div:first-child > div {
+  max-width: 1720px;
+  padding: 12px 16px;
+}
+
+[data-section="sales-customer-meta-header"] {
+  border-radius: 10px;
+  padding: 11px 13px;
+  box-shadow: none;
+}
+
+[data-section="sales-customer-meta-header"] > div:first-child {
+  margin-bottom: 8px;
+}
+
+[data-section="sales-customer-meta-header"] h2,
+[data-section="hardcoded-sales-lines"] h2 {
+  font-size: 14px;
+  line-height: 20px;
+}
+
+@media (min-width: 1280px) {
+  [data-section="sales-customer-meta-header"] > div:last-child {
+    display: grid;
+    grid-template-columns:
+      minmax(320px, 2.25fr)
+      minmax(150px, 0.8fr)
+      minmax(280px, 1.65fr)
+      156px
+      156px;
+    grid-template-areas:
+      "customer phone employee order delivery"
+      "address address address address address";
+    gap: 9px 10px;
+    align-items: end;
+  }
+
+  [data-section="sales-customer-meta-header"] > div:last-child > :nth-child(1) {
+    grid-area: customer;
+  }
+
+  [data-section="sales-customer-meta-header"] > div:last-child > :nth-child(2) {
+    grid-area: phone;
+  }
+
+  [data-section="sales-customer-meta-header"] > div:last-child > :nth-child(3) {
+    grid-area: address;
+  }
+
+  [data-section="sales-customer-meta-header"] > div:last-child > :nth-child(4) {
+    grid-area: order;
+  }
+
+  [data-section="sales-customer-meta-header"] > div:last-child > :nth-child(5) {
+    grid-area: delivery;
+  }
+
+  [data-section="sales-customer-meta-header"] > div:last-child > :nth-child(6) {
+    grid-area: employee;
+  }
+}
+
+[data-section="hardcoded-sales-lines"] {
+  gap: 7px;
+}
+
+[data-section="hardcoded-sales-lines"] > div:first-child {
+  min-height: 30px;
+}
+
+[data-section="hardcoded-sales-lines"] article {
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+[data-section="hardcoded-sales-lines"] article > div:first-child {
+  min-height: 38px;
+  padding: 6px 10px;
+  background: color-mix(in srgb, var(--muted) 55%, transparent);
+}
+
+[data-section="hardcoded-sales-lines"] article > div:last-child {
+  gap: 8px;
+  padding: 9px 11px 10px;
+}
+
+[data-section="hardcoded-sales-lines"] article > div:last-child > div:first-child {
+  gap: 8px;
+}
+
+@media (min-width: 1280px) {
+  [data-section="hardcoded-sales-lines"] article > div:last-child > div:first-child {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  [data-section="hardcoded-sales-lines"] article > div:last-child > div:first-child > div:first-child:only-child {
+    grid-column: 1 / span 3;
+  }
+}
+
+[data-section="hardcoded-sales-lines"] article > div:last-child > div.grid.rounded-md {
+  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+  gap: 8px;
+  padding: 8px;
+}
+
+[data-section="hardcoded-sales-lines"] article > div:last-child > div.flex.flex-wrap.items-center.justify-end {
+  margin-top: 1px;
+  padding-top: 7px;
+}
+
+[data-surface="alumdoor-sales-order-create"] > div:last-child {
+  padding: 8px 16px;
+  box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.035);
+}
+
+[data-surface="alumdoor-sales-order-create"] > div:last-child > div {
+  max-width: 1720px;
+}
+
+[data-surface="alumdoor-sales-order-create"] > div:last-child > div > div:first-child {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+[data-surface="alumdoor-sales-order-create"] > div:last-child > div > div:first-child > div:first-child {
+  font-size: 11px;
+}
+
+[data-surface="alumdoor-sales-order-create"] > div:last-child > div > div:first-child > div:nth-child(2) {
+  font-size: 18px;
+  line-height: 24px;
+}
+
+[data-surface="alumdoor-sales-order-create"] > div:last-child > div > div:first-child > div:last-child {
+  display: none;
+}
