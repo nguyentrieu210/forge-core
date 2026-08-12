@@ -87,6 +87,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          pnpm run build
           node --input-type=module <<'NODE'
           import { readFile } from 'node:fs/promises';
           import { compileBrief } from './scripts/lib/compile-brief.mjs';
