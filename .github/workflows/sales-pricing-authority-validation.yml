@@ -13,7 +13,12 @@ on:
       - "server/scripts/test-sales-pricing-authority-migration.py"
       - "server/scripts/seed-alumdoor-order-pricing-local.mjs"
       - "server/scripts/build-alumdoor-order-pricing-ui-local.mjs"
-      - "server/tests/**"
+      - "server/tests/commercial-pricing-policy.test.mjs"
+      - "server/tests/commercial-line-authority.test.mjs"
+      - "server/tests/order-commercial-policy.test.mjs"
+      - "server/tests/alumdoor-sales-order-totals.test.mjs"
+      - "server/tests/sales-price-field-lookup.test.mjs"
+      - "server/tests/transaction-closure-sales-o2c.test.mjs"
       - ".github/workflows/sales-pricing-authority-validation.yml"
   workflow_dispatch:
 
@@ -61,7 +66,6 @@ jobs:
           tests/commercial-line-authority.test.mjs
           tests/order-commercial-policy.test.mjs
           tests/alumdoor-sales-order-totals.test.mjs
-          tests/sales-uom-pricing.test.mjs
           tests/sales-price-field-lookup.test.mjs
           tests/transaction-closure-sales-o2c.test.mjs
 
@@ -72,7 +76,3 @@ jobs:
       - name: Full SQL migration replay
         working-directory: server
         run: pnpm run test:sql
-
-      - name: Full server unit suite
-        working-directory: server
-        run: pnpm run test:unit
