@@ -6,54 +6,14 @@ on:
   workflow_dispatch:
 
 jobs:
-  patch-and-probe:
+  probe:
     runs-on: self-hosted
-    timeout-minutes: 5
-    permissions:
-      contents: write
+    timeout-minutes: 4
     steps:
       - uses: actions/checkout@v4
         with:
           ref: fix/glide-react-runtime-bridge
-          fetch-depth: 0
-
-      - name: Patch Glide bundle React bridge
-        shell: powershell
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $path = 'client/vendor/glide-data-grid/forge-bundle/index.js'
-          $text = Get-Content -Raw -Encoding UTF8 $path
-          if ($text -notmatch '__FORGE_GLIDE_REACT_BRIDGE__') {
-            $prefix = @'
-          // __FORGE_GLIDE_REACT_BRIDGE__
-          import * as __forgeReactModule from "react";
-          import * as __forgeReactDomModule from "react-dom";
-          import * as __forgeJsxRuntimeModule from "react/jsx-runtime";
-          const __forgeReact = __forgeReactModule.default ?? __forgeReactModule;
-          const __forgeReactDom = __forgeReactDomModule.default ?? __forgeReactDomModule;
-          const __forgeRequire = (id) => {
-            if (id === "react") return __forgeReact;
-            if (id === "react-dom") return __forgeReactDom;
-            if (id === "react/jsx-runtime") return __forgeJsxRuntimeModule;
-            throw new Error(`Unsupported Glide runtime require: ${id}`);
-          };
-          var require = __forgeRequire;
-          '@
-            Set-Content -Encoding UTF8 $path ($prefix + "`n" + $text)
-          }
-          git diff -- $path
-
-      - name: Commit patch
-        shell: powershell
-        run: |
-          $ErrorActionPreference = 'Stop'
-          git config user.name "forge-ui-bot"
-          git config user.email "forge-ui-bot@users.noreply.github.com"
-          git add client/vendor/glide-data-grid/forge-bundle/index.js
-          if (-not (git diff --cached --quiet)) {
-            git commit -m "fix(ui): bridge React into vendored Glide bundle"
-            git push origin HEAD:fix/glide-react-runtime-bridge
-          }
+          fetch-depth: 1
 
       - name: Probe patched bundle on live preview
         shell: powershell
@@ -63,27 +23,25 @@ jobs:
           $target = Join-Path $preview 'client\vendor\glide-data-grid\forge-bundle\index.js'
           $backup = Join-Path $env:RUNNER_TEMP 'glide-index-main-backup.js'
           Copy-Item $target $backup -Force
+          $runtime = Join-Path $preview 'client\apps\runtime'
+          $html = Join-Path $runtime 'diag-glide.html'
+          $tsx = Join-Path $runtime 'src\diag-glide.tsx'
           try {
             Copy-Item 'client\vendor\glide-data-grid\forge-bundle\index.js' $target -Force
-            Start-Sleep -Milliseconds 800
+            Start-Sleep -Milliseconds 1000
 
-            $runtime = Join-Path $preview 'client\apps\runtime'
-            $html = Join-Path $runtime 'diag-glide.html'
-            $tsx = Join-Path $runtime 'src\diag-glide.tsx'
-            @'
-            <!doctype html><html><head><meta charset="utf-8"><title>Glide probe</title></head>
-            <body><div id="root" style="width:1200px;height:500px"></div><script type="module" src="/src/diag-glide.tsx"></script></body></html>
-            '@ | Set-Content -Encoding UTF8 $html
-            @'
-            import React from "react";
-            import { createRoot } from "react-dom/client";
-            import { AlumdoorSalesLinesGrid } from "../../../packages/views/src/app/vertical/alumdoor/AlumdoorSalesLinesGrid";
-            window.addEventListener("error", (event) => console.error("GLIDE_PROBE_ERROR", event.error ?? event.message));
-            window.addEventListener("unhandledrejection", (event) => console.error("GLIDE_PROBE_ERROR", event.reason));
-            const rows = [{ key:"row-1", itemCode:"", itemLabel:"", availability:"", salesOption:"", salesOptionLabel:"", salesOptionChoices:[], priceId:"", priceLabel:"", priceChoices:[], uom:"", uomChoices:[], quantity:1, quantityField:"qty", quantityEditable:true, discountLabel:"—", adjustmentLabel:"—", amountLabel:"0 ₫", docValues:{} }];
-            createRoot(document.getElementById("root")).render(<AlumdoorSalesLinesGrid rows={rows} selectedKey="row-1" onSelectedKeyChange={()=>{}} onChange={()=>{}} onAdd={()=>{}} onDuplicate={()=>{}} onDelete={()=>{}} registry={{resolve:()=>null}} services={{}} roles={[]} parentDocValues={{}} />);
-            setTimeout(() => { document.body.setAttribute("data-glide-probe", "mounted"); console.log("GLIDE_PROBE_MOUNTED"); }, 1200);
-            '@ | Set-Content -Encoding UTF8 $tsx
+            [IO.File]::WriteAllText($html, '<!doctype html><html><head><meta charset="utf-8"><title>Glide probe</title></head><body><div id="root" style="width:1200px;height:500px"></div><script type="module" src="/src/diag-glide.tsx"></script></body></html>')
+            $lines = @(
+              'import React from "react";',
+              'import { createRoot } from "react-dom/client";',
+              'import { AlumdoorSalesLinesGrid } from "../../../packages/views/src/app/vertical/alumdoor/AlumdoorSalesLinesGrid";',
+              'window.addEventListener("error", (event) => console.error("GLIDE_PROBE_ERROR", event.error ?? event.message));',
+              'window.addEventListener("unhandledrejection", (event) => console.error("GLIDE_PROBE_ERROR", event.reason));',
+              'const rows:any = [{ key:"row-1", itemCode:"", itemLabel:"", availability:"", salesOption:"", salesOptionLabel:"", salesOptionChoices:[], priceId:"", priceLabel:"", priceChoices:[], uom:"", uomChoices:[], quantity:1, quantityField:"qty", quantityEditable:true, discountLabel:"—", adjustmentLabel:"—", amountLabel:"0 ₫", docValues:{} }];',
+              'createRoot(document.getElementById("root")!).render(<AlumdoorSalesLinesGrid rows={rows} selectedKey="row-1" onSelectedKeyChange={()=>{}} onChange={()=>{}} onAdd={()=>{}} onDuplicate={()=>{}} onDelete={()=>{}} registry={{resolve:()=>null} as any} services={{} as any} roles={[]} parentDocValues={{}} />);',
+              'setTimeout(() => { document.body.setAttribute("data-glide-probe", "mounted"); console.log("GLIDE_PROBE_MOUNTED"); }, 1500);'
+            )
+            [IO.File]::WriteAllText($tsx, ($lines -join [Environment]::NewLine))
 
             $chromeCandidates = @('C:\Program Files\Google\Chrome\Application\chrome.exe','C:\Program Files (x86)\Google\Chrome\Application\chrome.exe','C:\Program Files\Microsoft\Edge\Application\msedge.exe')
             $chrome = $chromeCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
@@ -92,16 +50,19 @@ jobs:
             Remove-Item -Recurse -Force $profile -ErrorAction SilentlyContinue
             $out = Join-Path $env:RUNNER_TEMP 'glide-fix-out.txt'
             $err = Join-Path $env:RUNNER_TEMP 'glide-fix-err.txt'
-            $args = @('--headless=new','--disable-gpu','--no-sandbox','--disable-dev-shm-usage',"--user-data-dir=$profile",'--enable-logging=stderr','--v=1','--virtual-time-budget=7000','--dump-dom','http://localhost:5173/diag-glide.html')
+            $args = @('--headless=new','--disable-gpu','--no-sandbox','--disable-dev-shm-usage',"--user-data-dir=$profile",'--enable-logging=stderr','--v=1','--virtual-time-budget=8000','--dump-dom','http://localhost:5173/diag-glide.html?bridge=1')
             $proc = Start-Process -FilePath $chrome -ArgumentList $args -Wait -PassThru -RedirectStandardOutput $out -RedirectStandardError $err
+            Write-Host "CHROME_EXIT=$($proc.ExitCode)"
             Write-Host '=== CONSOLE ==='
-            Get-Content $err | Select-String -Pattern 'GLIDE_PROBE|Uncaught|TypeError|ReferenceError|SyntaxError|Dynamic require|Invalid hook|ERR_' -CaseSensitive:$false | Select-Object -First 120 | ForEach-Object { Write-Host $_.Line }
+            Get-Content $err | Select-String -Pattern 'GLIDE_PROBE|Uncaught|TypeError|ReferenceError|SyntaxError|Dynamic require|Invalid hook|Unsupported Glide runtime require|ERR_' -CaseSensitive:$false | Select-Object -First 160 | ForEach-Object { Write-Host $_.Line }
             Write-Host '=== DOM PROBE ==='
             Get-Content $out | Select-String -Pattern 'data-glide-probe="mounted"|canvas|probe-error' -CaseSensitive:$false | Select-Object -First 40 | ForEach-Object { Write-Host $_.Line }
-            if (-not ((Get-Content -Raw $out) -match 'data-glide-probe="mounted"')) { throw 'Glide probe did not mount' }
-            if ((Get-Content -Raw $err) -match 'GLIDE_PROBE_ERROR|Dynamic require|Invalid hook|Uncaught (Error|TypeError|ReferenceError|SyntaxError)') { throw 'Glide probe emitted runtime error' }
+            $dom = Get-Content -Raw $out
+            $console = Get-Content -Raw $err
+            if ($dom -notmatch 'data-glide-probe="mounted"') { throw 'Glide probe did not mount' }
+            if ($console -match 'GLIDE_PROBE_ERROR|Dynamic require|Invalid hook|Unsupported Glide runtime require|Uncaught (Error|TypeError|ReferenceError|SyntaxError)') { throw 'Glide probe emitted runtime error' }
           }
           finally {
             Copy-Item $backup $target -Force
-            Remove-Item -Force (Join-Path $preview 'client\apps\runtime\diag-glide.html'),(Join-Path $preview 'client\apps\runtime\src\diag-glide.tsx') -ErrorAction SilentlyContinue
+            Remove-Item -Force $html,$tsx -ErrorAction SilentlyContinue
           }
