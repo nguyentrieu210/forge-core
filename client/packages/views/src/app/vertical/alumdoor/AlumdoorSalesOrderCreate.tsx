@@ -47,6 +47,8 @@ interface SalesLine extends Json {
   _overrides?: Record<string, FieldOverride>;
   _loading?: boolean;
   _error?: string;
+  _pricingError?: string;
+  _commercial?: Json;
   item_code?: string;
   sales_option?: string;
   color?: string;
@@ -199,6 +201,64 @@ function selectField(
   } as DocField;
 }
 
+
+function numberValue(value: unknown): number | undefined {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function optionConditions(value: unknown): Json[] {
+  let rows = value;
+  if (typeof rows === "string" && rows.trim()) {
+    try { rows = JSON.parse(rows); } catch { return []; }
+  }
+  return Array.isArray(rows)
+    ? rows.filter((row): row is Json => Boolean(row) && typeof row === "object" && !Array.isArray(row))
+    : [];
+}
+
+function optionComparable(value: unknown): string | number | boolean | null {
+  if (typeof value === "number" || typeof value === "boolean") return value;
+  if (typeof value === "string") return normalized(value);
+  return value == null ? null : normalized(value);
+}
+
+function salesOptionApplicable(option: Doc, line: SalesLine): boolean {
+  const itemCode = text(option.item_code);
+  if (itemCode && itemCode !== text(line.item_code)) return false;
+  const itemGroup = text(option.item_group);
+  if (itemGroup && normalized(itemGroup) !== normalized(line._context?.item_group)) return false;
+  const facts: Json = {
+    ...line,
+    item_code: line.item_code,
+    item_group: line._context?.item_group,
+    door_type: line._context?.door_type,
+    inventory_mode: line._context?.inventory_mode,
+  };
+  return optionConditions(option.conditions).every((condition) => {
+    const field = text(condition.field ?? condition.fieldname);
+    const op = text(condition.operator ?? condition.op) || "eq";
+    if (!field) return false;
+    const actual = optionComparable(facts[field]);
+    if (op === "in" || op === "not_in") {
+      const values = Array.isArray(condition.values) ? condition.values.map(optionComparable) : [];
+      const matched = values.some((value) => value === actual);
+      return op === "in" ? matched : !matched;
+    }
+    const expected = optionComparable(condition.value);
+    if (op === "eq") return actual === expected;
+    if (op === "neq") return actual !== expected;
+    const left = Number(actual);
+    const right = Number(expected);
+    if (!Number.isFinite(left) || !Number.isFinite(right)) return false;
+    if (op === "lt") return left < right;
+    if (op === "lte") return left <= right;
+    if (op === "gt") return left > right;
+    if (op === "gte") return left >= right;
+    return false;
+  });
+}
+
 function StandardField(props: {
   id: string;
   field: DocField;
@@ -216,6 +276,7 @@ function StandardField(props: {
   className?: string;
   onCommit?: () => void;
   hideLabel?: boolean;
+  hideLabelOnDesktop?: boolean;
 }) {
   const Control = props.registry.resolve(props.field.fieldtype);
   const displayLabel = props.label || text(props.field.label) || props.field.fieldname;
@@ -257,7 +318,7 @@ function StandardField(props: {
       onKeyDownCapture={(event) => { if (event.key === "Enter") props.onCommit?.(); }}
     >
       {!props.hideLabel ? (
-        <label htmlFor={props.id} className="mb-1 block text-[13px] font-medium leading-tight text-foreground">
+        <label htmlFor={props.id} className={`${props.hideLabelOnDesktop ? "xl:hidden " : ""}mb-1 block text-[13px] font-medium leading-tight text-foreground`}>
           {displayLabel}{props.required ? <span className="ml-0.5 text-destructive">*</span> : null}
         </label>
       ) : null}
@@ -290,10 +351,6 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
     const candidates = ["customer_phone", "contact_phone", "contact_mobile", "mobile_no", "phone_no", "phone"];
     return candidates.find((name) => meta?.fields.some((field) => field.fieldname === name));
   }, [meta]);
-  const salesModes = useMemo(
-    () => optionList(childMeta, "sales_mode", ["Tách món", "Trọn bộ"]),
-    [childMeta],
-  );
   const leafVariants = useMemo(
     () => optionList(childMeta, "leaf_variant", ["Kéo tay", "Motor ngoài", "Motor trong"]),
     [childMeta],
@@ -430,14 +487,20 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
           "item_code",
           "is_default",
           "disabled",
+          "option_code",
+          "conditions",
+          "priority",
           "sales_mode",
           "price_variant",
+          "discount_basis_variant",
           "sales_package",
         ],
         filters: { item_group: itemGroup, disabled: 0 },
         pageLength: 100,
       });
-      return rows.filter((row) => !text(row.item_code) || text(row.item_code) === itemCode);
+      return rows
+        .filter((row) => !text(row.item_code) || text(row.item_code) === itemCode)
+        .sort((left, right) => (Number(right.priority) || 0) - (Number(left.priority) || 0) || text(left.option_label).localeCompare(text(right.option_label), "vi"));
     } catch {
       return [];
     }
@@ -453,35 +516,36 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
     if (!text(row.item_code)) return;
     const seq = (lineSeq.current.get(row._key) ?? 0) + 1;
     lineSeq.current.set(row._key, seq);
-    patchLine(row._key, { ...patch, _loading: true, _error: "" });
+    patchLine(row._key, { ...patch, _loading: true, _error: "", _pricingError: "" });
     try {
       const parent = { ...header, items: undefined };
       const colorsPromise: Promise<Json> = adapter
         .callPost<Json>("alumdoor.catalog.allowed_colors", {
-          item_code: row.item_code,
-          usage_scope: "sales",
+item_code: row.item_code,
+usage_scope: "sales",
         })
         .catch((): Json => ({}));
       const [context, preview, colors] = await Promise.all([
         adapter.callPost<ItemContext>("alumdoor.sales.item_context", {
-          item_code: row.item_code,
-          uom: row.uom,
-          warehouse: row.warehouse,
-          price_list: header.selling_price_list,
-          currency: header.currency || "VND",
-          qty: row.qty,
-          sales_option: row.sales_option,
+item_code: row.item_code,
+uom: row.uom,
+warehouse: row.warehouse,
+price_list: header.selling_price_list,
+currency: header.currency || "VND",
+qty: row.qty,
+sales_option: row.sales_option,
         }),
         adapter.callPost<Json>("alumdoor.ui.preview_child_row", {
-          child_doctype: childMeta.name,
-          child_fields: childFields,
-          row,
-          parent,
-          changed_field: changedField,
+child_doctype: childMeta.name,
+child_fields: childFields,
+row,
+parent,
+changed_field: changedField,
         }),
         colorsPromise,
       ]);
       if (lineSeq.current.get(row._key) !== seq) return;
+
       const serverPatch = preview.patch && typeof preview.patch === "object" && !Array.isArray(preview.patch)
         ? preview.patch as Json
         : {};
@@ -501,43 +565,81 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
         _overrides: overrides,
         _loading: false,
         _error: "",
+        _pricingError: "",
+        _commercial: undefined,
       };
       for (const field of Array.isArray(preview.clear) ? preview.clear.map(text) : []) {
         if (childFieldSet.has(field)) next[field] = undefined;
       }
-      if (changedField === "item_code") {
-        const options = await loadSalesOptions(text(row.item_code), text(context.item_group));
+
+      let options = source._salesOptions ?? [];
+      if (changedField === "item_code" || options.length === 0) {
+        options = await loadSalesOptions(text(row.item_code), text(context.item_group));
         if (lineSeq.current.get(row._key) !== seq) return;
-        next._salesOptions = options;
-        if (!text(row.sales_option)) {
-          const defaultOption = options.find(
-            (candidate) => candidate.is_default === true || candidate.is_default === 1,
-          );
-          if (defaultOption?.name) next.sales_option = String(defaultOption.name);
+      }
+      next._salesOptions = options;
+
+      let candidate = { ...row, ...next, _context: context } as SalesLine;
+      const applicableOptions = options.filter((option) => salesOptionApplicable(option, candidate));
+      const selected = text(candidate.sales_option);
+      if (selected && !applicableOptions.some((option) => String(option.name) === selected)) {
+        next.sales_option = undefined;
+        candidate = { ...candidate, sales_option: undefined } as SalesLine;
+      }
+      if (!text(candidate.sales_option)) {
+        const defaultOption = applicableOptions.find(
+(option) => option.is_default === true || option.is_default === 1,
+        );
+        if (defaultOption?.name) {
+next.sales_option = String(defaultOption.name);
+candidate = { ...candidate, sales_option: String(defaultOption.name) } as SalesLine;
         }
       }
-      patchLine(row._key, next);
-      if (
-        changedField === "item_code"
-        && text(next.sales_option)
-        && text(next.sales_option) !== text(row.sales_option)
-      ) {
-        void previewLine(
-          { ...row, ...next } as SalesLine,
-          "sales_option",
-          { sales_option: next.sales_option },
-        );
+
+      const pricedQty = numberValue(candidate.qty);
+      const priceList = text(header.selling_price_list);
+      if (pricedQty && pricedQty > 0 && priceList && text(candidate.uom)) {
+        try {
+const commercial = await adapter.callPost<Json>("metaforge.api.preview_sales_commercial_line", {
+  line: cleanLine(candidate),
+  price_list: priceList,
+  currency: text(header.currency) || "VND",
+  posting_date: text(header.transaction_date) || today(),
+  customer: text(header.customer),
+  customer_group: text(header.customer_group),
+});
+if (lineSeq.current.get(row._key) !== seq) return;
+const sellingRate = numberValue(commercial.selling_rate ?? commercial.rate);
+const grossAmount = numberValue(commercial.gross_amount);
+const discountPercentage = numberValue(commercial.discount_percentage);
+const discountAmount = numberValue(commercial.discount_amount);
+const adjustmentAmount = numberValue(commercial.adjustment_amount);
+const netAmount = numberValue(commercial.net_before_tax ?? commercial.net_amount ?? commercial.amount);
+if (sellingRate !== undefined) next.rate = sellingRate;
+if (grossAmount !== undefined) next.amount = grossAmount;
+if (discountPercentage !== undefined) next.discount_percentage = discountPercentage;
+if (discountAmount !== undefined) next.discount_amount = discountAmount;
+if (adjustmentAmount !== undefined) next.adjustment_amount = adjustmentAmount;
+if (netAmount !== undefined) next.net_amount = netAmount;
+if (text(commercial.sales_option)) next.sales_option = text(commercial.sales_option);
+next._commercial = commercial;
+next._pricingError = "";
+        } catch (error) {
+next._pricingError = mapError(error).message;
+        }
       }
+
+      patchLine(row._key, next);
     } catch (error) {
       if (lineSeq.current.get(row._key) === seq) {
         patchLine(row._key, {
-          ...patch,
-          _loading: false,
-          _error: mapError(error).message,
+...patch,
+_loading: false,
+_error: mapError(error).message,
         });
       }
     }
-  }, [adapter, childFieldSet, childFields, childMeta, header, loadSalesOptions, patchLine]);
+  }, [adapter, childFieldSet, childFields, childMeta, cleanLine, header, loadSalesOptions, patchLine]);
 
   const commitLine = useCallback((key: string, field: string, value: unknown) => {
     const current = lines.find((line) => line._key === key);
@@ -556,7 +658,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
     return () => window.clearTimeout(timer);
     // Re-preview only when commercial parent context changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [header.customer_group, header.selling_price_list, header.currency]);
+  }, [header.customer, header.customer_group, header.selling_price_list, header.currency, header.transaction_date]);
 
   const validate = useCallback((): string | null => {
     if (!meta || !childMeta) return "Chưa tải xong cấu trúc Sales Order.";
@@ -572,6 +674,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
       if (!text(line.item_code)) return `Dòng ${index + 1}: cần chọn mặt hàng.`;
       if (line._loading) return `Dòng ${index + 1}: đang tính lại.`;
       if (line._error) return `Dòng ${index + 1}: ${line._error}`;
+      if (line._pricingError) return `Dòng ${index + 1}: ${line._pricingError}`;
       for (const [field, rule] of Object.entries(line._overrides ?? {})) {
         if (!(rule.reqd === 1 || rule.reqd === true)) continue;
         if (rule.hidden === 1 || rule.hidden === true) continue;
@@ -657,10 +760,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
   const metaRequired = (fieldname: string) => Boolean(metaField(fieldname)?.reqd);
   const phoneValue = salesPhoneField ? text(header[salesPhoneField]) || customerPhone : customerPhone;
 
-  const parentTotal = Number(header.grand_total);
-  const displayedTotal = Number.isFinite(parentTotal) && parentTotal > 0
-    ? parentTotal
-    : lines.reduce((sum, line) => sum + lineTotal(line), 0);
+  const displayedTotal = lines.reduce((sum, line) => sum + lineTotal(line), 0);
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background" data-surface="alumdoor-sales-order-create">
@@ -767,107 +867,89 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
 </section>
 
 <section className="space-y-2" data-section="hardcoded-sales-lines">
-            <div className="flex min-h-8 items-center justify-between gap-2">
-              <h2 className="text-sm font-semibold">Chi tiết bán hàng</h2>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-8"
-                onClick={() => setLines((current) => [...current, newLine(current.length)])}
-              >
-                <Plus className="mr-1 size-4" /> Thêm sản phẩm
-              </Button>
-            </div>
+  <div className="flex min-h-9 items-center justify-between gap-3">
+    <div className="min-w-0">
+      <h2 className="text-sm font-semibold">Chi tiết bán hàng</h2>
+      <div className="truncate text-[11px] text-muted-foreground">
+        {text(header.customer_group) ? `Nhóm giá: ${text(header.customer_group)}` : "Chọn khách hàng để xác định nhóm giá"}
+        {text(header.selling_price_list) ? ` · ${text(header.selling_price_list)}` : ""}
+      </div>
+    </div>
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      className="h-8 shrink-0"
+      onClick={() => setLines((current) => [...current, newLine(current.length)])}
+    >
+      <Plus className="mr-1 size-4" /> Thêm sản phẩm
+    </Button>
+  </div>
 
-            <div className="hidden xl:grid xl:grid-cols-[42px_minmax(360px,2.5fr)_150px_150px_130px_130px_130px_130px_84px] items-center gap-2 rounded-t-md border border-b-0 bg-muted/45 px-2 py-1.5 text-[11px] font-semibold text-muted-foreground">
-              <div>#</div>
-              <div>Mặt hàng</div>
-              <div>ĐVT</div>
-              <div>SL / Khối lượng</div>
-              <div className="text-right">Đơn giá</div>
-              <div className="text-right">CK</div>
-              <div className="text-right">Phụ thu</div>
-              <div className="text-right">Thành tiền</div>
-              <div></div>
-            </div>
+  <div className="hidden xl:grid xl:grid-cols-[36px_minmax(280px,2.1fr)_minmax(185px,1.25fr)_110px_120px_130px_110px_115px_145px_68px] items-center gap-1.5 rounded-t-md border border-b-0 bg-muted/45 px-2 py-1.5 text-[11px] font-semibold text-muted-foreground">
+    <div>#</div>
+    <div>Mặt hàng</div>
+    <div>Phương án bán</div>
+    <div>ĐVT tính giá</div>
+    <div>SL tính giá</div>
+    <div className="text-right">Đơn giá</div>
+    <div className="text-right">Chiết khấu</div>
+    <div className="text-right">Phụ thu dòng</div>
+    <div className="text-right">Thành tiền</div>
+    <div></div>
+  </div>
 
-            {lines.map((line, index) => {
-              const kind = family(line);
-              const area = isAreaDoor(line);
-              const uoms = Array.isArray(line._context?.allowed_uoms)
-                ? line._context.allowed_uoms.map(text).filter(Boolean)
-                : [];
-              const colors = line._allowedColors ?? [];
-              const salesOptions = line._salesOptions ?? [];
-              const showSalesMode = area && fieldVisible(
-                line,
-                "sales_mode",
-                ["australian", "mesh", "taiwan", "super"].includes(kind),
-              );
-              const showLeafVariant = fieldVisible(line, "leaf_variant", kind === "australian");
-              const showWidth = area || fieldVisible(line, "width_m");
-              const showHeight = area || fieldVisible(line, "height_m");
-              const showSets = area || fieldVisible(line, "set_count");
-              const showLength = fieldVisible(line, "length_m")
-                && (fieldRequired(line, "length_m") || line.length_m != null);
-              const showBars = fieldVisible(line, "qty_bar")
-                && (fieldRequired(line, "qty_bar") || line.qty_bar != null);
-              const showPlainQty = !area && !showSets && !showBars;
+  {lines.map((line, index) => {
+    const kind = family(line);
+    const area = isAreaDoor(line);
+    const uoms = Array.isArray(line._context?.allowed_uoms)
+      ? line._context.allowed_uoms.map(text).filter(Boolean)
+      : [];
+    const colors = line._allowedColors ?? [];
+    const allSalesOptions = line._salesOptions ?? [];
+    const salesOptions = allSalesOptions.filter((option) => salesOptionApplicable(option, line));
+    const showLeafVariant = fieldVisible(line, "leaf_variant", kind === "australian");
+    const showWidth = area || fieldVisible(line, "width_m");
+    const showHeight = area || fieldVisible(line, "height_m");
+    const showSets = area || fieldVisible(line, "set_count");
+    const showLength = fieldVisible(line, "length_m")
+      && (fieldRequired(line, "length_m") || line.length_m != null);
+    const showBars = fieldVisible(line, "qty_bar")
+      && (fieldRequired(line, "qty_bar") || line.qty_bar != null);
+    const simpleCountPrimary = showSets && !area && !showWidth && !showHeight && !showLength && !showBars;
+    const directQtyPrimary = !simpleCountPrimary
+      && !fieldReadonly(line, "qty")
+      && !showWidth && !showHeight && !showSets && !showLength && !showBars;
+    const detailNeeded = colors.length > 0
+      || showWidth || showHeight || (showSets && !simpleCountPrimary)
+      || showLeafVariant || kind === "mesh" || fieldVisible(line, "has_butterfly_bracket")
+      || showLength || showBars;
+    const commercial = line._commercial ?? {};
+    const pricedQty = numberValue(commercial.priced_qty) ?? numberValue(line.qty);
+    const sellingRate = numberValue(commercial.selling_rate) ?? numberValue(line.rate);
+    const baseRate = numberValue(commercial.base_rate);
+    const discountAmount = numberValue(commercial.discount_amount) ?? numberValue(line.discount_amount) ?? 0;
+    const discountPercentage = numberValue(commercial.discount_percentage) ?? numberValue(line.discount_percentage) ?? 0;
+    const adjustmentAmount = numberValue(commercial.adjustment_amount) ?? numberValue(line.adjustment_amount) ?? 0;
+    const netAmount = numberValue(commercial.net_before_tax) ?? lineTotal(line);
+    const adjustments = Array.isArray(commercial.applied_adjustments)
+      ? commercial.applied_adjustments.filter((row): row is Json => Boolean(row) && typeof row === "object" && !Array.isArray(row))
+      : [];
+    const adjustmentTitle = adjustments.map((row) => text(row.rule_name)).filter(Boolean).join(" · ");
+    const selectedOption = allSalesOptions.find((option) => String(option.name) === text(line.sales_option));
+    const selectedOptionLabel = text(commercial.sales_option_label)
+      || text(selectedOption?.option_label)
+      || (text(line.sales_option) ? text(line.sales_option) : "Tiêu chuẩn");
 
-              return (
-                <article key={line._key} className="border-x border-b bg-card first:border-t xl:first:border-t">
-                  <div className="hidden">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <span className="grid size-5 shrink-0 place-items-center rounded bg-foreground text-[10px] font-semibold text-background">
-                        {index + 1}
-                      </span>
-                      <div className="min-w-0">
-                        <div className="truncate text-xs font-semibold">
-                          {line._itemLabel || text(line.item_code) || "Chọn mặt hàng"}
-                        </div>
-                        {text(line._context?.availability_status) ? (
-                          <div className="truncate text-[10px] text-muted-foreground">
-                            {text(line._context?.availability_status)}
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-0.5">
-                      {line._loading ? <Loader2 className="mr-1 size-3.5 animate-spin text-muted-foreground" /> : null}
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="size-7"
-                        title="Nhân dòng"
-                        onClick={() => setLines((current) => [
-                          ...current,
-                          { ...line, _key: newLine(current.length)._key, _loading: false, _error: "" },
-                        ])}
-                      >
-                        <Copy className="size-3.5" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="size-7"
-                        title="Xoá dòng"
-                        disabled={lines.length === 1}
-                        onClick={() => setLines((current) => current.filter((entry) => entry._key !== line._key))}
-                      >
-                        <Trash2 className="size-3.5" />
-                      </Button>
-                    </div>
-                  </div>
+    return (
+      <article key={line._key} className="border-x border-b bg-card first:border-t xl:first:border-t">
+        <div className="grid items-end gap-2 p-2 md:grid-cols-2 xl:grid-cols-[36px_minmax(280px,2.1fr)_minmax(185px,1.25fr)_110px_120px_130px_110px_115px_145px_68px] xl:gap-1.5">
+          <div className="hidden xl:grid h-9 place-items-center text-xs font-semibold text-muted-foreground">{index + 1}</div>
 
-                  <div className="space-y-1.5 p-2">
-                    <div className="grid items-end gap-1.5 md:grid-cols-2 xl:grid-cols-[42px_minmax(360px,2.5fr)_150px_150px_130px_130px_130px_130px_84px]">
-                      <div className="hidden xl:grid h-9 place-items-center text-xs font-semibold text-muted-foreground">{index + 1}</div>
+          <div className="min-w-0">
             <StandardField
               id={`sales-line-${index}-item`}
-              field={lineBaseField("item_code", "M\u1eb7t h\u00e0ng", "Link", "Item")}
+              field={lineBaseField("item_code", "Mặt hàng", "Link", "Item")}
               value={line.item_code}
               onChange={(value) => {
                 const itemCode = text(value);
@@ -879,6 +961,8 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                   _salesOptions: [],
                   _allowedColors: [],
                   _overrides: {},
+                  _commercial: undefined,
+                  _pricingError: "",
                   _error: "",
                 };
                 patchLine(line._key, reset);
@@ -892,115 +976,166 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
               required
               compact
               label="Mặt hàng"
-              className="md:col-span-2 xl:col-span-1"
+              hideLabelOnDesktop
             />
-
-
-            {uoms.length ? (
-              <StandardField
-                id={`sales-line-${index}-uom`}
-                field={selectField(childField("uom"), "uom", "\u0110VT", uoms)}
-                value={line.uom}
-                onChange={(value) => commitLine(line._key, "uom", text(value) || undefined)}
-                registry={registry}
-                services={services}
-                parentDoctype="Sales Order Item"
-                docValues={line}
-                roles={roles}
-                label="ĐVT"
-                className="xl:col-span-1"
-              />
-            ) : text(line.uom) ? (
-              <StandardField
-                id={`sales-line-${index}-uom`}
-                field={fallbackField("uom", "\u0110VT")}
-                value={line.uom}
-                onChange={() => undefined}
-                registry={registry}
-                services={services}
-                parentDoctype="Sales Order Item"
-                docValues={line}
-                roles={roles}
-                readOnly
-                label="ĐVT"
-                className="xl:col-span-1"
-              />
+            {text(line._context?.availability_status) ? (
+              <div className="mt-0.5 truncate text-[10px] text-muted-foreground">{text(line._context?.availability_status)}</div>
             ) : null}
+          </div>
 
-            {showPlainQty ? (
-              <StandardField
-                id={`sales-line-${index}-qty`}
-                field={lineBaseField("qty", "Kh\u1ed1i l\u01b0\u1ee3ng", "Float")}
-                value={line.qty}
-                onChange={(value) => patchLine(line._key, { qty: value == null || value === "" ? undefined : Number(value) })}
-                onCommit={() => commitLine(line._key, "qty", line.qty)}
-                registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
-                required readOnly={fieldReadonly(line, "qty")}
-                label="Khối lượng"
-                className="xl:col-span-2"
-              />
-            ) : null}
+          {salesOptions.length > 0 ? (
+            <StandardField
+              id={`sales-line-${index}-sales-option`}
+              field={selectField(
+                childField("sales_option"),
+                "sales_option",
+                "Phương án bán",
+                salesOptions.map((option) => String(option.name)),
+                Object.fromEntries(salesOptions.map((option) => [String(option.name), text(option.option_label) || String(option.name)])),
+              )}
+              value={line.sales_option}
+              onChange={(value) => commitLine(line._key, "sales_option", text(value) || undefined)}
+              registry={registry}
+              services={services}
+              parentDoctype="Sales Order Item"
+              docValues={line}
+              roles={roles}
+              required={!salesOptions.some((option) => option.is_default === true || option.is_default === 1)}
+              compact
+              label="Phương án bán"
+              hideLabelOnDesktop
+            />
+          ) : (
+            <div className="min-w-0">
+              <div className="mb-1 text-[13px] font-medium xl:hidden">Phương án bán</div>
+              <div className="flex h-9 items-center rounded-md border bg-muted/20 px-2 text-xs text-muted-foreground">{selectedOptionLabel}</div>
+            </div>
+          )}
 
-            <div className="hidden xl:block text-right text-xs tabular-nums">{money(line.rate)} ₫</div>
-            <div className="hidden xl:block text-right text-xs tabular-nums">{Number(line.discount_amount) > 0 ? `-${money(line.discount_amount)} ₫` : "—"}</div>
-            <div className="hidden xl:block text-right text-xs tabular-nums">{Number.isFinite(Number(line.adjustment_amount)) && Number(line.adjustment_amount) !== 0 ? `${money(line.adjustment_amount)} ₫` : "—"}</div>
-            <div className="hidden xl:block text-right text-xs font-semibold tabular-nums">{money(lineTotal(line))} ₫</div>
-            <div className="hidden xl:flex items-center justify-end gap-0.5">
-              <Button type="button" variant="ghost" size="icon" className="size-7" title="Nhân dòng" onClick={() => setLines((current) => [...current, { ...line, _key: newLine(current.length)._key, _loading: false, _error: "" }])}><Copy className="size-3.5" /></Button>
-              <Button type="button" variant="ghost" size="icon" className="size-7" title="Xoá dòng" disabled={lines.length === 1} onClick={() => setLines((current) => current.filter((entry) => entry._key !== line._key))}><Trash2 className="size-3.5" /></Button>
+          {uoms.length ? (
+            <StandardField
+              id={`sales-line-${index}-uom`}
+              field={selectField(childField("uom"), "uom", "ĐVT tính giá", uoms)}
+              value={line.uom}
+              onChange={(value) => commitLine(line._key, "uom", text(value) || undefined)}
+              registry={registry}
+              services={services}
+              parentDoctype="Sales Order Item"
+              docValues={line}
+              roles={roles}
+              compact
+              label="ĐVT tính giá"
+              hideLabelOnDesktop
+            />
+          ) : (
+            <div className="min-w-0">
+              <div className="mb-1 text-[13px] font-medium xl:hidden">ĐVT tính giá</div>
+              <div className="flex h-9 items-center rounded-md border bg-muted/20 px-2 text-xs">{text(line.uom) || "—"}</div>
+            </div>
+          )}
+
+          {simpleCountPrimary ? (
+            <StandardField
+              id={`sales-line-${index}-sets-primary`}
+              field={lineBaseField("set_count", fieldLabel(line, "set_count", "Số lượng"), "Int")}
+              value={line.set_count}
+              onChange={(value) => patchLine(line._key, { set_count: value == null || value === "" ? undefined : Number(value) })}
+              onCommit={() => commitLine(line._key, "set_count", line.set_count)}
+              registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
+              required readOnly={fieldReadonly(line, "set_count")} compact
+              label="SL tính giá" hideLabelOnDesktop
+            />
+          ) : directQtyPrimary ? (
+            <StandardField
+              id={`sales-line-${index}-qty-primary`}
+              field={lineBaseField("qty", "Số lượng", "Float")}
+              value={line.qty}
+              onChange={(value) => patchLine(line._key, { qty: value == null || value === "" ? undefined : Number(value) })}
+              onCommit={() => commitLine(line._key, "qty", line.qty)}
+              registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
+              required compact label="SL tính giá" hideLabelOnDesktop
+            />
+          ) : (
+            <div className="min-w-0">
+              <div className="mb-1 text-[13px] font-medium xl:hidden">SL tính giá</div>
+              <div className="flex h-9 items-center justify-end rounded-md border bg-muted/20 px-2 text-xs font-medium tabular-nums">
+                {pricedQty !== undefined ? pricedQty.toLocaleString("vi-VN", { maximumFractionDigits: 6 }) : "—"}
+              </div>
+            </div>
+          )}
+
+          <div className="min-w-0 self-stretch">
+            <div className="mb-1 text-[13px] font-medium xl:hidden">Đơn giá</div>
+            <div className="flex h-9 flex-col items-end justify-center text-right text-xs tabular-nums">
+              <strong>{sellingRate !== undefined ? `${money(sellingRate)} ₫` : "—"}</strong>
+              {sellingRate !== undefined && text(line.uom) ? <span className="text-[10px] text-muted-foreground">/{text(line.uom)}</span> : null}
+              {baseRate !== undefined && sellingRate !== undefined && Math.abs(baseRate - sellingRate) > 0.5 ? (
+                <span className="text-[9px] text-muted-foreground">Gốc {money(baseRate)} ₫</span>
+              ) : null}
             </div>
           </div>
 
-          {text(line.item_code) && (salesOptions.length > 0 || colors.length > 0 || showWidth || showHeight || showSets || showSalesMode || showLeafVariant || kind === "mesh" || fieldVisible(line, "has_butterfly_bracket") || showLength || showBars) ? (
-            <div className="grid items-end gap-1.5 border-t bg-muted/10 px-2 py-1.5 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
-            {salesOptions.length ? (
-              <StandardField
-                id={`sales-line-${index}-sales-option`}
-                field={selectField(
-                  childField("sales_option"),
-                  "sales_option",
-                  "Ph\u01b0\u01a1ng \u00e1n b\u00e1n",
-                  salesOptions.map((option) => String(option.name)),
-                  Object.fromEntries(salesOptions.map((option) => [String(option.name), text(option.option_label) || String(option.name)])),
-                )}
-                value={line.sales_option}
-                onChange={(value) => commitLine(line._key, "sales_option", text(value) || undefined)}
-                registry={registry}
-                services={services}
-                parentDoctype="Sales Order Item"
-                docValues={line}
-                roles={roles}
-                label="Phương án bán"
-                className="md:col-span-2 xl:col-span-2"
-              />
-            ) : null}
+          <div className="min-w-0 self-stretch">
+            <div className="mb-1 text-[13px] font-medium xl:hidden">Chiết khấu</div>
+            <div className="flex h-9 flex-col items-end justify-center text-right text-xs tabular-nums">
+              <span className={discountAmount > 0 ? "font-medium text-emerald-700 dark:text-emerald-400" : "text-muted-foreground"}>
+                {discountAmount > 0 ? `-${money(discountAmount)} ₫` : "—"}
+              </span>
+              {discountPercentage > 0 ? <span className="text-[10px] text-muted-foreground">{discountPercentage.toLocaleString("vi-VN", { maximumFractionDigits: 4 })}%</span> : null}
+            </div>
+          </div>
 
-            {colors.length ? (
-              <StandardField
-                id={`sales-line-${index}-color`}
-                field={selectField(childField("color"), "color", "M\u00e0u", colors)}
-                value={line.color}
-                onChange={(value) => commitLine(line._key, "color", text(value) || undefined)}
-                registry={registry}
-                services={services}
-                parentDoctype="Sales Order Item"
-                docValues={line}
-                roles={roles}
-                label="Màu"
-                className="xl:col-span-1"
-              />
-            ) : null}
+          <div className="min-w-0 self-stretch" title={adjustmentTitle || undefined}>
+            <div className="mb-1 text-[13px] font-medium xl:hidden">Phụ thu dòng</div>
+            <div className="flex h-9 flex-col items-end justify-center text-right text-xs tabular-nums">
+              <span className={adjustmentAmount !== 0 ? "font-medium" : "text-muted-foreground"}>
+                {adjustmentAmount !== 0 ? `${money(adjustmentAmount)} ₫` : "—"}
+              </span>
+              {adjustments.length > 0 ? <span className="text-[9px] text-muted-foreground">{adjustments.length} chính sách</span> : null}
+            </div>
+          </div>
+
+          <div className="min-w-0 self-stretch">
+            <div className="mb-1 text-[13px] font-medium xl:hidden">Thành tiền</div>
+            <div className="flex h-9 items-center justify-end text-right text-sm font-semibold tabular-nums">{money(netAmount)} ₫</div>
+          </div>
+
+          <div className="flex h-9 items-center justify-end gap-0.5 md:col-span-2 xl:col-span-1">
+            {line._loading ? <Loader2 className="mr-1 size-3.5 animate-spin text-muted-foreground" /> : null}
+            <Button type="button" variant="ghost" size="icon" className="size-7" title="Nhân dòng" onClick={() => setLines((current) => [...current, { ...line, _key: newLine(current.length)._key, _loading: false, _error: "", _pricingError: "" }])}><Copy className="size-3.5" /></Button>
+            <Button type="button" variant="ghost" size="icon" className="size-7" title="Xoá dòng" disabled={lines.length === 1} onClick={() => setLines((current) => current.filter((entry) => entry._key !== line._key))}><Trash2 className="size-3.5" /></Button>
+          </div>
+        </div>
+
+        {text(line.item_code) && detailNeeded ? (
+          <div className="border-t bg-muted/10 px-2 py-2">
+            <div className="mb-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
+              <span className="font-semibold uppercase tracking-wide">Thông số bán</span>
+              {numberValue(line.billable_area_sqm) !== undefined ? <span>Diện tích tính giá: <strong>{numberValue(line.billable_area_sqm)?.toLocaleString("vi-VN", { maximumFractionDigits: 6 })} m²</strong></span> : null}
+              {text(commercial.item_price) ? <span>Giá: {text(commercial.item_price)}</span> : null}
+            </div>
+            <div className="grid items-end gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
+              {colors.length ? (
+                <StandardField
+                  id={`sales-line-${index}-color`}
+                  field={selectField(childField("color"), "color", "Màu", colors)}
+                  value={line.color}
+                  onChange={(value) => commitLine(line._key, "color", text(value) || undefined)}
+                  registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
+                  label="Màu"
+                />
+              ) : null}
 
               {showWidth ? (
                 <StandardField
                   id={`sales-line-${index}-width`}
-                  field={lineBaseField("width_m", fieldLabel(line, "width_m", "R\u1ed9ng (m)"), "Float")}
+                  field={lineBaseField("width_m", fieldLabel(line, "width_m", "Rộng (m)"), "Float")}
                   value={line.width_m}
                   onChange={(value) => patchLine(line._key, { width_m: value == null || value === "" ? undefined : Number(value) })}
                   onCommit={() => commitLine(line._key, "width_m", line.width_m)}
                   registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
                   required={area || fieldRequired(line, "width_m")} readOnly={fieldReadonly(line, "width_m")}
-                  label={fieldLabel(line, "width_m", "R\u1ed9ng (m)")}
+                  label={fieldLabel(line, "width_m", "Rộng (m)")}
                 />
               ) : null}
 
@@ -1017,34 +1152,23 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                 />
               ) : null}
 
-              {showSets ? (
+              {showSets && !simpleCountPrimary ? (
                 <StandardField
                   id={`sales-line-${index}-sets`}
-                  field={lineBaseField("set_count", fieldLabel(line, "set_count", area ? "S\u1ed1 b\u1ed9" : "S\u1ed1 l\u01b0\u1ee3ng"), "Int")}
+                  field={lineBaseField("set_count", fieldLabel(line, "set_count", area ? "Số bộ" : "Số lượng"), "Int")}
                   value={line.set_count}
                   onChange={(value) => patchLine(line._key, { set_count: value == null || value === "" ? undefined : Number(value) })}
                   onCommit={() => commitLine(line._key, "set_count", line.set_count)}
                   registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
                   required={area || fieldRequired(line, "set_count")} readOnly={fieldReadonly(line, "set_count")}
-                  label={fieldLabel(line, "set_count", area ? "S\u1ed1 b\u1ed9" : "S\u1ed1 l\u01b0\u1ee3ng")}
-                />
-              ) : null}
-
-              {showSalesMode ? (
-                <StandardField
-                  id={`sales-line-${index}-sales-mode`}
-                  field={selectField(childField("sales_mode"), "sales_mode", "C\u00e1ch b\u00e1n", salesModes)}
-                  value={line.sales_mode || "Tr\u1ecdn b\u1ed9"}
-                  onChange={(value) => commitLine(line._key, "sales_mode", text(value) || undefined)}
-                  registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
-                  label="Cách bán"
+                  label={fieldLabel(line, "set_count", area ? "Số bộ" : "Số lượng")}
                 />
               ) : null}
 
               {showLeafVariant ? (
                 <StandardField
                   id={`sales-line-${index}-leaf-variant`}
-                  field={selectField(childField("leaf_variant"), "leaf_variant", "Ki\u1ec3u k\u00e9o / motor", leafVariants)}
+                  field={selectField(childField("leaf_variant"), "leaf_variant", "Kiểu kéo / motor", leafVariants)}
                   value={line.leaf_variant}
                   onChange={(value) => commitLine(line._key, "leaf_variant", text(value) || undefined)}
                   registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
@@ -1055,7 +1179,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
               {kind === "mesh" ? (
                 <StandardField
                   id={`sales-line-${index}-mesh-height`}
-                  field={lineBaseField("mesh_height_m", "Cao l\u01b0\u1edbi (m)", "Float")}
+                  field={lineBaseField("mesh_height_m", "Cao lưới (m)", "Float")}
                   value={line.mesh_height_m}
                   onChange={(value) => patchLine(line._key, { mesh_height_m: value == null || value === "" ? undefined : Number(value) })}
                   onCommit={() => commitLine(line._key, "mesh_height_m", line.mesh_height_m)}
@@ -1067,7 +1191,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
               {fieldVisible(line, "has_butterfly_bracket") ? (
                 <StandardField
                   id={`sales-line-${index}-butterfly`}
-                  field={lineBaseField("has_butterfly_bracket", "C\u00f3 b\u1ea3n b\u01b0\u1edbm", "Check")}
+                  field={lineBaseField("has_butterfly_bracket", "Có bản bướm", "Check")}
                   value={line.has_butterfly_bracket}
                   onChange={(value) => commitLine(line._key, "has_butterfly_bracket", value ? 1 : 0)}
                   registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
@@ -1079,70 +1203,50 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
               {showLength ? (
                 <StandardField
                   id={`sales-line-${index}-length`}
-                  field={lineBaseField("length_m", fieldLabel(line, "length_m", "D\u00e0i m\u1ed9t c\u00e2y/\u0111o\u1ea1n (m)"), "Float")}
+                  field={lineBaseField("length_m", fieldLabel(line, "length_m", "Dài một cây/đoạn (m)"), "Float")}
                   value={line.length_m}
                   onChange={(value) => patchLine(line._key, { length_m: value == null || value === "" ? undefined : Number(value) })}
                   onCommit={() => commitLine(line._key, "length_m", line.length_m)}
                   registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
                   required={fieldRequired(line, "length_m")} readOnly={fieldReadonly(line, "length_m")}
-                  label={fieldLabel(line, "length_m", "D\u00e0i m\u1ed9t c\u00e2y/\u0111o\u1ea1n (m)")}
+                  label={fieldLabel(line, "length_m", "Dài một cây/đoạn (m)")}
                 />
               ) : null}
 
               {showBars ? (
                 <StandardField
                   id={`sales-line-${index}-bars`}
-                  field={lineBaseField("qty_bar", fieldLabel(line, "qty_bar", "S\u1ed1 c\u00e2y/\u0111o\u1ea1n"), "Int")}
+                  field={lineBaseField("qty_bar", fieldLabel(line, "qty_bar", "Số cây/đoạn"), "Int")}
                   value={line.qty_bar}
                   onChange={(value) => patchLine(line._key, { qty_bar: value == null || value === "" ? undefined : Number(value) })}
                   onCommit={() => commitLine(line._key, "qty_bar", line.qty_bar)}
                   registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
                   required={fieldRequired(line, "qty_bar")} readOnly={fieldReadonly(line, "qty_bar")}
-                  label={fieldLabel(line, "qty_bar", "S\u1ed1 c\u00e2y/\u0111o\u1ea1n")}
+                  label={fieldLabel(line, "qty_bar", "Số cây/đoạn")}
                 />
               ) : null}
-
             </div>
-          ) : null}
+          </div>
+        ) : null}
 
-          {line._error ? (
-                      <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-1.5 text-xs text-destructive">
-                        {line._error}
-                      </div>
-                    ) : null}
-                    {line._context?.price_missing ? (
-                      <div className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-1.5 text-xs text-amber-700 dark:text-amber-300">
-                        {text(line._context.price_error) || "Chưa khai đơn giá phù hợp."}
-                      </div>
-                    ) : null}
-
-                    {text(line.item_code) ? (
-                      <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 border-t px-2 py-1 text-[10px] tabular-nums xl:hidden">
-                        <span className="text-muted-foreground">
-                          {Number.isFinite(Number(line.qty)) ? Number(line.qty).toLocaleString("vi-VN", { maximumFractionDigits: 6 }) : "—"} {text(line.uom)}
-                        </span>
-                        <span>ĐG <strong>{money(line.rate)} ₫</strong></span>
-                        {Number(line.discount_amount) > 0 ? (
-                          <span className="text-emerald-700 dark:text-emerald-400">CK -{money(line.discount_amount)} ₫</span>
-                        ) : null}
-                        {Number.isFinite(Number(line.adjustment_amount)) && Number(line.adjustment_amount) !== 0 ? (
-                          <span>Phụ thu +{money(line.adjustment_amount)} ₫</span>
-                        ) : null}
-                        <span className="ml-1 text-xs font-semibold">Thành tiền <strong className="text-sm">{money(lineTotal(line))} ₫</strong></span>
-                      </div>
-                    ) : null}
-                  </div>
-                </article>
-              );
-            })}
-          </section>
+        {line._error ? (
+          <div className="border-t border-destructive/20 bg-destructive/5 px-3 py-1.5 text-xs text-destructive">{line._error}</div>
+        ) : line._pricingError ? (
+          <div className="border-t border-amber-500/20 bg-amber-500/5 px-3 py-1.5 text-xs text-amber-700 dark:text-amber-300">{line._pricingError}</div>
+        ) : line._context?.price_missing && !line._commercial ? (
+          <div className="border-t border-amber-500/20 bg-amber-500/5 px-3 py-1.5 text-xs text-amber-700 dark:text-amber-300">{text(line._context.price_error) || "Chưa khai đơn giá phù hợp."}</div>
+        ) : null}
+      </article>
+    );
+  })}
+</section>
         </div>
       </div>
 
       <div className="shrink-0 border-t bg-card px-4 py-2 shadow-[0_-4px_14px_rgba(0,0,0,0.035)]">
         <div className="mx-auto flex w-full max-w-[1760px] flex-wrap items-center justify-between gap-2">
           <div className="flex items-baseline gap-2">
-            <span className="text-[11px] text-muted-foreground">Tạm tính</span>
+            <span className="text-[11px] text-muted-foreground">Tạm tính dòng</span>
             <strong className="text-xl font-bold tabular-nums">{money(displayedTotal)} ₫</strong>
           </div>
           <div className="flex flex-wrap gap-1.5">
