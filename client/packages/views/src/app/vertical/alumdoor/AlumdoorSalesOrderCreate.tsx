@@ -215,6 +215,7 @@ function StandardField(props: {
   compact?: boolean;
   className?: string;
   onCommit?: () => void;
+  hideLabel?: boolean;
 }) {
   const Control = props.registry.resolve(props.field.fieldtype);
   const displayLabel = props.label || text(props.field.label) || props.field.fieldname;
@@ -255,9 +256,11 @@ function StandardField(props: {
       onBlurCapture={() => props.onCommit?.()}
       onKeyDownCapture={(event) => { if (event.key === "Enter") props.onCommit?.(); }}
     >
-      <label htmlFor={props.id} className="mb-1 block text-[13px] font-medium leading-tight text-foreground">
-        {displayLabel}{props.required ? <span className="ml-0.5 text-destructive">*</span> : null}
-      </label>
+      {!props.hideLabel ? (
+        <label htmlFor={props.id} className="mb-1 block text-[13px] font-medium leading-tight text-foreground">
+          {displayLabel}{props.required ? <span className="ml-0.5 text-destructive">*</span> : null}
+        </label>
+      ) : null}
       {control}
     </div>
   );
@@ -777,6 +780,18 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
               </Button>
             </div>
 
+            <div className="hidden xl:grid xl:grid-cols-[42px_minmax(360px,2.5fr)_150px_150px_130px_130px_130px_130px_84px] items-center gap-2 rounded-t-md border border-b-0 bg-muted/45 px-2 py-1.5 text-[11px] font-semibold text-muted-foreground">
+              <div>#</div>
+              <div>M???t h??ng</div>
+              <div>??VT</div>
+              <div>SL / Kh???i l?????ng</div>
+              <div className="text-right">????n gi??</div>
+              <div className="text-right">CK</div>
+              <div className="text-right">Ph??? thu</div>
+              <div className="text-right">Th??nh ti???n</div>
+              <div></div>
+            </div>
+
             {lines.map((line, index) => {
               const kind = family(line);
               const area = isAreaDoor(line);
@@ -801,8 +816,8 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
               const showPlainQty = !area && !showSets && !showBars;
 
               return (
-                <article key={line._key} className="overflow-hidden rounded-md border bg-card">
-                  <div className="flex min-h-8 items-center justify-between gap-2 border-b bg-muted/20 px-2 py-1">
+                <article key={line._key} className="border-x border-b bg-card first:border-t xl:first:border-t">
+                  <div className="hidden">
                     <div className="flex min-w-0 items-center gap-2">
                       <span className="grid size-5 shrink-0 place-items-center rounded bg-foreground text-[10px] font-semibold text-background">
                         {index + 1}
@@ -961,6 +976,15 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                 className="xl:col-span-2"
               />
             ) : null}
+
+            <div className="hidden xl:block text-right text-xs tabular-nums">{money(line.rate)} ???</div>
+            <div className="hidden xl:block text-right text-xs tabular-nums">{Number(line.discount_amount) > 0 ? `-${money(line.discount_amount)} ???` : "???"}</div>
+            <div className="hidden xl:block text-right text-xs tabular-nums">{Number.isFinite(Number(line.adjustment_amount)) && Number(line.adjustment_amount) !== 0 ? `${money(line.adjustment_amount)} ???` : "???"}</div>
+            <div className="hidden xl:block text-right text-xs font-semibold tabular-nums">{money(lineTotal(line))} ???</div>
+            <div className="hidden xl:flex items-center justify-end gap-0.5">
+              <Button type="button" variant="ghost" size="icon" className="size-7" title="Nh??n d??ng" onClick={() => setLines((current) => [...current, { ...line, _key: newLine(current.length)._key, _loading: false, _error: "" }])}><Copy className="size-3.5" /></Button>
+              <Button type="button" variant="ghost" size="icon" className="size-7" title="Xo?? d??ng" disabled={lines.length === 1} onClick={() => setLines((current) => current.filter((entry) => entry._key !== line._key))}><Trash2 className="size-3.5" /></Button>
+            </div>
           </div>
 
           {text(line.item_code) && (showWidth || showHeight || showSets || showSalesMode || showLeafVariant || kind === "mesh" || fieldVisible(line, "has_butterfly_bracket") || showLength || showBars) ? (
