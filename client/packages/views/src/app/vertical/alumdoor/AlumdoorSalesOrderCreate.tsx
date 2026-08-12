@@ -801,10 +801,10 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
               const showPlainQty = !area && !showSets && !showBars;
 
               return (
-                <article key={line._key} className="overflow-hidden rounded-lg border bg-card">
-                  <div className="flex min-h-9 items-center justify-between gap-2 border-b bg-muted/25 px-2.5 py-1.5">
+                <article key={line._key} className="overflow-hidden rounded-md border bg-card">
+                  <div className="flex min-h-8 items-center justify-between gap-2 border-b bg-muted/20 px-2 py-1">
                     <div className="flex min-w-0 items-center gap-2">
-                      <span className="grid size-6 shrink-0 place-items-center rounded-full bg-foreground text-[11px] font-semibold text-background">
+                      <span className="grid size-5 shrink-0 place-items-center rounded bg-foreground text-[10px] font-semibold text-background">
                         {index + 1}
                       </span>
                       <div className="min-w-0">
@@ -847,8 +847,8 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                     </div>
                   </div>
 
-                  <div className="space-y-2 p-2.5">
-                    <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-12">
+                  <div className="space-y-1.5 p-2">
+                    <div className="grid items-end gap-1.5 md:grid-cols-2 xl:grid-cols-12">
             <StandardField
               id={`sales-line-${index}-item`}
               field={lineBaseField("item_code", "M\u1eb7t h\u00e0ng", "Link", "Item")}
@@ -876,7 +876,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
               required
               compact
               label="Mặt hàng"
-              className={text(line.item_code) ? "md:col-span-2 xl:col-span-5" : "md:col-span-2 xl:col-span-8"}
+              className={text(line.item_code) ? "md:col-span-2 xl:col-span-4" : "md:col-span-2 xl:col-span-6"}
             />
 
             {salesOptions.length ? (
@@ -897,7 +897,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                 docValues={line}
                 roles={roles}
                 label="Phương án bán"
-                className="md:col-span-2 xl:col-span-3"
+                className="md:col-span-2 xl:col-span-2"
               />
             ) : null}
 
@@ -964,7 +964,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
           </div>
 
           {text(line.item_code) && (showWidth || showHeight || showSets || showSalesMode || showLeafVariant || kind === "mesh" || fieldVisible(line, "has_butterfly_bracket") || showLength || showBars) ? (
-            <div className="grid gap-2 rounded-md border bg-muted/10 p-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+            <div className="grid items-end gap-1.5 border-t bg-muted/10 px-2 py-1.5 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
               {showWidth ? (
                 <StandardField
                   id={`sales-line-${index}-width`}
@@ -1091,7 +1091,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                     ) : null}
 
                     {text(line.item_code) ? (
-                      <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 rounded-md bg-muted/20 px-2.5 py-1.5 text-[11px] tabular-nums">
+                      <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 border-t px-2 py-1 text-[10px] tabular-nums">
                         <span className="text-muted-foreground">
                           {Number.isFinite(Number(line.qty)) ? Number(line.qty).toLocaleString("vi-VN", { maximumFractionDigits: 6 }) : "—"} {text(line.uom)}
                         </span>
