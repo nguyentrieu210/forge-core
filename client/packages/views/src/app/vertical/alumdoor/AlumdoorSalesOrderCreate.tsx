@@ -704,7 +704,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
 
     <StandardField
       id="sales-address"
-      field={headerField("install_address", "\u0110\u1ecba ch\u1ec9 giao / l\u1eafp \u0111\u1eb7t")}
+      field={{ ...headerField("install_address", "\u0110\u1ecba ch\u1ec9 giao / l\u1eafp \u0111\u1eb7t"), fieldtype: "Data" } as DocField}
       value={header.install_address}
       onChange={(value) => setHeaderField("install_address", text(value) || undefined)}
       registry={registry}
@@ -713,7 +713,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
       docValues={header}
       roles={roles}
       required={metaRequired("install_address")}
-      label="\u0110\u1ecba ch\u1ec9 giao / l\u1eafp \u0111\u1eb7t"
+      label="Địa chỉ giao / lắp đặt"
       className="md:col-span-2 xl:order-6 xl:col-span-5"
     />
 
@@ -728,7 +728,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
       docValues={header}
       roles={roles}
       required={metaRequired("transaction_date")}
-      label="Ng\u00e0y \u0111\u1eb7t h\u00e0ng"
+      label="Ngày đặt hàng"
       className="xl:order-4"
     />
 
@@ -743,7 +743,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
       docValues={header}
       roles={roles}
       required={metaRequired("delivery_date")}
-      label="Ng\u00e0y giao"
+      label="Ngày giao"
       className="xl:order-5"
     />
 
@@ -758,7 +758,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
       docValues={header}
       roles={roles}
       required={metaRequired("responsible_person")}
-      label="Nh\u00e2n vi\u00ean b\u00e1n h\u00e0ng"
+      label="Nhân viên bán hàng"
       className="md:col-span-2 xl:order-3 xl:col-span-1"
     />
   </div>
@@ -875,7 +875,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
               roles={roles}
               required
               compact
-              label="M\u1eb7t h\u00e0ng"
+              label="Mặt hàng"
               className={text(line.item_code) ? "md:col-span-2 xl:col-span-5" : "md:col-span-2 xl:col-span-8"}
             />
 
@@ -896,7 +896,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                 parentDoctype="Sales Order Item"
                 docValues={line}
                 roles={roles}
-                label="Ph\u01b0\u01a1ng \u00e1n b\u00e1n"
+                label="Phương án bán"
                 className="md:col-span-2 xl:col-span-3"
               />
             ) : null}
@@ -912,7 +912,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                 parentDoctype="Sales Order Item"
                 docValues={line}
                 roles={roles}
-                label="M\u00e0u"
+                label="Màu"
                 className="xl:col-span-2"
               />
             ) : null}
@@ -928,7 +928,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                 parentDoctype="Sales Order Item"
                 docValues={line}
                 roles={roles}
-                label="\u0110VT"
+                label="ĐVT"
                 className="xl:col-span-2"
               />
             ) : text(line.uom) ? (
@@ -943,7 +943,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                 docValues={line}
                 roles={roles}
                 readOnly
-                label="\u0110VT"
+                label="ĐVT"
                 className="xl:col-span-2"
               />
             ) : null}
@@ -997,7 +997,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                   value={line.sales_mode || "Tr\u1ecdn b\u1ed9"}
                   onChange={(value) => commitLine(line._key, "sales_mode", text(value) || undefined)}
                   registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
-                  label="C\u00e1ch b\u00e1n"
+                  label="Cách bán"
                 />
               ) : null}
 
@@ -1008,7 +1008,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                   value={line.leaf_variant}
                   onChange={(value) => commitLine(line._key, "leaf_variant", text(value) || undefined)}
                   registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
-                  label="Ki\u1ec3u k\u00e9o / motor"
+                  label="Kiểu kéo / motor"
                 />
               ) : null}
 
@@ -1020,7 +1020,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                   onChange={(value) => patchLine(line._key, { mesh_height_m: value == null || value === "" ? undefined : Number(value) })}
                   onCommit={() => commitLine(line._key, "mesh_height_m", line.mesh_height_m)}
                   registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
-                  label="Cao l\u01b0\u1edbi (m)"
+                  label="Cao lưới (m)"
                 />
               ) : null}
 
@@ -1032,7 +1032,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                   onChange={(value) => commitLine(line._key, "has_butterfly_bracket", value ? 1 : 0)}
                   registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
                   readOnly={fieldReadonly(line, "has_butterfly_bracket")}
-                  label="C\u00f3 b\u1ea3n b\u01b0\u1edbm"
+                  label="Có bản bướm"
                 />
               ) : null}
 
@@ -1071,7 +1071,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                   onCommit={() => commitLine(line._key, "qty", line.qty)}
                   registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
                   required readOnly={fieldReadonly(line, "qty")}
-                  label="Kh\u1ed1i l\u01b0\u1ee3ng"
+                  label="Khối lượng"
                 />
               ) : null}
             </div>
