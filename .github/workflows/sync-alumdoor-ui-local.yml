@@ -1,0 +1,43 @@
+name: Sync AlumDoor UI Local
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: sync-alumdoor-ui-local
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    runs-on: [self-hosted]
+    timeout-minutes: 2
+    steps:
+      - name: Sync main to C:\alumdoor-ui-local
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $path = 'C:\alumdoor-ui-local'
+          $repo = 'https://github.com/nguyentrieu210/forge.git'
+
+          if (-not (Test-Path $path)) {
+            New-Item -ItemType Directory -Path $path | Out-Null
+          }
+
+          if (-not (Test-Path (Join-Path $path '.git'))) {
+            git -C $path init
+          }
+
+          $hasOrigin = git -C $path remote 2>$null | Where-Object { $_ -eq 'origin' }
+          if ($hasOrigin) {
+            git -C $path remote set-url origin $repo
+          } else {
+            git -C $path remote add origin $repo
+          }
+
+          git -C $path fetch origin main --prune
+          git -C $path reset --hard origin/main
+
+          Write-Host "Synced C:\alumdoor-ui-local to:"
+          git -C $path log -1 --oneline
