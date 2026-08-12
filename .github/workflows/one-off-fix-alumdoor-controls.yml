@@ -1,0 +1,90 @@
+name: One-off fix AlumDoor control source
+
+on:
+  push:
+    branches: [ui/alumdoor-standard-controls]
+    paths: [.github/workflows/one-off-fix-alumdoor-controls.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: [self-hosted]
+    timeout-minutes: 2
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Fix TSX escapes and labels
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $repo = 'C:\alumdoor-hardcode-preview'
+          $branch = 'ui/alumdoor-standard-controls'
+          $remote = 'https://github.com/nguyentrieu210/forge.git'
+
+          git -C $repo remote set-url origin $remote
+          git -C $repo fetch origin $branch --prune
+          git -C $repo checkout -B $branch "origin/$branch"
+          git -C $repo reset --hard "origin/$branch"
+
+          $nodeScript = @'
+          const fs = require('fs');
+          const file = 'C:/alumdoor-hardcode-preview/client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx';
+          let source = fs.readFileSync(file, 'utf8');
+
+          source = source.replace(/\\`/g, '`').replace(/\\\$\{/g, '${');
+
+          source = source.replace(
+            '<h2 className="text-sm font-semibold">Th??ng tin kh??ch h??ng</h2>',
+            '<h2 className="text-sm font-semibold">{"Th\\u00f4ng tin kh\\u00e1ch h\\u00e0ng"}</h2>',
+          );
+          source = source.replace(
+            '<span className="text-[11px] text-muted-foreground">????n b??n h??ng m???i</span>',
+            '<span className="text-[11px] text-muted-foreground">{"\\u0110\\u01a1n b\\u00e1n h\\u00e0ng m\\u1edbi"}</span>',
+          );
+          source = source.replace('Ch??a c?? control cho', 'Missing control for');
+
+          const replacements = [
+            ['Kh??ch h??ng', 'Kh\\u00e1ch h\\u00e0ng'],
+            ['S??T', 'S\\u0110T'],
+            ['?????a ch??? giao / l???p ?????t', '\\u0110\\u1ecba ch\\u1ec9 giao / l\\u1eafp \\u0111\\u1eb7t'],
+            ['Ng??y ?????t h??ng', 'Ng\\u00e0y \\u0111\\u1eb7t h\\u00e0ng'],
+            ['Ng??y giao', 'Ng\\u00e0y giao'],
+            ['Nh??n vi??n b??n h??ng', 'Nh\\u00e2n vi\\u00ean b\\u00e1n h\\u00e0ng'],
+            ['M???t h??ng', 'M\\u1eb7t h\\u00e0ng'],
+            ['Ph????ng ??n b??n', 'Ph\\u01b0\\u01a1ng \\u00e1n b\\u00e1n'],
+            ['M??u', 'M\\u00e0u'],
+            ['??VT', '\\u0110VT'],
+            ['R???ng (m)', 'R\\u1ed9ng (m)'],
+            ['S??? b???', 'S\\u1ed1 b\\u1ed9'],
+            ['S??? l?????ng', 'S\\u1ed1 l\\u01b0\\u1ee3ng'],
+            ['C??ch b??n', 'C\\u00e1ch b\\u00e1n'],
+            ['Tr???n b???', 'Tr\\u1ecdn b\\u1ed9'],
+            ['Ki???u k??o / motor', 'Ki\\u1ec3u k\\u00e9o / motor'],
+            ['Cao l?????i (m)', 'Cao l\\u01b0\\u1edbi (m)'],
+            ['C?? b???n b?????m', 'C\\u00f3 b\\u1ea3n b\\u01b0\\u1edbm'],
+            ['D??i m???t c??y/??o???n (m)', 'D\\u00e0i m\\u1ed9t c\\u00e2y/\\u0111o\\u1ea1n (m)'],
+            ['S??? c??y/??o???n', 'S\\u1ed1 c\\u00e2y/\\u0111o\\u1ea1n'],
+            ['Kh???i l?????ng', 'Kh\\u1ed1i l\\u01b0\\u1ee3ng'],
+          ];
+          for (const [from, to] of replacements) source = source.split(from).join(to);
+
+          const leftovers = replacements.map(([from]) => from).filter((from) => source.includes(from));
+          if (leftovers.length) throw new Error(`Broken labels remain: ${leftovers.join(', ')}`);
+          if (source.includes('\\`') || source.includes('\\${')) throw new Error('Escaped template literal remains');
+
+          fs.writeFileSync(file, source, 'utf8');
+          '@
+
+          $nodeScript | node
+
+          git -C $repo rm '.github/workflows/one-off-fix-alumdoor-controls.yml'
+          git -C $repo add 'client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx'
+          git -C $repo config user.name 'github-actions[bot]'
+          git -C $repo config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git -C $repo commit -m 'fix(ui): normalize standard-control TSX source'
+
+          git -C $repo remote set-url origin "https://x-access-token:$env:GH_TOKEN@github.com/nguyentrieu210/forge.git"
+          git -C $repo push origin "HEAD:$branch"
+          git -C $repo remote set-url origin $remote
