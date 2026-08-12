@@ -587,17 +587,19 @@ function SmartMetadataChildGrid(props: ChildGridProps) {
   const detailDoc = detailRow === null ? undefined : rows[detailRow];
   const shellClass = fullscreen
     ? "fixed inset-3 z-50 flex min-h-0 flex-col overflow-hidden rounded-xl border bg-background shadow-2xl"
-    : "overflow-hidden rounded-md border";
+    : "flex flex-col overflow-hidden rounded-md border";
   const desktopTableClass = fullscreen ? "hidden min-h-0 flex-1 overflow-auto md:block" : "hidden overflow-x-auto md:block";
 
   return (
     <div ref={gridRef} className={shellClass} data-metadata-child-grid={childMeta.name} data-smart-child-grid="true">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/20 px-2 py-1.5">
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span>{rows.length} dòng</span>
-          {selectedRows.length ? <span>• Đã chọn {selectedRows.length}</span> : null}
-        </div>
-        <div className="flex flex-wrap items-center justify-end gap-1">
+      <div className="order-3 flex flex-wrap items-center gap-2 border-t bg-muted/20 px-2 py-1.5">
+        {!readOnly ? (
+          <div className="flex flex-wrap items-center gap-1">
+            <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs" onClick={addRow}><Plus className="size-3.5" /> Thêm dòng</Button>
+            <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs" onClick={() => setAddManyOpen(true)}><Plus className="size-3.5" /> Thêm nhiều</Button>
+          </div>
+        ) : null}
+        <div className="flex flex-wrap items-center gap-1">
           {selectedRows.length && !readOnly ? (
             <>
               <Button type="button" variant="ghost" size="icon" className="size-7" aria-label="Đưa dòng đã chọn lên" onClick={() => moveSelection(-1)}><ArrowUp className="size-3.5" /></Button>
@@ -608,19 +610,12 @@ function SmartMetadataChildGrid(props: ChildGridProps) {
           ) : null}
           {pickedCell && selectedRows.length > 1 && !readOnly ? <Button type="button" variant="ghost" size="icon" className="size-7" aria-label="Điền xuống dòng đã chọn" onClick={fillDown}><ArrowDownToLine className="size-3.5" /></Button> : null}
           {lastDeleted?.length && !readOnly ? <Button type="button" variant="ghost" size="icon" className="size-7" aria-label="Hoàn tác xóa dòng" onClick={undoDelete}><Undo2 className="size-3.5" /></Button> : null}
+        </div>
+        <div className="ml-auto flex items-center gap-1">
           <Button type="button" variant="ghost" size="icon" className="size-7" aria-label="Tùy chỉnh cột" onClick={() => setColumnSettingsOpen(true)}><Columns3 className="size-3.5" /></Button>
-          {canExpand ? (
-            <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs" onClick={() => setExpanded((value) => !value)}>
-              {expanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}{expanded ? "Thu gọn" : "Mở rộng"}
-            </Button>
-          ) : null}
+          {canExpand ? <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs" onClick={() => setExpanded((value) => !value)}>{expanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}{expanded ? "Thu gọn" : "Mở rộng"}</Button> : null}
           <Button type="button" variant="ghost" size="icon" className="size-7" aria-label={fullscreen ? "Thoát toàn màn hình" : "Mở toàn màn hình"} onClick={() => setFullscreen((value) => !value)}>{fullscreen ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}</Button>
-          {!readOnly ? (
-            <>
-              <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs" onClick={() => setAddManyOpen(true)}><Plus className="size-3.5" /> Thêm nhiều</Button>
-              <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs" onClick={addRow}><Plus className="size-3.5" /> Thêm dòng</Button>
-            </>
-          ) : null}
+          <span className="ml-2 text-xs text-muted-foreground">{rows.length} dòng{selectedRows.length ? ` · Đã chọn ${selectedRows.length}` : ""}</span>
         </div>
       </div>
 

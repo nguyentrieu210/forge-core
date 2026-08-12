@@ -845,8 +845,11 @@ export function ChildGrid(props: ChildGridProps) {
       if (field.fieldname === "height_m" && row.inventory_mode === "Thành phẩm theo m2") {
         return { ...field, label: "Cao PB\n(m)" };
       }
+      if (field.fieldname === "qty") {
+        return { ...field, label: "Khối lượng", read_only: quantity.derived ? 1 : field.read_only };
+      }
       if (field.fieldname === "rate") {
-        return { ...field, label: "Đơn giá\n(VNĐ)" };
+        return { ...field, label: "Đơn giá (chiết khấu)\n(VNĐ)" };
       }
       if (field.fieldname === "sales_option") return { ...field, label: "Phương án bán" };
       if (field.fieldname === "discount_percentage") return { ...field, hidden: 1, read_only: 1 };
@@ -867,6 +870,7 @@ export function ChildGrid(props: ChildGridProps) {
       const allowed = allowedUomsByItem[itemCode] ?? [];
       return {
         ...field,
+        label: "ĐVT",
         link_filters: JSON.stringify([
           ["UOM", "name", "in", allowed.length ? allowed : ["__NO_CONFIGURED_SALES_UOM__"]],
         ]),

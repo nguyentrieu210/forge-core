@@ -353,7 +353,9 @@ async function previewSales(call: PlatformCall, args: Json, row: Json, parent: J
     fieldOverride(overrides, fields, "width_m", { label: widthBasis.includes("nhựa") ? "Rộng PB nhựa\n(m)" : widthBasis.includes("ray") ? "Rộng PB ray\n(m)" : text(parent.customer_group) === "Đại lý" ? "Rộng PB nhựa\n(m)" : "Rộng PB ray\n(m)" });
     fieldOverride(overrides, fields, "height_m", { label: "Cao PB\n(m)" });
   }
-  fieldOverride(overrides, fields, "rate", { label: "Đơn giá\n(VNĐ)" });
+  fieldOverride(overrides, fields, "uom", { label: "ĐVT" });
+  fieldOverride(overrides, fields, "qty", { label: "Khối lượng", read_only: quantity.derived ? 1 : 0 });
+  fieldOverride(overrides, fields, "rate", { label: "Đơn giá (chiết khấu)\n(VNĐ)" });
   fieldOverride(overrides, fields, "discount_percentage", { label: "Chiết khấu\n(%)" });
   fieldOverride(overrides, fields, "amount", { label: "Thành tiền\n(VNĐ)" });
 
