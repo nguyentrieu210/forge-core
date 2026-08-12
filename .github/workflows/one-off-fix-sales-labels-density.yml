@@ -1,0 +1,70 @@
+name: One-off fix Sales Order labels and density
+
+on:
+  push:
+    branches:
+      - ui/fix-sales-labels-density
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ui/fix-sales-labels-density
+
+      - name: Fix TSX presentation only
+        shell: powershell
+        run: |
+          @'
+          import re
+          from pathlib import Path
+
+          path = Path("client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx")
+          source = path.read_text(encoding="utf-8")
+
+          # JSX quoted attributes do not interpret JavaScript unicode escapes. Decode only
+          # label="...\\uXXXX..." attributes; normal JS strings remain untouched.
+          def decode_label(match):
+              raw = match.group(1)
+              decoded = re.sub(r"\\u([0-9a-fA-F]{4})", lambda m: chr(int(m.group(1), 16)), raw)
+              return f'label="{decoded}"'
+
+          source, label_count = re.subn(
+              r'label="([^"]*\\u[0-9a-fA-F]{4}[^"]*)"',
+              decode_label,
+              source,
+          )
+
+          # The canonical install_address metadata is multi-line, but this vertical sales
+          # screen intentionally presents it as a compact one-line standard Data control.
+          source, address_count = re.subn(
+              r'field=\{headerField\("install_address",\s*("[^"]+")\)\}',
+              r'field={{ ...headerField("install_address", \1), fieldtype: "Data" } as DocField}',
+              source,
+              count=1,
+          )
+
+          if label_count == 0:
+              raise SystemExit("No escaped JSX label attributes were found")
+          if address_count != 1:
+              raise SystemExit(f"Expected one install_address presentation override, got {address_count}")
+          if re.search(r'label="[^"]*\\u[0-9a-fA-F]{4}', source):
+              raise SystemExit("Escaped unicode remains in JSX label attributes")
+
+          path.write_text(source, encoding="utf-8", newline="\n")
+          print(f"decoded_labels={label_count}; compact_address={address_count}")
+          '@ | python -
+
+          git diff -- client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx
+          git rm .github/workflows/one-off-fix-sales-labels-density.yml
+          git commit -m "fix(ui): clean Sales Order labels and compact address"
+          git push origin HEAD:ui/fix-sales-labels-density
