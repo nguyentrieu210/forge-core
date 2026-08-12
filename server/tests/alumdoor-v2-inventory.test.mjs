@@ -26,14 +26,16 @@ function setup(clock = now) {
     has_catch_weight: 1,
     weight_uom: "Kg",
     measurement_profile: "NHOM-CAY",
+    material_specification: "AL548-TECH",
     item_group: "Nhôm",
   });
   store.seedMaster("Measurement Profile", "NHOM-CAY", "demo", {
     inventory_mode: "Nhôm cây/lá",
-    kerf_mm: 3,
+  });
+  store.seedMaster("Material Specification", "AL548-TECH", "demo", {
     scrap_threshold_m: "0.200000",
   });
-  store.seedMaster("Cutting Policy", "CAT-CUA-DUC", "demo", { disabled: 0 });
+  store.seedMaster("Cutting Policy", "CAT-CUA-DUC", "demo", { disabled: 0, kerf_mm: 3 });
   store.seedMaster("Warehouse", "KHO-CHINH", "demo", {
     company: "Demo", stock_role: "Kho chính", is_group: 0,
   });
@@ -185,9 +187,7 @@ test("Cut Order không được ăn vào phần đã giữ cho lệnh khác", as
 
 async function reservationSetup() {
   const state = setup();
-  state.store.seedMaster("Measurement Profile", "NHOM-CAY", "demo", {
-    inventory_mode: "Nhôm cây/lá", kerf_mm: 0, scrap_threshold_m: "0.2",
-  });
+  state.store.seedMaster("Cutting Policy", "CAT-CUA-DUC", "demo", { disabled: 0, kerf_mm: 0 });
   state.store.seedMaster("Batch", "LO-45", "demo", {
     item_code: "AL548", length_m: "4.5", received_warehouse: "KHO-CHINH",
   });

@@ -44,6 +44,15 @@ test("ron, ray, trục and atomic leaves are purchased and stocked by Kg", async
   }
   assert.equal(targets.find((row) => row.itemCode === "RNHUA-DR")?.kgPerM, 0.263);
   assert.equal(targets.find((row) => row.itemCode === "RNINOX-DR")?.kgPerM, 0.124);
+  assert.deepEqual(
+    targets
+      .filter((row) => row.itemCode.startsWith("TRỤC 114_"))
+      .map((row) => ({ code: row.itemCode, profile: row.measurementProfile, section: row.sectionCode, thickness: row.thicknessMm, kgPerM: row.kgPerM })),
+    [
+      { code: "TRỤC 114_1.8LY", profile: "Ống/trục", section: "Φ114", thickness: 1.8, kgPerM: 4.4 },
+      { code: "TRỤC 114_2.1LY", profile: "Ống/trục", section: "Φ114", thickness: 2.1, kgPerM: 4.7 },
+    ],
+  );
 });
 
 test("three composite catalog records are removed in favor of atomic children", () => {
@@ -76,4 +85,9 @@ test("migration is catalog-only and contains no purchasing formula implementatio
   assert.match(sql, /DELETE FROM documents[\s\S]+name='RONNHUA_INOX'/);
   assert.match(sql, /DELETE FROM documents[\s\S]+name='TP-BO3LADAY'/);
   assert.match(sql, /legacy_component_split/);
+  assert.match(sql, /Measurement Profile:Ống\/trục/);
+  assert.match(sql, /"measurement_profile":"Ống\/trục"/);
+  assert.match(sql, /"spec_type":"Ống\/trục"/);
+  assert.match(sql, /"thickness_mm":1\.8/);
+  assert.match(sql, /"theoretical_kg_per_m":4\.4/);
 });

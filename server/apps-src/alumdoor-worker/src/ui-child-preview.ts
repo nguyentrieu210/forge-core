@@ -1,5 +1,6 @@
 import { salesItemContext, type SalesPlatformCall } from "./sales-item-context.js";
 import { calculateSalesProductionLine, type ProductionPlatformCall } from "./sales-production.js";
+import { allowedColorNamesForGroup } from "./color-scopes.js";
 
 type Json = Record<string, unknown>;
 type PlatformCall = SalesPlatformCall & ProductionPlatformCall;
@@ -239,6 +240,7 @@ async function previewSales(call: PlatformCall, args: Json, row: Json, parent: J
     price_list: parent.selling_price_list,
     currency: parent.currency,
     qty: row.qty,
+    sales_option: row.sales_option,
   });
   const context = contextResponse.ok ? await contextResponse.json() as Json : {};
 
@@ -251,9 +253,7 @@ async function previewSales(call: PlatformCall, args: Json, row: Json, parent: J
   ];
   for (const [name, value] of masterPlan) setIfField(patch, fields, name, value);
 
-  const allowedColors = Array.isArray(item.allowed_colors)
-    ? item.allowed_colors.map((entry) => text((entry as Json)?.color)).filter(Boolean)
-    : [];
+  const allowedColors = await allowedColorNamesForGroup(call, text(item.item_group), "sales");
   const linear = deriveLinearSalesBasis(item);
   const currentColor = text(row.color ?? row.colour);
   if (linear === "TRUC" || (currentColor && allowedColors.length && !allowedColors.includes(currentColor))) {
@@ -349,18 +349,27 @@ async function previewSales(call: PlatformCall, args: Json, row: Json, parent: J
 
   const finalForFields = { ...row, ...patch };
   const widthBasis = normalized(finalForFields.width_basis);
+  const supportsButterflyBracket = formula?.supports_butterfly_bracket === true;
   if (text(item.inventory_mode) === "Thành phẩm theo m2") {
     fieldOverride(overrides, fields, "width_m", { label: widthBasis.includes("nhựa") ? "Rộng PB nhựa\n(m)" : widthBasis.includes("ray") ? "Rộng PB ray\n(m)" : text(parent.customer_group) === "Đại lý" ? "Rộng PB nhựa\n(m)" : "Rộng PB ray\n(m)" });
     fieldOverride(overrides, fields, "height_m", { label: "Cao PB\n(m)" });
   }
+  fieldOverride(overrides, fields, "has_butterfly_bracket", {
+    hidden: supportsButterflyBracket ? 0 : 1,
+    reqd: 0,
+    label: "Có bản bướm",
+    depends_on: null,
+    mandatory_depends_on: null,
+  });
   fieldOverride(overrides, fields, "uom", { label: "ĐVT" });
   fieldOverride(overrides, fields, "qty", { label: "Khối lượng", read_only: quantity.derived ? 1 : 0 });
   fieldOverride(overrides, fields, "rate", { label: "Đơn giá (chiết khấu)\n(VNĐ)" });
   fieldOverride(overrides, fields, "discount_percentage", { label: "Chiết khấu\n(%)" });
   fieldOverride(overrides, fields, "amount", { label: "Thành tiền\n(VNĐ)" });
 
-  const setsRequired = Boolean(linear || isWidthQuantitySalesItem(item) || isOrdinaryQuantitySalesItem(item));
-  if (setsRequired) fieldOverride(overrides, fields, "set_count", { hidden: 0, reqd: 1, label: "Số lượng", depends_on: null, mandatory_depends_on: null });
+  const setsRequired = Boolean(linear || isWidthQuantitySalesItem(item) || isOrdinaryQuantitySalesItem(item)
+    || text(item.inventory_mode) === "Thành phẩm theo m2");
+  if (setsRequired) fieldOverride(overrides, fields, "set_count", { hidden: 0, reqd: 1, label: "Khối lượng", depends_on: null, mandatory_depends_on: null });
   if (linear === "RAY") fieldOverride(overrides, fields, "height_m", { hidden: 0, reqd: 1, label: "Cao (m)", depends_on: null, mandatory_depends_on: null });
   if (linear === "TRUC" || isWidthQuantitySalesItem(item)) fieldOverride(overrides, fields, "width_m", { hidden: 0, reqd: 1, label: "Rộng (m)", depends_on: null, mandatory_depends_on: null });
   if (isOrdinaryQuantitySalesItem(item)) fieldOverride(overrides, fields, "qty", { read_only: 1, label: "Khối lượng", read_only_depends_on: null });
@@ -393,6 +402,17 @@ async function previewPurchase(call: PlatformCall, args: Json, row: Json, fields
     ["door_type", item.door_type], ["purchase_kg_per_m2", item.purchase_kg_per_m2], ["leaf_divisor_m", item.leaf_divisor_m],
   ];
   for (const [name, value] of plan) setIfField(patch, fields, name, value);
+  const allowedColors = await allowedColorNamesForGroup(call, text(item.item_group), "purchase");
+  const currentColor = text(row.color ?? row.colour);
+  if (currentColor && !allowedColors.includes(currentColor)) {
+    clearIfField(clear, fields, "color");
+    clearIfField(clear, fields, "colour");
+  }
+  for (const name of ["color", "colour"]) {
+    fieldOverride(overrides, fields, name, {
+      link_filters: JSON.stringify([["Item Color", "name", "in", allowedColors.length ? allowedColors : ["__NO_ALLOWED_COLOR_CONFIG__"]]]),
+    });
+  }
   if (changed === "item_code" && !text(row.color ?? row.colour) && text(item.default_color)) {
     setIfField(patch, fields, "color", item.default_color);
     setIfField(patch, fields, "colour", item.default_color);

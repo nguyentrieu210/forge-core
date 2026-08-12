@@ -63,6 +63,7 @@ const ALUMDOOR_MASTER_WORKSPACES: Record<string, string[]> = {
   Supplier: ["Mua hàng", "Công nợ", "Bảo hành"],
   "Price List": ["Bán hàng"],
   "Item Price": ["Bán hàng"],
+  "Pricing Scope": ["Bán hàng"],
   "Pricing Rule": ["Bán hàng"],
   "Cutting Policy": ["Sản xuất"],
   "Measurement Profile": ["Kho", "Sản xuất"],

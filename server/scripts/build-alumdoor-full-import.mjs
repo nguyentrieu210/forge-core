@@ -266,12 +266,12 @@ appendSearchUpserts("Item Group", groups.map((name) => ({
 
 appendDocumentUpserts("Warehouse", [
   { name: "Kho Alumdoor", payload: { warehouse_name: "Kho Alumdoor", is_group: true, disabled: false, _metadata_revision: 25 } },
-  { name: "K12", payload: { warehouse_name: "K12", parent_warehouse: "Kho Alumdoor", is_group: false, address: "Kho vật lý K12", disabled: false, _metadata_revision: 25 } },
+  { name: "K12", payload: { warehouse_name: "Kho K12", parent_warehouse: "Kho Alumdoor", is_group: false, address: "Kho vật lý K12", disabled: false, _metadata_revision: 25 } },
   { name: "K36", payload: { warehouse_name: "K36", parent_warehouse: "Kho Alumdoor", is_group: false, address: "Kho vật lý K36", disabled: false, _metadata_revision: 25 } },
 ]);
 appendSearchUpserts("Warehouse", [
   { name: "Kho Alumdoor", title: "Kho Alumdoor", content: "Kho Alumdoor nhóm gốc" },
-  { name: "K12", title: "K12", content: "K12 Kho vật lý K12 Kho Alumdoor" },
+  { name: "K12", title: "Kho K12", content: "K12 Kho K12 Kho vật lý K12 Kho Alumdoor" },
   { name: "K36", title: "K36", content: "K36 Kho vật lý K36 Kho Alumdoor" },
 ]);
 

@@ -663,10 +663,18 @@ async function normalizeCutRow(
   const profile = profileName
     ? await context.reader.getMasterRecordData(context.command.tenant_id, "Measurement Profile", profileName)
     : null;
-  if (!profile) throw errors.reference(`Mặt hàng ${source.item_code} chưa có bộ quy cách hợp lệ`);
-  const kerfMicros = toScaledInt(Number(profile.kerf_mm ?? 0) / 1000, 6, "kerf_mm");
+  if (!profile) throw errors.reference(`Mặt hàng ${source.item_code} chưa có bộ theo dõi vật tư hợp lệ`);
+  const policy = await context.reader.getMasterRecordData(
+    context.command.tenant_id, "Cutting Policy", context.command.document.cutting_policy,
+  );
+  if (!policy) throw errors.reference(`Công thức cửa ${context.command.document.cutting_policy} không tồn tại hoặc đã ngừng dùng`);
+  const kerfMicros = toScaledInt(Number(policy.kerf_mm ?? 0) / 1000, 6, "kerf_mm");
   if (kerfMicros < 0 || kerfMicros > 10_000) throw errors.validation("Bề rộng lưỡi cắt phải trong khoảng 0–10 mm");
-  const threshold = toScaledInt(decimal(profile.scrap_threshold_m, "scrap_threshold_m"), 6);
+  const specificationName = typeof item.material_specification === "string" ? item.material_specification : "";
+  const specification = specificationName
+    ? await context.reader.getMasterRecordData(context.command.tenant_id, "Material Specification", specificationName)
+    : null;
+  const threshold = toScaledInt(decimal(specification?.scrap_threshold_m ?? 0, "scrap_threshold_m"), 6);
   if (threshold < 0) throw errors.validation("Ngưỡng phế liệu không được âm");
 
   let sourceLength = -1;

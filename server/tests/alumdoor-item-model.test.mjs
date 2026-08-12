@@ -49,6 +49,40 @@ test("Alumdoor Item declares reusable inventory measurement profiles", () => {
   assert.ok(doctype("Material Specification"));
   assert.ok(doctype("Supplier Item"));
   assert.ok(doctype("Measurement Profile"));
+  assert.equal(v2Doctype("Measurement Profile")?.label, "Bộ theo dõi vật tư");
+  assert.ok(v2Field("Measurement Profile", "track_bundle_qty"));
+  for (const moved of ["theoretical_kg_per_m", "effective_width_m", "scrap_threshold_m", "kerf_mm", "require_bundle_qty"]) {
+    assert.equal(v2Field("Measurement Profile", moved), undefined, `${moved} không thuộc Bộ theo dõi vật tư`);
+  }
+  assert.ok(v2Field("Measurement Profile", "weight_tolerance_pct"));
+  assert.ok(v2Field("Material Specification", "theoretical_kg_per_m"));
+  assert.ok(v2Field("Material Specification", "effective_width_m"));
+  assert.ok(v2Field("Material Specification", "scrap_threshold_m"));
+  assert.ok(v2Field("Cutting Policy", "kerf_mm"));
+  assert.equal(v2Field("Item", "section_inventory")?.label, "Đơn vị và theo dõi");
+  for (const removed of [
+    "tab_item_accounts", "section_accounts", "reorder_levels", "default_warehouse",
+    "inventory_account", "cogs_account", "income_account", "expense_account",
+    "standard_rate", "valuation_method", "brand", "manufacturer", "manufacturer_part_no",
+    "default_color", "allowed_colors", "barcodes", "tab_item_identity", "tab_item_tracking", "section_tracking", "has_batch_no",
+    "has_serial_no", "allow_negative_stock", "shelf_life_in_days", "has_catch_weight", "weight_uom",
+  ]) {
+    assert.equal(v2Field("Item", removed), undefined, `${removed} không còn hiện trên form vật tư`);
+  }
+  assert.equal(v2Field("Item", "section_identity")?.label, "Chi tiết vật tư");
+  assert.equal(v2Field("Item", "item_nature")?.hidden, true);
+  assert.equal(v2Field("Item", "is_stock_item")?.hidden, true);
+  assert.equal(v2Field("Item", "inventory_mode")?.hidden, true);
+  const v2ItemFields = v2Doctype("Item")?.fields ?? [];
+  for (const moved of ["door_type", "purchase_kg_per_m2", "leaf_divisor_m"]) {
+    assert.ok(v2ItemFields.findIndex((entry) => entry.fieldname === moved) > v2ItemFields.findIndex((entry) => entry.fieldname === "section_identity"), `${moved} nằm trong phần Chi tiết vật tư`);
+  }
+  assert.deepEqual(
+    v2ItemFields.filter((entry) => entry.fieldtype === "Tab Break").map((entry) => entry.label),
+    ["Thông tin chính"],
+  );
+  assert.deepEqual(v2Field("Item Color", "usage_scope")?.options.split("\n"), ["Mua hàng", "Bán hàng", "Mua & bán"]);
+  assert.equal(v2Field("Item Color", "usage_scope")?.default, "Mua & bán");
   assert.equal(doctype("Item Allowed Color")?.is_child, true);
   assert.equal(doctype("Item")?.allow_rename, true);
   assert.equal(field("Item", "item_code")?.read_only_depends_on, "eval: !doc.__islocal");
@@ -80,6 +114,18 @@ test("Alumdoor Item declares reusable inventory measurement profiles", () => {
   assert.equal(field("Item", "expense_account")?.options, "Account");
   assert.equal(field("Item Price", "uom")?.options, "UOM");
   assert.equal(field("Item Price", "uom")?.fetch_from, "item_code.default_sales_uom");
+  assert.equal(field("Item Price", "sales_option")?.options, "Sales Option");
+  assert.equal(field("Item Price", "sales_option")?.label, "Phương án bán");
+  assert.deepEqual(JSON.parse(field("Item Price", "sales_option")?.link_filters ?? "[]"), [
+    ["Sales Option", "disabled", "=", 0],
+    ["Sales Option", "item_group", "=", "eval:doc.item_group"],
+  ]);
+  assert.equal(field("Item Price", "item_group")?.fetch_from, "item_code.item_group");
+  assert.equal(field("Item Price", "item_group")?.depends_on, "eval:false");
+  assert.equal(field("Item Price", "price_variant")?.fetch_from, "sales_option.price_variant");
+  assert.equal(field("Item Price", "price_variant")?.default, "STANDARD");
+  assert.equal(field("Item Price", "price_variant")?.depends_on, "eval:false");
+  assert.equal(doctype("Item Price")?.autoname, "format:{price_list}:{item_code}:{uom}:{price_variant}");
   assert.equal(field("Pricing Rule", "party")?.fieldtype, "Dynamic Link");
   assert.equal(field("Pricing Rule", "party")?.options, "party_type");
   assert.equal(field("Payment Entry", "party")?.fieldtype, "Dynamic Link");
@@ -100,6 +146,20 @@ test("Alumdoor Item declares reusable inventory measurement profiles", () => {
     brief.fixtures.find((entry) => entry.type === "Measurement Profile" && entry.name === "Thành phẩm theo m2")?.data?.require_color,
     true,
   );
+});
+
+test("Item Price stores independent sales-option variants without exposing technical fields", () => {
+  assert.equal(field("Item Price", "uom")?.fetch_from, "item_code.default_sales_uom");
+  assert.equal(field("Item Price", "sales_option")?.options, "Sales Option");
+  assert.deepEqual(JSON.parse(field("Item Price", "sales_option")?.link_filters ?? "[]"), [
+    ["Sales Option", "disabled", "=", 0],
+    ["Sales Option", "item_group", "=", "eval:doc.item_group"],
+  ]);
+  assert.equal(field("Item Price", "item_group")?.fetch_from, "item_code.item_group");
+  assert.equal(field("Item Price", "item_group")?.depends_on, "eval:false");
+  assert.equal(field("Item Price", "price_variant")?.fetch_from, "sales_option.price_variant");
+  assert.equal(field("Item Price", "price_variant")?.depends_on, "eval:false");
+  assert.equal(doctype("Item Price")?.autoname, "format:{price_list}:{item_code}:{uom}:{price_variant}");
 });
 
 test("purchase rows expose aluminium dimensions only for aluminium items", () => {
@@ -186,6 +246,20 @@ test("purchase rows expose aluminium dimensions only for aluminium items", () =>
 
 test("V2 purchase receipt exposes dimensions and area weight without mixing kg/m", () => {
   assert.equal(v2Brief.version, "2.2.3");
+  const shaftProfile = v2Brief.fixtures.find(
+    (entry) => entry.type === "Measurement Profile" && entry.name === "Ống/trục",
+  )?.data;
+  assert.deepEqual(
+    {
+      mode: shaftProfile?.inventory_mode,
+      uom: shaftProfile?.stock_uom,
+      color: shaftProfile?.require_color,
+      length: shaftProfile?.require_length,
+      pieces: shaftProfile?.require_piece_qty,
+      bundles: shaftProfile?.track_bundle_qty,
+    },
+    { mode: "Nhôm cây/lá", uom: "Kg", color: false, length: true, pieces: true, bundles: true },
+  );
   const receiptItem = v2Doctype("Purchase Receipt Item");
   for (const fieldname of [
     "height_m", "width_m", "set_count", "actual_weight_kg", "actual_kg_per_m", "actual_kg_per_sqm",
@@ -284,6 +358,12 @@ function masterPlatform(records) {
       const parts = new URL(request.url).pathname.split("/").filter(Boolean);
       const doctypeName = decodeURIComponent(parts.at(-2));
       const name = decodeURIComponent(parts.at(-1));
+      if (doctypeName === "resource" && name === "Item Color") {
+        const data = Object.entries(records)
+          .filter(([key]) => key.startsWith("Item Color:"))
+          .map(([key, value]) => ({ name: key.slice("Item Color:".length), ...value }));
+        return Promise.resolve(Response.json({ data }));
+      }
       const value = records[`${doctypeName}:${name}`];
       return value
         ? Promise.resolve(Response.json({ data: value }))
@@ -380,7 +460,7 @@ test("a service cannot masquerade as stock", async () => {
   assert.match((await response.json()).message, /dịch vụ không được bật Quản lý tồn kho/);
 });
 
-test("Item color policy rejects duplicates and a default outside the allowed list", async () => {
+test("Item color policy is inherited from Item Color group scopes", async () => {
   const base = {
     item_code: "CUA-01",
     item_group: "Thành phẩm",
@@ -404,34 +484,45 @@ test("Item color policy rejects duplicates and a default outside the allowed lis
   const env = {
     PLATFORM: masterPlatform({
       "Item Group:Thành phẩm": { is_group: 0 },
+      "Item Group:Tất cả mặt hàng": { is_group: 1 },
       "Measurement Profile:Thành phẩm theo m2": { inventory_mode: "Thành phẩm theo m2", stock_uom: "Bộ", require_color: 1 },
-      "Item Color:GS": { disabled: 0 },
-      "Item Color:CF": { disabled: 0 },
+      "Item:CUA-01": { item_group: "Thành phẩm" },
+      "Item Color:GS": { disabled: 0, applies_to_groups: [{ item_group: "Thành phẩm" }] },
+      "Item Color:CF": { disabled: 0, applies_to_groups: [{ item_group: "Nhóm khác" }] },
+      "Item Color:THÔ": { disabled: 0, usage_scope: "Mua hàng", applies_to_groups: [] },
     }),
   };
 
-  const duplicate = await alumdoorWorker.fetch(
-    request({ ...base, allowed_colors: [{ color: "GS" }, { color: "GS" }] }),
-    env,
-    {},
-  );
-  assert.equal(duplicate.status, 422);
-  assert.match((await duplicate.json()).message, /khai lặp/);
-
-  const outside = await alumdoorWorker.fetch(
-    request({ ...base, default_color: "CF", allowed_colors: [{ color: "GS" }] }),
-    env,
-    {},
-  );
-  assert.equal(outside.status, 422);
-  assert.match((await outside.json()).message, /chưa nằm trong Các màu được phép/);
-
   const dynamicArea = await alumdoorWorker.fetch(
-    request({ ...base, default_sales_uom: "m2", allowed_colors: [{ color: "GS" }] }),
+    request({ ...base, default_sales_uom: "m2" }),
     env,
     {},
   );
   assert.equal(dynamicArea.status, 200, await dynamicArea.text());
+
+  const context = await alumdoorWorker.fetch(new Request("https://app.internal/api/method/alumdoor.catalog.allowed_colors", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-cloudforge-tenant": "tenant-test",
+      "x-cloudforge-callback": "https://tenant.test/_app/",
+    },
+    body: JSON.stringify({ args: { item_code: "CUA-01", usage_scope: "purchase" } }),
+  }), env, {});
+  assert.equal(context.status, 200, await context.text());
+  assert.deepEqual((await context.json()).allowed_colors, ["GS", "THÔ"]);
+
+  const salesContext = await alumdoorWorker.fetch(new Request("https://app.internal/api/method/alumdoor.catalog.allowed_colors", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-cloudforge-tenant": "tenant-test",
+      "x-cloudforge-callback": "https://tenant.test/_app/",
+    },
+    body: JSON.stringify({ args: { item_code: "CUA-01", usage_scope: "sales" } }),
+  }), env, {});
+  assert.equal(salesContext.status, 200, await salesContext.text());
+  assert.deepEqual((await salesContext.json()).allowed_colors, ["GS"]);
 
   const manufacturedOnly = await alumdoorWorker.fetch(
     request({ ...base, is_purchase_item: 0, is_sales_item: 1, default_purchase_uom: "Kg", default_sales_uom: "m2" }),
@@ -459,13 +550,15 @@ test("sales and production documents require an active allowed color", async () 
   const env = {
     PLATFORM: masterPlatform({
       "Item:CUA-01": {
+        item_group: "Thành phẩm",
         inventory_mode: "Thành phẩm theo m2",
         measurement_profile: "Thành phẩm theo m2",
-        allowed_colors: [{ color: "GS" }],
       },
+      "Item Group:Thành phẩm": { is_group: 0 },
       "Measurement Profile:Thành phẩm theo m2": { require_color: 1 },
-      "Item Color:GS": { disabled: 0 },
-      "Item Color:CF": { disabled: 0 },
+      "Item Color:GS": { disabled: 0, applies_to_groups: [{ item_group: "Thành phẩm" }] },
+      "Item Color:CF": { disabled: 0, applies_to_groups: [{ item_group: "Nhóm khác" }] },
+      "Item Color:THÔ": { disabled: 0, usage_scope: "Mua hàng", applies_to_groups: [] },
     }),
   };
 
@@ -475,7 +568,11 @@ test("sales and production documents require an active allowed color", async () 
 
   const disallowed = await alumdoorWorker.fetch(request("CF"), env, {});
   assert.equal(disallowed.status, 422);
-  assert.match((await disallowed.json()).message, /không nằm trong Các màu được phép/);
+  assert.match((await disallowed.json()).message, /không áp dụng cho Nhóm hàng/);
+
+  const purchaseOnly = await alumdoorWorker.fetch(request("THÔ"), env, {});
+  assert.equal(purchaseOnly.status, 422);
+  assert.match((await purchaseOnly.json()).message, /chỉ dùng khi mua hàng/);
 
   const valid = await alumdoorWorker.fetch(request("GS"), env, {});
   assert.equal(valid.status, 200, await valid.text());
@@ -502,7 +599,6 @@ test("ray and truc sales lines do not require a color", async () => {
         item_code: "TRUC-114",
         inventory_mode: "Thành phẩm theo m2",
         measurement_profile: "Thành phẩm theo m2",
-        allowed_colors: [],
       },
       "Measurement Profile:Thành phẩm theo m2": { require_color: 1 },
     }),
@@ -525,17 +621,18 @@ test("purchase order uses width, kg-per-m and trees to derive barem kg", async (
   const env = {
     PLATFORM: masterPlatform({
       "Item:AL71": {
+        item_group: "Nan/lá cửa",
         inventory_mode: "Nhôm cây/lá",
         stock_uom: "Kg",
         measurement_profile: "Nhôm cây/lá",
         material_specification: "ĐM-AL71",
-        allowed_colors: [{ color: "GS" }],
       },
+      "Item Group:Nan/lá cửa": { is_group: 0 },
       "Measurement Profile:Nhôm cây/lá": { require_color: 1 },
       "Material Specification:ĐM-AL71": {
         theoretical_kg_per_m: 0.389,
       },
-      "Item Color:GS": { disabled: 0 },
+      "Item Color:GS": { disabled: 0, applies_to_groups: [{ item_group: "Nan/lá cửa" }] },
     }),
   };
   const line = {
@@ -573,12 +670,12 @@ test("purchase order uses width, kg-per-m and trees to derive barem kg", async (
 
 test("purchase receipt validates actual kg per square metre from height, width and pieces", async () => {
   const item = {
+    item_group: "Cửa thành phẩm",
     inventory_mode: "Thành phẩm theo m2",
     stock_uom: "m2",
     default_purchase_uom: "m2",
     min_area_sqm: 0,
     is_purchase_item: 1,
-    allowed_colors: [{ color: "GS" }],
   };
   const base = {
     item_code: "CUA-M2",
@@ -593,7 +690,11 @@ test("purchase receipt validates actual kg per square metre from height, width a
     conversion_factor: 1,
     stock_qty: 24,
   };
-  const env = { PLATFORM: platform({ "CUA-M2": item, GS: { disabled: 0 } }) };
+  const env = { PLATFORM: masterPlatform({
+    "Item:CUA-M2": item,
+    "Item Group:Cửa thành phẩm": { is_group: 0 },
+    "Item Color:GS": { disabled: 0, applies_to_groups: [{ item_group: "Cửa thành phẩm" }] },
+  }) };
 
   const valid = await alumdoorWorker.fetch(validatorRequest([base]), env, {});
   assert.equal(valid.status, 200, await valid.text());
@@ -633,16 +734,17 @@ test("m2 sales derives a dynamic conversion to exact set stock", async () => {
   const env = {
     PLATFORM: masterPlatform({
       "Item:CUA-M2": {
+        item_group: "Cửa thành phẩm",
         inventory_mode: "Thành phẩm theo m2",
         measurement_profile: "Thành phẩm theo m2",
         stock_uom: "Bộ",
         default_sales_uom: "m2",
         min_area_sqm: 3,
         is_sales_item: 1,
-        allowed_colors: [{ color: "GS" }],
       },
+      "Item Group:Cửa thành phẩm": { is_group: 0 },
       "Measurement Profile:Thành phẩm theo m2": { require_color: 1 },
-      "Item Color:GS": { disabled: 0 },
+      "Item Color:GS": { disabled: 0, applies_to_groups: [{ item_group: "Cửa thành phẩm" }] },
     }),
   };
   const base = {
@@ -659,9 +761,10 @@ test("m2 sales derives a dynamic conversion to exact set stock", async () => {
 });
 
 test("aluminium is authoritative Kg stock plus required physical dimensions", async () => {
-  const env = { PLATFORM: platform({
-    A282: { inventory_mode: "Nhôm cây/lá", stock_uom: "Kg", allowed_colors: [{ color: "GS" }] },
-    GS: { disabled: 0 },
+  const env = { PLATFORM: masterPlatform({
+    "Item:A282": { item_group: "Nan/lá cửa", inventory_mode: "Nhôm cây/lá", stock_uom: "Kg" },
+    "Item Group:Nan/lá cửa": { is_group: 0 },
+    "Item Color:GS": { disabled: 0, applies_to_groups: [{ item_group: "Nan/lá cửa" }] },
   }) };
   const valid = await alumdoorWorker.fetch(
     validatorRequest([{

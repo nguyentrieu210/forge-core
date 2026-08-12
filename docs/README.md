@@ -2,6 +2,11 @@
 
 Ngày cập nhật: **2026-08-04**.
 
+## Dữ liệu nguồn Alumdoor tra nhanh
+
+- `docs/source-data/README.md` — chỉ mục Markdown sinh từ Word/Excel gốc, kèm đường dẫn nguồn, ngày sửa và SHA-256.
+- Khi file gốc thay đổi, chạy `server/scripts/build-alumdoor-source-md.py` để cập nhật lại toàn bộ bản tra nhanh.
+
 Tài liệu trong repo được chia theo **authority**, không theo số lượng file. Exact GitHub state, code, migration và test luôn thắng prose stale.
 
 ## 1. Live authority — đọc trước

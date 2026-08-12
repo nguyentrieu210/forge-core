@@ -2,7 +2,7 @@
   "$schema": "./brief.schema.json",
   "id": "alumdoor",
   "name": "Alumdoor",
-  "version": "2.0.36",
+  "version": "2.0.42",
   "module": "Alumdoor",
   "domain": "alumdoor",
   "brand": "warm",
@@ -317,7 +317,13 @@
       "permission": "Purchase Receipt",
       "fields": [
         "purchase_order:Link(Purchase Order)! Đơn mua",
-        "warehouse:Link(Warehouse) Kho nhập (trống = theo dòng đơn mua)",
+        {
+          "fieldname": "warehouse",
+          "label": "Kho nhập (trống = theo dòng đơn mua)",
+          "fieldtype": "Link",
+          "options": "Warehouse",
+          "link_filters": "{\"is_group\":0,\"disabled\":0}"
+        },
         "supplier_invoice_no:Data Số phiếu giao của NCC",
         "driver:Data Người giao"
       ],
@@ -343,7 +349,14 @@
         "rate:Currency! Đơn giá/kg",
         "color:Link(Item Color)! Màu",
         "is_stamped:Select(Có,Không)!=(Không) Dập",
-        "warehouse:Link(Warehouse)! Kho nhập",
+        {
+          "fieldname": "warehouse",
+          "label": "Kho nhập",
+          "fieldtype": "Link",
+          "options": "Warehouse",
+          "required": true,
+          "link_filters": "{\"is_group\":0,\"disabled\":0}"
+        },
         "supplier_invoice_no:Data Số phiếu giao NCC",
         "driver:Data Người giao"
       ],
@@ -362,7 +375,13 @@
       "permission": "Delivery Note",
       "fields": [
         "sales_order:Link(Sales Order)! Đơn hàng",
-        "warehouse:Link(Warehouse) Kho xuất (trống = theo từng dòng)",
+        {
+          "fieldname": "warehouse",
+          "label": "Kho xuất (trống = theo từng dòng)",
+          "fieldtype": "Link",
+          "options": "Warehouse",
+          "link_filters": "{\"is_group\":0,\"disabled\":0}"
+        },
         "install_address:Small Text Địa chỉ giao (trống = theo đơn)",
         "install_date:Date Ngày lắp",
         "installer:Data Đội lắp đặt",
@@ -397,7 +416,13 @@
         "image:Attach Image! Ảnh chụp chứng từ",
         "target:Select(Đơn mua hàng,Phiếu nhập mua,Hoá đơn mua)!=(Phiếu nhập mua) Đọc thành chứng từ gì",
         "supplier:Link(Supplier)! Nhà cung cấp",
-        "warehouse:Link(Warehouse) Kho (bắt buộc khi tạo phiếu nhập)",
+        {
+          "fieldname": "warehouse",
+          "label": "Kho (bắt buộc khi tạo phiếu nhập)",
+          "fieldtype": "Link",
+          "options": "Warehouse",
+          "link_filters": "{\"is_group\":0,\"disabled\":0}"
+        },
         "purchase_order:Link(Purchase Order) Theo đơn mua (nếu có)",
         "supplier_invoice_no:Data Số hoá đơn / phiếu giao của NCC"
       ],
@@ -414,8 +439,22 @@
       "permission": "Work Order",
       "fields": [
         "sales_order:Link(Sales Order)! Đơn hàng đã ghi sổ",
-        "source_warehouse:Link(Warehouse)! Kho nguyên vật liệu",
-        "target_warehouse:Link(Warehouse)! Kho nhập thành phẩm",
+        {
+          "fieldname": "source_warehouse",
+          "label": "Kho nguyên vật liệu",
+          "fieldtype": "Link",
+          "options": "Warehouse",
+          "required": true,
+          "link_filters": "{\"is_group\":0,\"disabled\":0}"
+        },
+        {
+          "fieldname": "target_warehouse",
+          "label": "Kho nhập thành phẩm",
+          "fieldtype": "Link",
+          "options": "Warehouse",
+          "required": true,
+          "link_filters": "{\"is_group\":0,\"disabled\":0}"
+        },
         "planned_start_date:Datetime Ngày bắt đầu",
         "planned_end_date:Date Ngày hẹn hoàn thành",
         "note:Small Text Ghi chú xưởng"
@@ -436,7 +475,14 @@
         "item_code:Link(Item)! Mã nhôm",
         "color:Link(Item Color) Màu (bỏ trống = mọi màu)",
         "condition:Select(Thô,Đã sơn,Lỗi) Tình trạng",
-        "warehouse:Link(Warehouse)! Kho",
+        {
+          "fieldname": "warehouse",
+          "label": "Kho",
+          "fieldtype": "Link",
+          "options": "Warehouse",
+          "required": true,
+          "link_filters": "{\"is_group\":0,\"disabled\":0}"
+        },
         "cutting_policy:Link(Cutting Policy)! Công thức cửa",
         "cut_width_m:Float! Rộng cắt lá (m)",
         "sheets:Float! Số lá cần",
@@ -458,7 +504,14 @@
         "item_code:Link(Item)! Mã nhôm",
         "color:Link(Item Color) Màu",
         "condition:Select(Thô,Đã sơn,Lỗi) Tình trạng",
-        "warehouse:Link(Warehouse)! Kho",
+        {
+          "fieldname": "warehouse",
+          "label": "Kho",
+          "fieldtype": "Link",
+          "options": "Warehouse",
+          "required": true,
+          "link_filters": "{\"is_group\":0,\"disabled\":0}"
+        },
         "min_length_m:Float! Khổ tối thiểu (m)",
         "qty_reserved:Float! Số cây giữ",
         "source_doctype:Select(Sales Order,Work Order,Cut Order) Giữ cho chứng từ",
@@ -489,9 +542,22 @@
       "permission": "Stock Reconciliation",
       "description": "Chụp tồn sổ tại thời điểm bấm và điền vào phiếu. KHÔNG ghi bút toán nào.",
       "fields": [
-        "warehouse:Link(Warehouse)! Kho",
+        {
+          "fieldname": "warehouse",
+          "label": "Kho",
+          "fieldtype": "Link",
+          "options": "Warehouse",
+          "required": true,
+          "link_filters": "{\"is_group\":0,\"disabled\":0}"
+        },
         "scope:Select(Toàn kho,Theo nhóm hàng,Một mặt hàng)!=(Toàn kho) Phạm vi",
-        "item_group:Link(Item Group) Nhóm hàng",
+        {
+          "fieldname": "item_group",
+          "label": "Nhóm hàng",
+          "fieldtype": "Link",
+          "options": "Item Group",
+          "link_filters": "{\"is_group\":0,\"disabled\":0}"
+        },
         "item_code:Link(Item) Mặt hàng"
       ],
       "commit": "alumdoor.recon.snapshot | Chốt số sổ",
@@ -598,7 +664,14 @@
       "description": "Xem đơn đến hạn và tạo một Phiếu xuất nháp mỗi đơn; retry không tạo trùng.",
       "fields": [
         "delivery_date:Date!=(Today) Ngày giao",
-        "warehouse:Link(Warehouse)! Kho xuất",
+        {
+          "fieldname": "warehouse",
+          "label": "Kho xuất",
+          "fieldtype": "Link",
+          "options": "Warehouse",
+          "required": true,
+          "link_filters": "{\"is_group\":0,\"disabled\":0}"
+        },
         "driver:Data Người giao / lái xe",
         "vehicle:Data Biển số"
       ],
@@ -761,6 +834,38 @@
       "name": "Cây",
       "data": {
         "uom_name": "Cây",
+        "must_be_whole_number": true
+      }
+    },
+    {
+      "type": "UOM",
+      "name": "Lá",
+      "data": {
+        "uom_name": "Lá",
+        "must_be_whole_number": true
+      }
+    },
+    {
+      "type": "UOM",
+      "name": "Thân",
+      "data": {
+        "uom_name": "Thân",
+        "must_be_whole_number": true
+      }
+    },
+    {
+      "type": "UOM",
+      "name": "Cặp",
+      "data": {
+        "uom_name": "Cặp",
+        "must_be_whole_number": true
+      }
+    },
+    {
+      "type": "UOM",
+      "name": "Con",
+      "data": {
+        "uom_name": "Con",
         "must_be_whole_number": true
       }
     },
@@ -959,7 +1064,7 @@
       "type": "Warehouse",
       "name": "K12",
       "data": {
-        "warehouse_name": "K12",
+        "warehouse_name": "Kho K12",
         "parent_warehouse": "Kho Alumdoor",
         "is_group": false,
         "address": "Kho vật lý K12",
@@ -1160,7 +1265,8 @@
         "require_color": true,
         "require_length": true,
         "require_piece_qty": true,
-        "_desc": "Tồn nhôm theo số cây/lá có Batch và chiều dài; Kg là catch weight/đơn vị mua-định giá, không phải số lượng tồn."
+        "track_bundle_qty": true,
+        "_desc": "Tồn nhôm theo số cây/lá có Batch và chiều dài; số bó chỉ để theo dõi; Kg là catch weight/đơn vị mua-định giá."
       }
     },
     {
@@ -1309,6 +1415,24 @@
         "stock_role": "Kho phế",
         "disabled": false
       }
+    },
+    {
+      "type": "Measurement Profile",
+      "name": "Ống/trục",
+      "data": {
+        "profile_name": "Ống/trục",
+        "inventory_mode": "Nhôm cây/lá",
+        "stock_uom": "Kg",
+        "track_dimension_lot": true,
+        "require_color": false,
+        "require_condition": true,
+        "require_length": true,
+        "require_width": false,
+        "require_piece_qty": true,
+        "track_bundle_qty": true,
+        "weight_tolerance_pct": 13,
+        "note": "Mua và tồn theo Kg; bán theo Mét; số cây và số bó chỉ dùng để theo dõi giao nhận."
+      }
     }
   ],
   "doctypes": [
@@ -1367,7 +1491,7 @@
         "default_income_account:Link(Account) TK doanh thu mặc định",
         "default_expense_account:Link(Account) TK chi phí mặc định",
         "default_valuation_method:Select(FIFO,Bình quân di động) Phương pháp giá vốn mặc định",
-        "default_measurement_profile:Link(Measurement Profile) Bộ quy cách mặc định",
+        "default_measurement_profile:Link(Measurement Profile) Bộ theo dõi mặc định",
         "disabled:Check Ngừng dùng"
       ],
       "permissions": {
@@ -1459,6 +1583,7 @@
         "color_code:Data*! Mã màu",
         "color_name:Data! Tên màu",
         "finish:Select(Thô,Sơn tĩnh điện,Anode,Vân gỗ,Mạ,Khác) Bề mặt",
+        "usage_scope:Select(Mua hàng,Bán hàng,Mua & bán)!=(Mua & bán) Phạm vi giao dịch",
         "applies_to_groups:Table(Item Color Scope) Nhóm SP áp dụng",
         "supplier_color_code:Data Mã màu nhà cung cấp",
         "disabled:Check Ngừng dùng"
@@ -1562,26 +1687,78 @@
       "list": [
         "spec_code",
         "spec_name",
-        "material_grade",
+        "item_group",
+        "spec_type",
         "theoretical_kg_per_m",
         "standard_length_m"
       ],
       "search": [
         "spec_code",
         "spec_name",
+        "item_group",
         "profile_system"
       ],
       "fields": [
         "spec_code:Data*! Mã quy cách",
         "spec_name:Data! Tên quy cách",
+        {
+          "fieldname": "item_group",
+          "label": "Nhóm sản phẩm áp dụng",
+          "fieldtype": "Link",
+          "options": "Item Group",
+          "required": true,
+          "link_filters": "{\"is_group\":0,\"disabled\":0}"
+        },
+        "spec_type:Select(Nhôm cây/lá,Ống/trục,Tấm/Kính,Cuộn,Khác)! Loại quy cách",
         "material_grade:Link(Material Grade) Mác vật liệu",
-        "profile_system:Data Hệ / dòng profile",
-        "section_code:Data Mã tiết diện",
-        "theoretical_kg_per_m:Float Kg/m lý thuyết",
-        "standard_length_m:Float Chiều dài chuẩn (m)",
-        "width_m:Float Khổ rộng (m)",
-        "thickness_mm:Float Độ dày (mm)",
-        "scrap_threshold_m:Float Ngưỡng phế liệu (m)",
+        {
+          "fieldname": "profile_system",
+          "fieldtype": "Data",
+          "label": "Hệ / dòng profile",
+          "depends_on": "eval:doc.spec_type == 'Nhôm cây/lá' || doc.spec_type == 'Ống/trục'"
+        },
+        {
+          "fieldname": "section_code",
+          "fieldtype": "Data",
+          "label": "Phi / mã tiết diện",
+          "depends_on": "eval:doc.spec_type == 'Nhôm cây/lá' || doc.spec_type == 'Ống/trục'"
+        },
+        {
+          "fieldname": "theoretical_kg_per_m",
+          "fieldtype": "Float",
+          "label": "Kg/m lý thuyết",
+          "depends_on": "eval:doc.spec_type == 'Nhôm cây/lá' || doc.spec_type == 'Ống/trục'"
+        },
+        {
+          "fieldname": "standard_length_m",
+          "fieldtype": "Float",
+          "label": "Chiều dài chuẩn (m)",
+          "depends_on": "eval:doc.spec_type == 'Nhôm cây/lá' || doc.spec_type == 'Ống/trục' || doc.spec_type == 'Tấm/Kính'"
+        },
+        {
+          "fieldname": "width_m",
+          "fieldtype": "Float",
+          "label": "Khổ rộng (m)",
+          "depends_on": "eval:doc.spec_type == 'Tấm/Kính' || doc.spec_type == 'Cuộn'"
+        },
+        {
+          "fieldname": "effective_width_m",
+          "fieldtype": "Float",
+          "label": "Bản rộng hữu dụng (m)",
+          "depends_on": "eval:doc.spec_type == 'Tấm/Kính' || doc.spec_type == 'Cuộn'"
+        },
+        {
+          "fieldname": "thickness_mm",
+          "fieldtype": "Float",
+          "label": "Độ dày (mm)",
+          "depends_on": "eval:doc.spec_type == 'Nhôm cây/lá' || doc.spec_type == 'Ống/trục' || doc.spec_type == 'Tấm/Kính' || doc.spec_type == 'Cuộn'"
+        },
+        {
+          "fieldname": "scrap_threshold_m",
+          "fieldtype": "Float",
+          "label": "Ngưỡng phế liệu (m)",
+          "depends_on": "eval:doc.spec_type == 'Nhôm cây/lá' || doc.spec_type == 'Ống/trục' || doc.spec_type == 'Cuộn'"
+        },
         "drawing:Attach Bản vẽ kỹ thuật",
         "note:Small Text Ghi chú",
         "disabled:Check Ngừng dùng"
@@ -1814,10 +1991,11 @@
           "surface": "quick"
         },
         {
-          "fieldname": "default_warehouse",
           "label": "Kho mặc định",
+          "fieldname": "default_warehouse",
           "fieldtype": "Link",
           "options": "Warehouse",
+          "link_filters": "{\"is_group\":0,\"disabled\":0}",
           "surface": "quick"
         },
         {
@@ -1883,11 +2061,12 @@
       ],
       "fields": [
         {
-          "fieldname": "warehouse",
           "label": "Kho",
+          "fieldname": "warehouse",
           "fieldtype": "Link",
           "options": "Warehouse",
           "required": true,
+          "link_filters": "{\"is_group\":0,\"disabled\":0}",
           "surface": "quick"
         },
         {
@@ -1978,9 +2157,9 @@
       }
     },
     {
-      "//": "Bộ quy cách quyết định một Item cần những đại lượng vật lý nào. Item chỉ giữ sự thật ổn định; màu, khổ và số cây của từng chuyến nằm trên lô/chứng từ.",
+      "//": "Bộ theo dõi chỉ quyết định kho cần ghi nhận gì; thông số cố định nằm ở Quy cách kỹ thuật vật tư.",
       "name": "Measurement Profile",
-      "label": "Bộ quy cách tồn kho",
+      "label": "Bộ theo dõi vật tư",
       "icon": "ruler",
       "group": "Danh mục",
       "naming": "field:profile_name",
@@ -1995,7 +2174,7 @@
         "profile_name"
       ],
       "fields": [
-        "profile_name:Data*! Tên bộ quy cách",
+        "profile_name:Data*! Tên bộ theo dõi",
         "inventory_mode:Select(Hàng thường,Nhôm cây/lá,Tấm/Kính,Cuộn,Lô/Serial,Thành phẩm theo m2)!=(Hàng thường) Kiểu quản lý tồn",
         "stock_uom:Link(UOM)!=(Cái) Đơn vị tồn đề xuất",
         "track_dimension_lot:Check Theo dõi lô kích thước",
@@ -2004,24 +2183,13 @@
         "require_length:Check Bắt buộc chiều dài",
         "require_width:Check Bắt buộc chiều rộng",
         "require_piece_qty:Check Bắt buộc số cây/lá/tấm",
-        "require_bundle_qty:Check Bắt buộc số bó",
-        "theoretical_kg_per_m:Float Kg/m lý thuyết",
-        "effective_width_m:Float Bản rộng hữu dụng (m)",
-        "scrap_threshold_m:Float Ngưỡng phế liệu (m)",
-        {
-          "//": "Bề rộng lưỡi cắt. Cửa 51 lá là 51 nhát — bản cũ không tính, mất ~15 cm mỗi bộ.",
-          "fieldname": "kerf_mm",
-          "fieldtype": "Float",
-          "label": "Bề rộng lưỡi cắt (mm)",
-          "default": 3,
-          "description": "Chuẩn ngành 2–4 mm. Trừ kerf × số nhát khỏi chiều dài dùng được."
-        },
+        "track_bundle_qty:Check Theo dõi số bó",
         {
           "fieldname": "weight_tolerance_pct",
           "fieldtype": "Float",
           "label": "Ngưỡng cảnh báo lệch cân (%)",
           "default": 13,
-          "description": "Lấy từ sai số đo thật 6,57→8,61 m/cây. Vượt ngưỡng thì cảnh báo lúc nhập, KHÔNG chặn."
+          "description": "Vượt ngưỡng thì cảnh báo lúc nhập, không chặn ghi sổ."
         },
         "note:Small Text Ghi chú / quy tắc áp dụng"
       ],
@@ -2078,14 +2246,22 @@
         },
         "item_name:Data! Tên hàng",
         {
+          "label": "Nhóm hàng",
           "fieldname": "item_group",
           "fieldtype": "Link",
           "options": "Item Group",
-          "label": "Nhóm hàng",
           "required": true,
           "link_filters": "{\"is_group\":0,\"disabled\":0}"
         },
-        "item_nature:Select(Hàng tồn kho,Dịch vụ,Tài sản)!=(Hàng tồn kho) Bản chất mặt hàng",
+        {
+          "fieldname": "item_nature",
+          "label": "Bản chất mặt hàng",
+          "fieldtype": "Select",
+          "options": "Hàng tồn kho\nDịch vụ\nTài sản",
+          "required": true,
+          "default": "Hàng tồn kho",
+          "hidden": true
+        },
         {
           "fieldname": "material_stage",
           "fieldtype": "Select",
@@ -2107,7 +2283,8 @@
           "fieldtype": "Check",
           "label": "Quản lý tồn kho",
           "default": true,
-          "read_only_depends_on": "eval:doc.item_nature == 'Dịch vụ'"
+          "read_only_depends_on": "eval:doc.item_nature == 'Dịch vụ'",
+          "hidden": true
         },
         {
           "//": "`in_standard_filter` để trường này LỌC ĐƯỢC. Danh sách trường lọc dựng từ Link + in_list_view + in_standard_filter, nên một Check không đánh dấu thì mọi truy vấn theo nó bị từ chối — kể cả `link_filters` của ô chọn mặt hàng, thứ chính là lý do trường này tồn tại.",
@@ -2134,17 +2311,43 @@
         {
           "fieldname": "section_inventory",
           "fieldtype": "Section Break",
-          "label": "Quản lý kho và đơn vị"
+          "label": "Đơn vị và theo dõi"
         },
         {
-          "//": "GƯƠNG của Measurement Profile.inventory_mode — KHÔNG sửa tay được. Nguồn sự thật là bộ quy cách.",
+          "//": "GƯƠNG của Measurement Profile.inventory_mode — KHÔNG sửa tay được. Nguồn sự thật là bộ theo dõi vật tư.",
           "fieldname": "inventory_mode",
           "fieldtype": "Data",
           "label": "Kiểu quản lý tồn",
           "read_only": true,
+          "hidden": true,
           "fetch_from": "measurement_profile.inventory_mode",
           "in_standard_filter": true
         },
+        {
+          "//": "NGUỒN DUY NHẤT của inventory_mode sau V2. Hàng thường vẫn phải trỏ vào profile 'Hàng thường'.",
+          "fieldname": "measurement_profile",
+          "fieldtype": "Link",
+          "options": "Measurement Profile",
+          "label": "Bộ theo dõi vật tư",
+          "required": true
+        },
+        "stock_uom:Link(UOM)!=(Cái) Đơn vị TỒN KHO",
+        "default_purchase_uom:Link(UOM) ĐVT mua mặc định",
+        "default_sales_uom:Link(UOM) ĐVT bán mặc định",
+        {
+          "fieldname": "uom_conversions",
+          "fieldtype": "Table",
+          "options": "UOM Conversion",
+          "label": "Đơn vị quy đổi khác",
+          "depends_on": "eval:doc.default_purchase_uom != doc.stock_uom || doc.default_sales_uom != doc.stock_uom",
+          "description": "Chỉ khai khi đơn vị mua/bán khác đơn vị tồn."
+        },
+        {
+          "fieldname": "section_identity",
+          "fieldtype": "Section Break",
+          "label": "Chi tiết vật tư"
+        },
+        "material_specification:Link(Material Specification) Quy cách kỹ thuật",
         {
           "fieldname": "door_type",
           "fieldtype": "Select",
@@ -2167,103 +2370,6 @@
           "depends_on": "eval:doc.door_type",
           "description": "Ước số kỹ thuật dùng chia số lá khi Công thức cửa chọn lấy từ bộ quy cách/Item. Để trống sẽ chặn tạo lệnh sản xuất."
         },
-        {
-          "//": "NGUỒN DUY NHẤT của inventory_mode sau V2. Hàng thường vẫn phải trỏ vào profile 'Hàng thường'.",
-          "fieldname": "measurement_profile",
-          "fieldtype": "Link",
-          "options": "Measurement Profile",
-          "label": "Bộ quy cách",
-          "required": true
-        },
-        "stock_uom:Link(UOM)!=(Cái) Đơn vị TỒN KHO",
-        {
-          "//": "Bật = mọi dòng sổ mang HAI con số: actual_qty_micros và actual_weight_micros.",
-          "fieldname": "has_catch_weight",
-          "fieldtype": "Check",
-          "label": "Cân theo kiện (catch weight)"
-        },
-        {
-          "fieldname": "weight_uom",
-          "fieldtype": "Link",
-          "options": "UOM",
-          "label": "Đơn vị khối lượng",
-          "default": "Kg",
-          "depends_on": "eval:doc.has_catch_weight",
-          "mandatory_depends_on": "eval:doc.has_catch_weight"
-        },
-        "default_purchase_uom:Link(UOM) ĐVT mua mặc định",
-        "default_sales_uom:Link(UOM) ĐVT bán mặc định",
-        {
-          "//": "CẤM khai cho mặt hàng catch weight — xem docs/brd-v2/brd-entities/item.md §2.2.",
-          "fieldname": "uom_conversions",
-          "fieldtype": "Table",
-          "options": "UOM Conversion",
-          "label": "Đơn vị quy đổi khác",
-          "depends_on": "eval:!doc.has_catch_weight && (doc.default_purchase_uom != doc.stock_uom || doc.default_sales_uom != doc.stock_uom)",
-          "description": "Chỉ khai khi đơn vị mua/bán khác đơn vị tồn. Mặt hàng cân theo kiện KHÔNG dùng bảng này."
-        },
-        {
-          "fieldname": "tab_item_identity",
-          "fieldtype": "Tab Break",
-          "label": "Nhận diện"
-        },
-        {
-          "fieldname": "section_identity",
-          "fieldtype": "Section Break",
-          "label": "Nhận diện và phân loại"
-        },
-        "brand:Link(Brand) Thương hiệu",
-        "manufacturer:Link(Manufacturer) Nhà sản xuất",
-        "manufacturer_part_no:Data Mã của nhà sản xuất",
-        "material_specification:Link(Material Specification) Quy cách kỹ thuật",
-        "default_color:Link(Item Color) Màu mặc định",
-        {
-          "fieldname": "allowed_colors",
-          "fieldtype": "Table",
-          "options": "Item Allowed Color",
-          "label": "Các màu được phép",
-          "description": "Để trống nếu mặt hàng dùng được mọi mã màu đang hoạt động. Có khai thì báo giá, mua hàng, lô nhôm và sản xuất chỉ được chọn trong danh sách này."
-        },
-        "barcodes:Table(Item Barcode) Mã vạch",
-        {
-          "fieldname": "tab_item_accounts",
-          "fieldtype": "Tab Break",
-          "label": "Kho & kế toán"
-        },
-        {
-          "fieldname": "section_accounts",
-          "fieldtype": "Section Break",
-          "label": "Kho và kế toán"
-        },
-        "reorder_levels:Table(Item Reorder) Mức tồn / đặt hàng",
-        "default_warehouse:Link(Warehouse) Kho mặc định",
-        "inventory_account:Link(Account) Tài khoản tồn kho",
-        "cogs_account:Link(Account) Tài khoản giá vốn",
-        "income_account:Link(Account) Tài khoản doanh thu",
-        "expense_account:Link(Account) Tài khoản chi phí",
-        "standard_rate:Currency Giá định mức BOM",
-        {
-          "fieldname": "valuation_method",
-          "fieldtype": "Select",
-          "options": "FIFO\nBình quân di động",
-          "label": "Phương pháp giá vốn",
-          "default": "FIFO",
-          "description": "TT99/2025 cho phép mỗi nhóm hàng một phương pháp. Đổi giữa chừng phải ghi audit — thông tư đòi nhất quán giữa các kỳ."
-        },
-        {
-          "fieldname": "tab_item_tracking",
-          "fieldtype": "Tab Break",
-          "label": "Theo dõi"
-        },
-        {
-          "fieldname": "section_tracking",
-          "fieldtype": "Section Break",
-          "label": "Theo dõi và trạng thái"
-        },
-        "has_batch_no:Check Theo dõi số lô",
-        "has_serial_no:Check Theo dõi serial",
-        "allow_negative_stock:Check Cho phép tồn âm",
-        "shelf_life_in_days:Int Hạn sử dụng (ngày)",
         {
           "fieldname": "min_area_sqm",
           "fieldtype": "Float",
@@ -2409,25 +2515,25 @@
       "title": "customer_name",
       "list": [
         "customer_name",
-        "customer_type",
         "account_manager",
+        "contact_person",
         "phone",
         "tax_id",
         "credit_limit"
       ],
       "search": [
         "customer_name",
+        "contact_person",
         "phone",
         "tax_id"
       ],
       "fields": [
         "customer_name:Data*! Tên khách hàng",
-        "customer_type:Select(Đại lý,Khách lẻ,Khác)=(Đại lý) Phân loại (mô tả)",
         {
           "//": "NHÓM GIÁ — trường quyết định, không phải `customer_type`.",
           "//vi-sao": [
             "Hai thứ này trông giống nhau nên rất dễ nhập một chỗ rồi tưởng chỗ kia cũng đúng.",
-            "`customer_type` là nhãn mô tả có sẵn từ lúc nạp dữ liệu và KHÔNG đáng tin: 321/439",
+            "Cột phân loại cũ trong file nạp KHÔNG đáng tin: 321/439",
             "khách đang mang đúng giá trị mặc định 'Đại lý', 114 khách để 'Khác', chỉ 4 khách là",
             "'Khách lẻ'. Bốn khách lẻ trên bốn trăm ba chín là con số không thể có thật.",
             "",
@@ -2446,7 +2552,15 @@
           "in_standard_filter": true,
           "description": "Quyết định cách đo bề rộng và giá bán. Đại lý đo phủ bì nhựa, khách lẻ đo phủ bì ray. Công trình và nhà thầu tính như khách lẻ."
         },
-        "account_manager:Data Người phụ trách nội bộ",
+        {
+          "fieldname": "account_manager",
+          "fieldtype": "Link",
+          "options": "Employee",
+          "label": "Nhân viên bán hàng",
+          "link_filters": "{\"employee_status\":\"Đang làm việc\"}",
+          "description": "Nhân viên bán hàng đang phụ trách khách hàng này."
+        },
+        "contact_person:Data Người liên hệ",
         "phone:Data Điện thoại",
         "email:Data Email",
         "address:Small Text Địa chỉ",
@@ -2497,25 +2611,37 @@
       }
     },
     {
-      "//": "Đơn giá một mặt hàng theo đúng ĐVT trong một bảng giá. TÊN bản ghi là `<bảng giá>:<mã hàng>:<ĐVT>`; dữ liệu cũ hai thành phần chỉ được đọc khi ĐVT khớp tuyệt đối.",
+      "//": "Đơn giá một mặt hàng theo đúng ĐVT và phương án bán trong một bảng giá. TÊN bản ghi là `<bảng giá>:<mã hàng>:<ĐVT>:<biến thể giá>`; dữ liệu cũ vẫn được đọc như biến thể STANDARD.",
       "name": "Item Price",
       "label": "Đơn giá theo bảng giá",
       "icon": "circle-dollar-sign",
       "group": "Danh mục",
-      "naming": "format:{price_list}:{item_code}:{uom}",
+      "naming": "format:{price_list}:{item_code}:{uom}:{price_variant}",
       "title": "item_code",
       "list": [
         "price_list",
         "item_code",
         "uom",
+        "sales_option",
         "rate"
       ],
       "search": [
-        "item_code"
+        "item_code",
+        "sales_option"
       ],
       "fields": [
         "price_list:Link(Price List)! Bảng giá",
         "item_code:Link(Item)! Mã hàng",
+        {
+          "label": "Nhóm sản phẩm",
+          "fieldname": "item_group",
+          "fieldtype": "Link",
+          "options": "Item Group",
+          "fetch_from": "item_code.item_group",
+          "read_only": true,
+          "depends_on": "eval:false",
+          "link_filters": "{\"is_group\":0,\"disabled\":0}"
+        },
         {
           "fieldname": "uom",
           "fieldtype": "Link",
@@ -2524,6 +2650,26 @@
           "required": true,
           "fetch_from": "item_code.default_sales_uom",
           "description": "Đơn giá chỉ áp dụng khi dòng bán dùng đúng đơn vị này."
+        },
+        {
+          "fieldname": "sales_option",
+          "fieldtype": "Link",
+          "options": "Sales Option",
+          "label": "Phương án bán",
+          "in_list_view": true,
+          "in_standard_filter": true,
+          "link_filters": "[[\"Sales Option\",\"disabled\",\"=\",0],[\"Sales Option\",\"item_group\",\"=\",\"eval:doc.item_group\"]]",
+          "description": "Để trống nếu mặt hàng chỉ có một giá bán."
+        },
+        {
+          "fieldname": "price_variant",
+          "fieldtype": "Data",
+          "label": "Mã giá",
+          "default": "STANDARD",
+          "required": true,
+          "read_only": true,
+          "depends_on": "eval:false",
+          "fetch_from": "sales_option.price_variant"
         },
         "rate:Currency! Đơn giá",
         "currency:Link(Currency)-!=(VND) Tiền tệ",
@@ -2607,7 +2753,13 @@
         "policy_name:Data*! Tên chính sách",
         "door_type:Select(Cửa Đức,Cửa Úc,Cửa Lưới,Cửa Đài Loan,Cửa Siêu Trường,Cửa tấm liền Úc)! Loại cửa",
         "ray_type:Select(U75,U100,Ray sắt U70,Không dùng ray)!=(U75) Loại ray",
-        "item_group:Link(Item Group) Chỉ áp cho nhóm hàng này (trống = mọi nhóm của loại cửa)",
+        {
+          "fieldname": "item_group",
+          "label": "Chỉ áp cho nhóm hàng này (trống = mọi nhóm của loại cửa)",
+          "fieldtype": "Link",
+          "options": "Item Group",
+          "link_filters": "{\"is_group\":0,\"disabled\":0}"
+        },
         "dealer_width_basis:Select(Phủ bì nhựa,Phủ bì ray)! Đại lý nhập rộng theo",
         "retail_width_basis:Select(Phủ bì nhựa,Phủ bì ray)! Khách lẻ nhập rộng theo",
         {
@@ -2659,6 +2811,14 @@
           "default": 0.6
         },
         "leaf_variants:Table(Leaf Variant) Biến thể theo loại motor (cửa Úc)",
+        {
+          "//": "Bề rộng đường cắt thuộc công thức cắt, không thuộc cách theo dõi tồn.",
+          "fieldname": "kerf_mm",
+          "fieldtype": "Float",
+          "label": "Bề rộng lưỡi cắt (mm)",
+          "default": 3,
+          "description": "Trừ bề rộng lưỡi cắt × số nhát khỏi chiều dài dùng được."
+        },
         "dealer_split_sales_basis:Select(Phủ bì nhựa,Phủ bì ray,Rộng cắt lá)! Đại lý tách món bán theo rộng",
         "dealer_full_sales_basis:Select(Phủ bì nhựa,Phủ bì ray,Rộng cắt lá)! Đại lý trọn bộ bán theo rộng",
         "retail_sales_basis:Select(Phủ bì nhựa,Phủ bì ray,Rộng cắt lá)! Khách lẻ bán theo rộng",
@@ -2761,7 +2921,7 @@
         },
         {
           "fieldname": "measurement_profile",
-          "label": "Bộ quy cách",
+          "label": "Bộ theo dõi",
           "fieldtype": "Link",
           "options": "Measurement Profile",
           "read_only": true,
@@ -3440,7 +3600,7 @@
         },
         {
           "fieldname": "measurement_profile",
-          "label": "Bộ quy cách",
+          "label": "Bộ theo dõi",
           "fieldtype": "Link",
           "options": "Measurement Profile",
           "read_only": true,
@@ -3873,10 +4033,11 @@
           "serverEnforced": true
         },
         {
-          "fieldname": "warehouse",
           "label": "Kho xuất",
+          "fieldname": "warehouse",
           "fieldtype": "Link",
           "options": "Warehouse",
+          "link_filters": "{\"is_group\":0,\"disabled\":0}",
           "surface": "internal",
           "hidden": true,
           "editMode": "hidden",
@@ -4022,8 +4183,10 @@
         {
           "label": "Người phụ trách",
           "fieldname": "responsible_person",
-          "fieldtype": "Data",
+          "fieldtype": "Link",
+          "options": "Employee",
           "fetch_from": "customer.account_manager",
+          "link_filters": "{\"employee_status\":\"Đang làm việc\"}",
           "form_region": "main"
         },
         {
@@ -4256,7 +4419,7 @@
         },
         {
           "fieldname": "measurement_profile",
-          "label": "Bộ quy cách",
+          "label": "Bộ theo dõi",
           "fieldtype": "Link",
           "options": "Measurement Profile",
           "read_only": true,
@@ -4437,11 +4600,12 @@
           "serverEnforced": true
         },
         {
-          "fieldname": "warehouse",
           "label": "Kho xuất",
+          "fieldname": "warehouse",
           "fieldtype": "Link",
           "options": "Warehouse",
           "required": true,
+          "link_filters": "{\"is_group\":0,\"disabled\":0}",
           "surface": "quick"
         },
         {
@@ -4656,17 +4820,19 @@
           "surface": "quick"
         },
         {
-          "fieldname": "source_warehouse",
           "label": "Kho xuất",
+          "fieldname": "source_warehouse",
           "fieldtype": "Link",
           "options": "Warehouse",
+          "link_filters": "{\"is_group\":0,\"disabled\":0}",
           "surface": "quick"
         },
         {
-          "fieldname": "target_warehouse",
           "label": "Kho nhập",
+          "fieldname": "target_warehouse",
           "fieldtype": "Link",
           "options": "Warehouse",
+          "link_filters": "{\"is_group\":0,\"disabled\":0}",
           "surface": "quick"
         },
         {
@@ -4754,8 +4920,20 @@
         "work_order:Link(Work Order) Theo lệnh sản xuất",
         "finished_good_item:Link(Item) Thành phẩm nhập kho",
         "finished_good_qty:Float Số lượng thành phẩm",
-        "source_warehouse:Link(Warehouse) Kho xuất vật tư (phiếu sản xuất)",
-        "target_warehouse:Link(Warehouse) Kho nhập thành phẩm",
+        {
+          "fieldname": "source_warehouse",
+          "label": "Kho xuất vật tư (phiếu sản xuất)",
+          "fieldtype": "Link",
+          "options": "Warehouse",
+          "link_filters": "{\"is_group\":0,\"disabled\":0}"
+        },
+        {
+          "fieldname": "target_warehouse",
+          "label": "Kho nhập thành phẩm",
+          "fieldtype": "Link",
+          "options": "Warehouse",
+          "link_filters": "{\"is_group\":0,\"disabled\":0}"
+        },
         "items:Table(Stock Entry Item)! Dòng vật tư",
         "note:Small Text Ghi chú"
       ],
@@ -4821,7 +4999,7 @@
         },
         {
           "fieldname": "measurement_profile",
-          "label": "Bộ quy cách",
+          "label": "Bộ theo dõi",
           "fieldtype": "Link",
           "options": "Measurement Profile",
           "read_only": true,
@@ -5188,10 +5366,11 @@
           "serverEnforced": true
         },
         {
-          "fieldname": "source_warehouse",
           "label": "Kho xuất vật tư",
+          "fieldname": "source_warehouse",
           "fieldtype": "Link",
           "options": "Warehouse",
+          "link_filters": "{\"is_group\":0,\"disabled\":0}",
           "surface": "quick"
         },
         {
@@ -5244,9 +5423,8 @@
       "list": [
         "supplier_name",
         "supplier_group",
-        "account_manager",
-        "phone",
         "contact_person",
+        "phone",
         "payment_terms"
       ],
       "search": [
@@ -5256,8 +5434,7 @@
       ],
       "fields": [
         "supplier_name:Data*! Tên nhà cung cấp",
-        "supplier_group:Select(Nhôm,Mô tơ,Sơn,Phụ kiện,Vận chuyển,Khác)=(Khác) Nhóm nhà cung cấp",
-        "account_manager:Data Người phụ trách nội bộ",
+        "supplier_group:Select(Nhôm,Mô tơ,Sơn,Phụ kiện,Vận chuyển,Khác)!=(Khác) Nhóm nhà cung cấp",
         "contact_person:Data Người liên hệ",
         "phone:Data Điện thoại",
         "email:Data Email",
@@ -5342,10 +5519,11 @@
           "surface": "expanded"
         },
         {
-          "fieldname": "warehouse",
           "label": "Cần về kho",
+          "fieldname": "warehouse",
           "fieldtype": "Link",
           "options": "Warehouse",
+          "link_filters": "{\"is_group\":0,\"disabled\":0}",
           "surface": "quick"
         },
         {
@@ -5576,7 +5754,7 @@
           "serverEnforced": true
         },
         {
-          "label": "Bộ quy cách",
+          "label": "Bộ theo dõi",
           "fieldname": "measurement_profile",
           "fieldtype": "Link",
           "options": "Measurement Profile",
@@ -5890,7 +6068,7 @@
           "serverEnforced": true
         },
         {
-          "label": "Bộ quy cách",
+          "label": "Bộ theo dõi",
           "fieldname": "measurement_profile",
           "fieldtype": "Link",
           "options": "Measurement Profile",
@@ -6080,10 +6258,11 @@
           "surface": "expanded"
         },
         {
-          "fieldname": "warehouse",
           "label": "Kho nhận",
+          "fieldname": "warehouse",
           "fieldtype": "Link",
           "options": "Warehouse",
+          "link_filters": "{\"is_group\":0,\"disabled\":0}",
           "surface": "expanded"
         },
         {
@@ -6271,7 +6450,7 @@
           "serverEnforced": true
         },
         {
-          "label": "Bộ quy cách",
+          "label": "Bộ theo dõi",
           "fieldname": "measurement_profile",
           "fieldtype": "Link",
           "options": "Measurement Profile",
@@ -6452,11 +6631,12 @@
           "surface": "expanded"
         },
         {
-          "fieldname": "warehouse",
           "label": "Kho nhập",
+          "fieldname": "warehouse",
           "fieldtype": "Link",
           "options": "Warehouse",
           "required": true,
+          "link_filters": "{\"is_group\":0,\"disabled\":0}",
           "surface": "quick"
         },
         {
@@ -6501,7 +6681,7 @@
           "fieldtype": "Float",
           "read_only": true,
           "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'",
-          "description": "khổ × kg/m của bộ quy cách × số cây. Dùng để đối chiếu cân, không vào sổ.",
+          "description": "khổ × kg/m của quy cách kỹ thuật × số cây. Dùng để đối chiếu cân, không vào sổ.",
           "surface": "expanded"
         },
         {
@@ -6510,7 +6690,7 @@
           "fieldtype": "Float",
           "read_only": true,
           "depends_on": "eval:doc.inventory_mode == 'Nhôm cây/lá'",
-          "description": "Vượt ngưỡng của bộ quy cách thì cảnh báo, KHÔNG chặn ghi sổ.",
+          "description": "Vượt ngưỡng của bộ theo dõi thì cảnh báo, KHÔNG chặn ghi sổ.",
           "surface": "expanded"
         },
         {
@@ -6757,7 +6937,7 @@
         },
         {
           "fieldname": "measurement_profile",
-          "label": "Bộ quy cách",
+          "label": "Bộ theo dõi",
           "fieldtype": "Link",
           "options": "Measurement Profile",
           "read_only": true,
@@ -6874,10 +7054,11 @@
           "serverEnforced": true
         },
         {
-          "fieldname": "warehouse",
           "label": "Kho",
+          "fieldname": "warehouse",
           "fieldtype": "Link",
           "options": "Warehouse",
+          "link_filters": "{\"is_group\":0,\"disabled\":0}",
           "surface": "expanded"
         }
       ],
@@ -6995,11 +7176,12 @@
           "surface": "quick"
         },
         {
-          "fieldname": "warehouse",
           "label": "Kho xuất trả (phải đúng kho đã nhập)",
+          "fieldname": "warehouse",
           "fieldtype": "Link",
           "options": "Warehouse",
           "required": true,
+          "link_filters": "{\"is_group\":0,\"disabled\":0}",
           "surface": "quick"
         },
         {
@@ -7363,8 +7545,22 @@
         },
         "color:Link(Item Color) Màu / mã sơn",
         "motor_model:Link(Item) Mô tơ",
-        "source_warehouse:Link(Warehouse)! Kho nguyên vật liệu",
-        "target_warehouse:Link(Warehouse)! Kho nhập thành phẩm",
+        {
+          "fieldname": "source_warehouse",
+          "label": "Kho nguyên vật liệu",
+          "fieldtype": "Link",
+          "options": "Warehouse",
+          "required": true,
+          "link_filters": "{\"is_group\":0,\"disabled\":0}"
+        },
+        {
+          "fieldname": "target_warehouse",
+          "label": "Kho nhập thành phẩm",
+          "fieldtype": "Link",
+          "options": "Warehouse",
+          "required": true,
+          "link_filters": "{\"is_group\":0,\"disabled\":0}"
+        },
         "against_sales_order:Link(Sales Order) Theo đơn hàng",
         "planned_start_date:Date Ngày bắt đầu",
         "planned_end_date:Date Ngày hẹn giao",
@@ -7784,10 +7980,11 @@
           "surface": "quick"
         },
         {
-          "fieldname": "item_group",
           "label": "Nhóm sản phẩm",
+          "fieldname": "item_group",
           "fieldtype": "Link",
           "options": "Item Group",
+          "link_filters": "{\"is_group\":0,\"disabled\":0}",
           "surface": "expanded"
         },
         {
@@ -7936,19 +8133,21 @@
           "surface": "expanded"
         },
         {
-          "fieldname": "source_warehouse",
           "label": "Kho vật tư",
+          "fieldname": "source_warehouse",
           "fieldtype": "Link",
           "options": "Warehouse",
           "required": true,
+          "link_filters": "{\"is_group\":0,\"disabled\":0}",
           "surface": "quick"
         },
         {
-          "fieldname": "target_warehouse",
           "label": "Kho thành phẩm",
+          "fieldname": "target_warehouse",
           "fieldtype": "Link",
           "options": "Warehouse",
           "required": true,
+          "link_filters": "{\"is_group\":0,\"disabled\":0}",
           "surface": "quick"
         },
         {
@@ -8104,8 +8303,22 @@
         "customer:Link(Customer)! Khách hàng",
         "requested_on:Datetime!=(Now) Lập lúc",
         "delivery_date:Date Ngày hẹn giao",
-        "source_warehouse:Link(Warehouse)! Kho nguyên vật liệu",
-        "target_warehouse:Link(Warehouse)! Kho nhập thành phẩm",
+        {
+          "fieldname": "source_warehouse",
+          "label": "Kho nguyên vật liệu",
+          "fieldtype": "Link",
+          "options": "Warehouse",
+          "required": true,
+          "link_filters": "{\"is_group\":0,\"disabled\":0}"
+        },
+        {
+          "fieldname": "target_warehouse",
+          "label": "Kho nhập thành phẩm",
+          "fieldtype": "Link",
+          "options": "Warehouse",
+          "required": true,
+          "link_filters": "{\"is_group\":0,\"disabled\":0}"
+        },
         "request_state:Select(Nháp,Đang tạo lệnh,Đã tạo lệnh,Đang sản xuất,Hoàn thành,Đã huỷ)!=(Nháp) Trạng thái",
         "work_order_count:Int~ Số lệnh sản xuất",
         "items:Table(Production Request Item)! Từng bộ cửa",
@@ -8385,11 +8598,12 @@
       ],
       "fields": [
         {
-          "fieldname": "item_group",
           "label": "Nhóm hàng",
+          "fieldname": "item_group",
           "fieldtype": "Link",
           "options": "Item Group",
           "required": true,
+          "link_filters": "{\"is_group\":0,\"disabled\":0}",
           "surface": "quick"
         }
       ],
@@ -8497,6 +8711,7 @@
           "fieldtype": "Link",
           "options": "Warehouse",
           "read_only": true,
+          "link_filters": "{\"is_group\":0,\"disabled\":0}",
           "surface": "expanded"
         },
         {
@@ -8687,7 +8902,13 @@
         "color:Link(Item Color) Màu (trống = mọi màu)",
         "condition:Select(Thô,Đã sơn,Lỗi) Tình trạng (trống = mọi tình trạng)",
         "min_length_m:Float! Khổ tối thiểu (m)",
-        "warehouse:Link(Warehouse) Kho (trống = mọi kho chính)",
+        {
+          "fieldname": "warehouse",
+          "label": "Kho (trống = mọi kho chính)",
+          "fieldtype": "Link",
+          "options": "Warehouse",
+          "link_filters": "{\"is_group\":0,\"disabled\":0}"
+        },
         "qty_reserved:Float! Số lá giữ",
         "source_doctype:Select(Work Order,Sales Order,Cut Order)! Giữ cho",
         "source_name:Data! Số chứng từ nguồn",
@@ -8723,9 +8944,22 @@
         "warehouse"
       ],
       "fields": [
-        "warehouse:Link(Warehouse)! Kho kiểm kê",
+        {
+          "fieldname": "warehouse",
+          "label": "Kho kiểm kê",
+          "fieldtype": "Link",
+          "options": "Warehouse",
+          "required": true,
+          "link_filters": "{\"is_group\":0,\"disabled\":0}"
+        },
         "scope:Select(Toàn kho,Theo nhóm hàng,Theo mã hàng)!=(Toàn kho) Phạm vi",
-        "item_group:Link(Item Group) Nhóm hàng",
+        {
+          "fieldname": "item_group",
+          "label": "Nhóm hàng",
+          "fieldtype": "Link",
+          "options": "Item Group",
+          "link_filters": "{\"is_group\":0,\"disabled\":0}"
+        },
         "item_code:Link(Item) Mã hàng",
         "snapshot_at:Datetime!=(Now) Thời điểm chốt số sổ",
         "counted_by:Link(User)! Người đếm",
@@ -9638,7 +9872,15 @@
       "is_stamped:Check Đã dập",
       "length_m:Float Khổ (m)",
       "intake_kg:Float Kg thực cân lúc nhập",
-      "received_warehouse:Link(Warehouse) Kho nhập ban đầu",
+      {
+        "field": {
+          "fieldname": "received_warehouse",
+          "label": "Kho nhập ban đầu",
+          "fieldtype": "Link",
+          "options": "Warehouse",
+          "link_filters": "{\"is_group\":0,\"disabled\":0}"
+        }
+      },
       "is_offcut:Check Là đầu thừa",
       "parent_batch:Link(Batch) Cắt ra từ lô",
       "cut_generation:Int Đời cắt",

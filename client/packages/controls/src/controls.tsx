@@ -62,6 +62,8 @@ export function TextControl(p: FieldControlProps) {
 }
 
 export function TextAreaControl(p: FieldControlProps) {
+  if (p.parentDoctype === "Sales Option" && p.field.fieldname === "conditions") return <SalesOptionConditionsControl {...p} />;
+  if (p.parentDoctype === "Pricing Rule" && p.field.fieldname === "conditions") return <PricingRuleConditionsControl {...p} />;
   if (p.masked) return <Masked />;
   return (
     <Textarea
@@ -74,6 +76,185 @@ export function TextAreaControl(p: FieldControlProps) {
       {...a11y(p)}
       onChange={(e: ChangeEvent<HTMLTextAreaElement>) => p.onChange(e.target.value)}
     />
+  );
+}
+
+type SalesOptionCondition = {
+  field: string;
+  op: "gt" | "gte" | "lt" | "lte" | "eq" | "neq";
+  value: number | string;
+};
+
+const SALES_OPTION_CONDITION_FIELDS = [
+  { value: "billable_area_sqm", label: "Diện tích", unit: "m²" },
+  { value: "height_m", label: "Chiều cao", unit: "m" },
+  { value: "width_m", label: "Chiều rộng", unit: "m" },
+  { value: "set_count", label: "Số bộ", unit: "bộ" },
+] as const;
+
+const SALES_OPTION_OPERATORS: Array<{ value: SalesOptionCondition["op"]; label: string }> = [
+  { value: "gt", label: ">" },
+  { value: "gte", label: "≥" },
+  { value: "lt", label: "<" },
+  { value: "lte", label: "≤" },
+  { value: "eq", label: "=" },
+  { value: "neq", label: "≠" },
+];
+
+function salesOptionConditions(value: unknown): SalesOptionCondition[] {
+  const raw = typeof value === "string" ? value.trim() : value;
+  if (!raw) return [];
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((row): row is Record<string, unknown> => Boolean(row) && typeof row === "object" && !Array.isArray(row))
+      .map((row) => ({
+        field: typeof row.field === "string" ? row.field : "billable_area_sqm",
+        op: SALES_OPTION_OPERATORS.some((operator) => operator.value === row.op) ? row.op as SalesOptionCondition["op"] : "gte",
+        value: typeof row.value === "number" || typeof row.value === "string" ? row.value : "",
+      }));
+  } catch {
+    return [];
+  }
+}
+
+function salesOptionConditionField(field: string) {
+  return SALES_OPTION_CONDITION_FIELDS.find((option) => option.value === field)
+    ?? { value: field, label: field, unit: "" };
+}
+
+/** A small, safe editor for numeric Sales Option conditions; storage stays the generic JSON contract. */
+export function SalesOptionConditionsControl(p: FieldControlProps) {
+  const rows = salesOptionConditions(p.value);
+  const commit = (next: SalesOptionCondition[]) => p.onChange(next.length ? JSON.stringify(next) : "");
+  const readOnlySummary = rows.map((row) => {
+    const criterion = salesOptionConditionField(row.field);
+    const operator = SALES_OPTION_OPERATORS.find((candidate) => candidate.value === row.op)?.label ?? row.op;
+    return `${criterion.label} ${operator} ${row.value}${criterion.unit ? ` ${criterion.unit}` : ""}`;
+  });
+
+  if (p.masked) return <Masked />;
+  if (p.readOnly) {
+    return <div id={labelId(p)} className="mf-control min-h-9 rounded-md border border-input bg-muted px-3 py-2 text-sm">{readOnlySummary.length ? readOnlySummary.join(" và ") : "Không giới hạn"}</div>;
+  }
+
+  return (
+    <div id={labelId(p)} className="mf-control space-y-2 rounded-md border border-input bg-muted/20 p-2" aria-describedby={p.describedBy} aria-label={p.label}>
+      {rows.map((row, index) => {
+        const criterion = salesOptionConditionField(row.field);
+        return (
+          <div key={`${row.field}-${index}`} className="grid grid-cols-[minmax(0,1fr)_5rem_minmax(5rem,8rem)_auto_auto] items-center gap-2 max-sm:grid-cols-[minmax(0,1fr)_4.5rem_minmax(4.5rem,1fr)_auto]">
+            <Select value={criterion.value} onValueChange={(field) => commit(rows.map((candidate, candidateIndex) => candidateIndex === index ? { ...candidate, field } : candidate))}>
+              <SelectTrigger aria-label={`Chỉ tiêu điều kiện ${index + 1}`}><SelectValue /></SelectTrigger>
+              <SelectContent>{SALES_OPTION_CONDITION_FIELDS.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
+            </Select>
+            <Select value={row.op} onValueChange={(op) => commit(rows.map((candidate, candidateIndex) => candidateIndex === index ? { ...candidate, op: op as SalesOptionCondition["op"] } : candidate))}>
+              <SelectTrigger aria-label={`Dấu so sánh điều kiện ${index + 1}`}><SelectValue /></SelectTrigger>
+              <SelectContent>{SALES_OPTION_OPERATORS.map((operator) => <SelectItem key={operator.value} value={operator.value}>{operator.label}</SelectItem>)}</SelectContent>
+            </Select>
+            <Input type="number" inputMode="decimal" step="any" aria-label={`Giá trị điều kiện ${index + 1}`} value={row.value} onChange={(event) => commit(rows.map((candidate, candidateIndex) => candidateIndex === index ? { ...candidate, value: event.target.value } : candidate))} />
+            <span className="min-w-7 text-sm text-muted-foreground">{criterion.unit}</span>
+            <Button type="button" variant="ghost" size="sm" className="text-muted-foreground hover:text-destructive" onClick={() => commit(rows.filter((_, candidateIndex) => candidateIndex !== index))}>Bỏ</Button>
+          </div>
+        );
+      })}
+      <Button type="button" variant="outline" size="sm" onClick={() => commit([...rows, { field: "billable_area_sqm", op: "gte", value: "" }])}>Thêm điều kiện</Button>
+      <p className="text-xs text-muted-foreground">Tất cả điều kiện đều phải đúng thì phương án mới được áp dụng.</p>
+    </div>
+  );
+}
+
+type PricingRuleCondition = {
+  field: string;
+  operator: "gt" | "gte" | "lt" | "lte" | "eq" | "neq";
+  value: number | string;
+};
+
+const PRICING_RULE_CONDITION_FIELDS = [
+  { value: "sales_option", label: "Phương án bán", unit: "", numeric: false },
+  { value: "price_variant", label: "Mã giá", unit: "", numeric: false },
+  { value: "color", label: "Màu", unit: "", numeric: false },
+  { value: "finish_type", label: "Bề mặt", unit: "", numeric: false },
+  { value: "billable_area_sqm", label: "Diện tích tính tiền", unit: "m²", numeric: true },
+  { value: "height_m", label: "Chiều cao", unit: "m", numeric: true },
+  { value: "width_m", label: "Chiều rộng", unit: "m", numeric: true },
+  { value: "length_m", label: "Chiều dài", unit: "m", numeric: true },
+  { value: "set_count", label: "Số bộ", unit: "bộ", numeric: true },
+] as const;
+
+function pricingRuleConditions(value: unknown): PricingRuleCondition[] {
+  const raw = typeof value === "string" ? value.trim() : value;
+  if (!raw) return [];
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((row): row is Record<string, unknown> => Boolean(row) && typeof row === "object" && !Array.isArray(row))
+      .map((row) => {
+        const field = typeof row.field === "string" ? row.field : "billable_area_sqm";
+        return {
+          field: field === "area_sqm" ? "billable_area_sqm" : field,
+          operator: SALES_OPTION_OPERATORS.some((operator) => operator.value === (row.operator ?? row.op))
+            ? (row.operator ?? row.op) as PricingRuleCondition["operator"]
+            : "gte",
+          value: typeof row.value === "number" || typeof row.value === "string" ? row.value : "",
+        };
+      });
+  } catch {
+    return [];
+  }
+}
+
+function pricingRuleConditionField(field: string) {
+  return PRICING_RULE_CONDITION_FIELDS.find((option) => option.value === field)
+    ?? { value: field, label: field, unit: "", numeric: false };
+}
+
+/** Friendly authoring for the generic server-side Pricing Rule condition array. */
+export function PricingRuleConditionsControl(p: FieldControlProps) {
+  const rows = pricingRuleConditions(p.value);
+  const commit = (next: PricingRuleCondition[]) => p.onChange(next.length ? JSON.stringify(next) : "");
+  const summary = rows.map((row) => {
+    const criterion = pricingRuleConditionField(row.field);
+    const operator = SALES_OPTION_OPERATORS.find((candidate) => candidate.value === row.operator)?.label ?? row.operator;
+    return `${criterion.label} ${operator} ${row.value}${criterion.unit ? ` ${criterion.unit}` : ""}`;
+  });
+
+  if (p.masked) return <Masked />;
+  if (p.readOnly) {
+    return <div id={labelId(p)} className="mf-control min-h-9 rounded-md border border-input bg-muted px-3 py-2 text-sm">{summary.length ? summary.join(" và ") : "Không có điều kiện thêm"}</div>;
+  }
+
+  return (
+    <div id={labelId(p)} className="mf-control space-y-2 rounded-md border border-input bg-muted/20 p-2" aria-describedby={p.describedBy} aria-label={p.label}>
+      {rows.map((row, index) => {
+        const criterion = pricingRuleConditionField(row.field);
+        const operators = criterion.numeric ? SALES_OPTION_OPERATORS : SALES_OPTION_OPERATORS.filter((operator) => operator.value === "eq" || operator.value === "neq");
+        const safeOperator = operators.some((operator) => operator.value === row.operator) ? row.operator : "eq";
+        return (
+          <div key={`${row.field}-${index}`} className="grid grid-cols-[minmax(8rem,1fr)_4.5rem_minmax(7rem,9rem)_auto_auto] items-center gap-2 max-sm:grid-cols-[minmax(7rem,1fr)_3.5rem_minmax(6rem,1fr)_auto_auto]">
+            <Select value={criterion.value} onValueChange={(field) => {
+              const nextCriterion = pricingRuleConditionField(field);
+              const nextOperator = nextCriterion.numeric ? row.operator : (row.operator === "eq" || row.operator === "neq" ? row.operator : "eq");
+              commit(rows.map((candidate, candidateIndex) => candidateIndex === index ? { ...candidate, field, operator: nextOperator } : candidate));
+            }}>
+              <SelectTrigger aria-label={`Chỉ tiêu điều kiện ${index + 1}`}><SelectValue /></SelectTrigger>
+              <SelectContent>{PRICING_RULE_CONDITION_FIELDS.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
+            </Select>
+            <Select value={safeOperator} onValueChange={(operator) => commit(rows.map((candidate, candidateIndex) => candidateIndex === index ? { ...candidate, operator: operator as PricingRuleCondition["operator"] } : candidate))}>
+              <SelectTrigger aria-label={`Dấu so sánh điều kiện ${index + 1}`}><SelectValue /></SelectTrigger>
+              <SelectContent>{operators.map((operator) => <SelectItem key={operator.value} value={operator.value}>{operator.label}</SelectItem>)}</SelectContent>
+            </Select>
+            <Input type={criterion.numeric ? "number" : "text"} inputMode={criterion.numeric ? "decimal" : undefined} step={criterion.numeric ? "any" : undefined} aria-label={`Giá trị điều kiện ${index + 1}`} value={row.value} onChange={(event) => commit(rows.map((candidate, candidateIndex) => candidateIndex === index ? { ...candidate, value: event.target.value } : candidate))} />
+            <span className="min-w-7 text-sm text-muted-foreground">{criterion.unit}</span>
+            <Button type="button" variant="ghost" size="sm" className="text-muted-foreground hover:text-destructive" onClick={() => commit(rows.filter((_, candidateIndex) => candidateIndex !== index))}>Bỏ</Button>
+          </div>
+        );
+      })}
+      <Button type="button" variant="outline" size="sm" onClick={() => commit([...rows, { field: "billable_area_sqm", operator: "gte", value: "" }])}>Thêm điều kiện</Button>
+      <p className="text-xs text-muted-foreground">Tất cả điều kiện đều phải đúng thì chính sách mới được áp dụng.</p>
+    </div>
   );
 }
 

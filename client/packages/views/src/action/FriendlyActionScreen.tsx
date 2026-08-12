@@ -140,6 +140,7 @@ function toDocField(field: AppActionField): DocField {
     label: field.label,
     fieldtype: field.fieldtype as Fieldtype,
     ...(field.options ? { options: field.options } : {}),
+    ...(field.link_filters ? { link_filters: field.link_filters } : {}),
     ...(field.required ? { reqd: 1 as const } : {}),
     ...(field.default == null ? {} : { default: field.default }),
   };

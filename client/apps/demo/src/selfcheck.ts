@@ -261,7 +261,7 @@ check("mã định danh chính được gợi ý tự động nhưng vẫn là f
   const field = editableCodeField(meta);
   assert.equal(field?.fieldname, "item_code");
   assert.equal(field?.read_only, undefined, "mã gợi ý vẫn sửa được");
-  assert.equal(
+  assert.deepEqual(
     suggestEditableCode(meta, field!, new Date(2026, 6, 28), "A4K9Q"),
     "ITEM-260728-A4K9Q",
   );
@@ -279,44 +279,46 @@ check("buildLinkFilters: static + eval-context + op + malformed→undefined", ()
   const fld = (link_filters?: string): DocField => ({ fieldname: "warehouse", fieldtype: "Link", options: "Warehouse", ...(link_filters ? { link_filters } : {}) });
 
   // Không có link_filters → undefined (không lọc)
-  assert.equal(buildLinkFilters(fld()), undefined);
+  assert.deepEqual(buildLinkFilters(fld()), { is_group: 0, disabled: 0 });
+  assert.equal(buildLinkFilters({ fieldname: "parent_warehouse", fieldtype: "Link", options: "Warehouse" }), undefined);
+  assert.deepEqual(buildLinkFilters({ fieldname: "item_group", fieldtype: "Link", options: "Item Group" }), { is_group: 0, disabled: 0 });
 
   // Tĩnh op "=" → { field: value }; op khác → { field: [op, value] }
   const st = buildLinkFilters(fld(JSON.stringify([
     ["Warehouse", "is_group", "=", 0],
     ["Warehouse", "warehouse_name", "like", "%kho%"],
   ])));
-  assert.deepEqual(st, { is_group: 0, warehouse_name: ["like", "%kho%"] });
+  assert.deepEqual(st, { is_group: 0, warehouse_name: ["like", "%kho%"], disabled: 0 });
 
   // eval: giải trong ngữ cảnh doc (dependent filter) — Warehouse theo company đang chọn
   const ev = buildLinkFilters(
     fld(JSON.stringify([["Warehouse", "company", "=", "eval:doc.company"]])),
     { company: "APH Co" },
   );
-  assert.deepEqual(ev, { company: "APH Co" });
+  assert.deepEqual(ev, { company: "APH Co", is_group: 0, disabled: 0 });
 
   // eval: field phụ thuộc chưa set → bỏ điều kiện (không ràng buộc → undefined toàn bộ filter)
   const ev2 = buildLinkFilters(fld(JSON.stringify([["Warehouse", "company", "=", "eval:doc.company"]])), {});
-  assert.equal(ev2, undefined);
-  assert.equal(
+  assert.deepEqual(ev2, { is_group: 0, disabled: 0 });
+  assert.deepEqual(
     buildLinkFilters(fld(JSON.stringify([["Warehouse", "company", "=", "eval:doc.company"]])), { company: "" }),
-    undefined,
+    { is_group: 0, disabled: 0 },
     "field phụ thuộc là chuỗi rỗng không được biến thành filter company=''",
   );
   assert.equal(
     buildLinkFilters(fld(JSON.stringify([["Warehouse", "company", "=", "eval:doc.company"]])), { company: null }),
-    undefined,
+    { is_group: 0, disabled: 0 },
     "field phụ thuộc null không được làm Link rỗng vĩnh viễn",
   );
 
   // eval ngoài allowlist (truy cập window) → bỏ điều kiện đó (fail-safe, không ném)
   const evBad = buildLinkFilters(fld(JSON.stringify([["Warehouse", "company", "=", "eval:window.location"]])), {});
-  assert.equal(evBad, undefined);
+  assert.deepEqual(evBad, { is_group: 0, disabled: 0 });
 
   // JSON hỏng → undefined (Link vẫn tìm được, chỉ mất lọc)
-  assert.equal(buildLinkFilters(fld("[[broken")), undefined);
+  assert.deepEqual(buildLinkFilters(fld("[[broken")), { is_group: 0, disabled: 0 });
   // Mảng rỗng → undefined
-  assert.equal(buildLinkFilters(fld("[]")), undefined);
+  assert.deepEqual(buildLinkFilters(fld("[]")), { is_group: 0, disabled: 0 });
 });
 
 // 4j. Gate 5 — sanitizeUrl chặn scheme nguy hiểm (javascript:/data:/vbscript:/file:).

@@ -84,7 +84,7 @@ WITH fixtures(name, data_json) AS (
       'disabled', json('false')
     )),
     ('K12', json_object(
-      'warehouse_name', 'K12',
+      'warehouse_name', 'Kho K12',
       'parent_warehouse', 'Kho Alumdoor',
       'is_group', json('false'),
       'address', 'Kho vật lý K12',

@@ -195,6 +195,8 @@ export interface AppActionField {
   required?: boolean;
   default?: string;
   description?: string;
+  /** Static/dependent filters passed to the shared Link autocomplete. */
+  link_filters?: string;
 }
 
 /**
@@ -998,6 +1000,7 @@ function parseAction(value: JsonValue, index: number, doctypeNames: ReadonlySet<
       throw errors.validation(`${where}.fieldtype is not one the action screen can render: ${fieldtype}`);
     }
     const options = field.options === undefined ? undefined : text(field.options, `${where}.options`, 2000);
+    const linkFilters = field.link_filters === undefined ? undefined : text(field.link_filters, `${where}.link_filters`, 2000);
     // A Link with no target renders an autocomplete that searches nothing; a Select with
     // no choices renders an empty dropdown. Both look like a broken screen.
     if ((fieldtype === "Link" || fieldtype === "Select") && !options) {
@@ -1014,6 +1017,7 @@ function parseAction(value: JsonValue, index: number, doctypeNames: ReadonlySet<
       ...(field.required === true ? { required: true } : {}),
       ...(field.default === undefined ? {} : { default: text(field.default, `${where}.default`, 160) }),
       ...(field.description === undefined ? {} : { description: text(field.description, `${where}.description`, 320) }),
+      ...(linkFilters ? { link_filters: linkFilters } : {}),
     };
   });
   if (!fields.length) throw errors.validation(`actions[${index}] (${name}) has no fields`);

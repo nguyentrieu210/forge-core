@@ -113,6 +113,13 @@ export function FormView(props: FormViewProps) {
   const prevLinks = useRef<Record<string, unknown>>({}); // giá trị link lần trước → phát hiện user đổi
   const fetchDocKey = useRef<string>(""); // doc đang đồng bộ → bỏ vòng fetch của lần (re)load (L1)
 
+  // Trường đích `fetch_from` có thể là field kỹ thuật ẩn, không nằm trong form profile.
+  // React Hook Form chỉ theo dõi ổn định field đã đăng ký; thiếu bước này làm giá trị vẫn
+  // được nạp nhưng không đi vào `docValues`, nên dependent link_filters thấy rỗng.
+  useEffect(() => {
+    for (const rule of fetchRules) form.register(rule.target);
+  }, [fetchRules, form]);
+
   // reset khi đổi document (name) hoặc tải lại (modified) — RHF tự lo dirty/back-to-initial.
   useEffect(() => {
     form.reset({ ...doc });
@@ -382,6 +389,9 @@ export function FormView(props: FormViewProps) {
 
   return (
     <form className={cn("mf-form-view flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-card", props.isNew && "mf-form-create")} onSubmit={form.handleSubmit(onValid)}>
+      {[...new Set(fetchRules.map((rule) => rule.target))].map((target) => (
+        <input key={target} type="hidden" {...form.register(target)} />
+      ))}
       {/* HEADER + TABS sticky — bỏ qua khi shell cha (vd modal Create) đã tự hiện tiêu đề riêng. */}
       {!props.hideHeader ? (
         <div className="mf-form-header sticky top-0 z-20 shrink-0 border-b bg-card/95 backdrop-blur">
@@ -494,6 +504,7 @@ export function FormView(props: FormViewProps) {
             const mainFields = sectionFields.filter((field) => field.field.form_region !== "aside" && field.field.form_region !== "full");
             const asideFields = sectionFields.filter((field) => field.field.form_region === "aside");
             const fullFields = sectionFields.filter((field) => field.field.form_region === "full");
+            const isTableField = (field: ResolvedField["field"]): boolean => field.fieldtype === "Table" || field.fieldtype === "Table MultiSelect";
             const renderFields = (fields: typeof sectionFields, region?: "main" | "aside" | "full") => groupCheckFields(fields).map((entry, groupIndex) =>
               Array.isArray(entry) ? (
                 <div key={`checks-${groupIndex}`} className="mf-check-group">
@@ -502,7 +513,7 @@ export function FormView(props: FormViewProps) {
                       key={rf.field.fieldname}
                       id={fieldDomId(rf.field.fieldname)}
                       rf={rf}
-                      width={region === "aside" || region === "full" ? "full" : region === "main" && !rf.field.form_width ? "half" : "third"}
+                      width={isTableField(rf.field) || region === "aside" || region === "full" ? "full" : region === "main" && !rf.field.form_width ? "half" : "third"}
                       form={form}
                       registry={registry}
                       services={services}
@@ -518,7 +529,7 @@ export function FormView(props: FormViewProps) {
                   key={entry.field.fieldname}
                   id={fieldDomId(entry.field.fieldname)}
                   rf={entry}
-                  width={region === "aside" || region === "full" ? "full" : region === "main" && !entry.field.form_width ? "half" : resolveFormFieldWidth(entry.field, meta.title_field)}
+                  width={isTableField(entry.field) || region === "aside" || region === "full" ? "full" : region === "main" && !entry.field.form_width ? "half" : resolveFormFieldWidth(entry.field, meta.title_field)}
                   form={form}
                   registry={registry}
                   services={services}
@@ -562,7 +573,10 @@ export function FormView(props: FormViewProps) {
                     {fullFields.length ? <div className="mf-form-grid mt-3 grid items-start gap-y-3">{renderFields(fullFields, "full")}</div> : null}
                   </>
                 ) : (
-                  <div className="mf-form-grid grid items-start gap-x-3 gap-y-3">{renderFields(sectionFields)}</div>
+                  <>
+                    <div className="mf-form-grid grid items-start gap-x-3 gap-y-3">{renderFields(mainFields, "main")}</div>
+                    {fullFields.length ? <div className="mf-form-grid mt-3 grid items-start gap-y-3">{renderFields(fullFields, "full")}</div> : null}
+                  </>
                 )}
               </section>
             );

@@ -2,6 +2,10 @@
 
 ## Unreleased — Alumdoor UI
 
+- Trường kỹ thuật dùng `fetch_from` vẫn được đăng ký trong form dù không hiển thị, để bộ chọn phụ thuộc lọc đúng theo dữ liệu vừa lấy từ Link nguồn.
+- Danh mục màu hỗ trợ phạm vi giao dịch mua/bán; màu `THÔ` chỉ hiện trong mua hàng nhưng vẫn được giữ cho tồn kho và sản xuất nội bộ.
+- Form Hàng hoá / Vật tư gom về một tab “Thông tin chính”, phần bổ sung nằm trong section “Chi tiết vật tư”; bỏ “Các màu được phép” khỏi mặt hàng và lấy màu từ “Màu vật tư → Nhóm SP áp dụng”; đồng thời ẩn các trường hệ thống và bỏ kho/kế toán mặc định, giá thành, cân theo kiện, thương hiệu, nhà sản xuất, mã hãng, màu mặc định, mã vạch cùng các cờ lô/serial khỏi màn nhập.
+- Màn Danh mục Alumdoor bỏ khối giới thiệu thừa, xếp card gọn theo cột độc lập và dùng nhóm nghiệp vụ cố định; đổi “Bộ quy cách tồn kho” thành “Bộ theo dõi vật tư”, chuyển kg/m, độ dày, bản rộng hữu dụng và ngưỡng phế liệu về Quy cách kỹ thuật, chuyển bề rộng lưỡi cắt về Công thức cửa. Nhôm lá tồn theo Cây/Lá; ống/trục có bộ theo dõi riêng, mua–tồn Kg, bán Mét, số cây và số bó chỉ để theo dõi.
 - Trạm QR có nút “Lấy vị trí hiện tại” để xin quyền GPS và tự điền đồng thời vĩ độ, kinh độ; hiển thị sai số hoặc lỗi rõ ràng và vẫn cho phép chỉnh tay.
 - Hồ sơ Chính sách ca đã duyệt cho phép quản lý sửa trực tiếp và có thao tác Xoá kèm xác nhận; server vẫn chặn xoá khi chính sách đang được dữ liệu khác sử dụng.
 - Chính sách ca không còn bắt người dùng quy đổi giờ sang phút: sáu mốc ca dùng định dạng 24 giờ `HH:mm`, còn giới hạn công thường nhập theo giờ và phút.

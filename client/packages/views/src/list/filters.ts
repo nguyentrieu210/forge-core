@@ -73,14 +73,18 @@ function splitOptions(opts?: string): string[] {
 export function deriveSearchFields(meta: DocTypeMeta): string[] {
   const raw = (meta as { search_fields?: string }).search_fields;
   const fromMeta = (raw ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-  if (fromMeta.length) return dedupe(["name", ...fromMeta]);
   const fields = meta.fields ?? [];
   const title = meta.title_field && fields.some((f) => f.fieldname === meta.title_field) ? [meta.title_field] : [];
-  const dataish = fields
-    .filter((f: DocField) => ["Data", "Small Text", "Link", "Select"].includes(f.fieldtype))
-    .slice(0, 3)
+  // Global search should cover the complete readable table surface, not only the title/code
+  // fields. The server applies the same policy from metadata, so list and mock/demo search stay
+  // aligned for notes, groups, UOM, price fields, and other visible text columns.
+  const searchable = fields
+    .filter((f: DocField) => [
+      "Data", "Small Text", "Text", "Long Text", "Code", "Select", "Link", "Dynamic Link",
+      "Read Only", "Autocomplete", "Barcode", "Phone", "Color", "Currency", "Float", "Int", "Percent",
+    ].includes(f.fieldtype))
     .map((f) => f.fieldname);
-  return dedupe(["name", ...title, ...dataish]);
+  return dedupe(["name", ...title, ...fromMeta, ...searchable]);
 }
 
 function dedupe(a: string[]): string[] {
