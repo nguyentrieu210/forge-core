@@ -1,0 +1,70 @@
+from pathlib import Path
+
+path = Path("client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx")
+source = path.read_text(encoding="utf-8")
+
+marker = '''              const showBars = fieldVisible(line, "qty_bar")
+                && (fieldRequired(line, "qty_bar") || line.qty_bar != null);'''
+if marker not in source:
+    raise SystemExit("showBars marker not found")
+source = source.replace(marker, marker + '''
+              const showPlainQty = !area && !showSets && !showBars;''', 1)
+
+old_qty = '''              {!area && !showSets && !showBars ? (
+                <StandardField
+                  id={`sales-line-${index}-qty`}
+                  field={lineBaseField("qty", "Kh\\u1ed1i l\\u01b0\\u1ee3ng", "Float")}
+                  value={line.qty}
+                  onChange={(value) => patchLine(line._key, { qty: value == null || value === "" ? undefined : Number(value) })}
+                  onCommit={() => commitLine(line._key, "qty", line.qty)}
+                  registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
+                  required readOnly={fieldReadonly(line, "qty")}
+                  label="Khối lượng"
+                />
+              ) : null}
+'''
+if old_qty not in source:
+    raise SystemExit("old ordinary qty block not found")
+source = source.replace(old_qty, "", 1)
+
+top_row_end = '''            ) : null}
+          </div>
+
+          {text(line.item_code) ? (
+            <div className="grid gap-2 rounded-md border bg-muted/10 p-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">'''
+if top_row_end not in source:
+    raise SystemExit("top-row/config marker not found")
+source = source.replace(top_row_end, '''            ) : null}
+
+            {showPlainQty ? (
+              <StandardField
+                id={`sales-line-${index}-qty`}
+                field={lineBaseField("qty", "Kh\\u1ed1i l\\u01b0\\u1ee3ng", "Float")}
+                value={line.qty}
+                onChange={(value) => patchLine(line._key, { qty: value == null || value === "" ? undefined : Number(value) })}
+                onCommit={() => commitLine(line._key, "qty", line.qty)}
+                registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
+                required readOnly={fieldReadonly(line, "qty")}
+                label="Khối lượng"
+                className="xl:col-span-2"
+              />
+            ) : null}
+          </div>
+
+          {text(line.item_code) && (showWidth || showHeight || showSets || showSalesMode || showLeafVariant || kind === "mesh" || fieldVisible(line, "has_butterfly_bracket") || showLength || showBars) ? (
+            <div className="grid gap-2 rounded-md border bg-muted/10 p-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">''', 1)
+
+source = source.replace(
+    '{Number(line.adjustment_amount) !== 0 ? (',
+    '{Number.isFinite(Number(line.adjustment_amount)) && Number(line.adjustment_amount) !== 0 ? (',
+    1,
+)
+
+source = source.replace(
+    '    <span className="text-[11px] text-muted-foreground">{"\\u0110\\u01a1n b\\u00e1n h\\u00e0ng m\\u1edbi"}</span>\n',
+    '',
+    1,
+)
+
+path.write_text(source, encoding="utf-8", newline="\n")
+print("patched compact ordinary-item presentation")
