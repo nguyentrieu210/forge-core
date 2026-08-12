@@ -219,7 +219,7 @@ function StandardField(props: {
   const Control = props.registry.resolve(props.field.fieldtype);
   const displayLabel = props.label || text(props.field.label) || props.field.fieldname;
   if (!Control) {
-    return <div className={props.className}><div className="text-xs text-destructive">Ch??a c?? control cho {props.field.fieldtype}</div></div>;
+    return <div className={props.className}><div className="text-xs text-destructive">Missing control for {props.field.fieldtype}</div></div>;
   }
   const control = (
     <Control
@@ -665,14 +665,14 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
         <div className="mx-auto w-full max-w-[1760px] space-y-3 px-4 py-3">
           <section className="rounded-lg border bg-card p-3" data-section="sales-customer-meta-header">
   <div className="mb-2 flex items-center justify-between gap-3">
-    <h2 className="text-sm font-semibold">Th??ng tin kh??ch h??ng</h2>
-    <span className="text-[11px] text-muted-foreground">????n b??n h??ng m???i</span>
+    <h2 className="text-sm font-semibold">{"Th\u00f4ng tin kh\u00e1ch h\u00e0ng"}</h2>
+    <span className="text-[11px] text-muted-foreground">{"\u0110\u01a1n b\u00e1n h\u00e0ng m\u1edbi"}</span>
   </div>
 
   <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(320px,2.2fr)_minmax(150px,.8fr)_minmax(260px,1.5fr)_150px_150px]">
     <StandardField
       id="sales-customer"
-      field={headerField("customer", "Kh??ch h??ng", "Link", "Customer")}
+      field={headerField("customer", "Kh\u00e1ch h\u00e0ng", "Link", "Customer")}
       value={header.customer}
       onChange={(value) => setHeaderField("customer", text(value) || undefined, true)}
       registry={registry}
@@ -686,7 +686,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
 
     <StandardField
       id="sales-phone"
-      field={salesPhoneField ? headerField(salesPhoneField, "S??T") : fallbackField("__customer_phone", "S??T")}
+      field={salesPhoneField ? headerField(salesPhoneField, "S\u0110T") : fallbackField("__customer_phone", "S\u0110T")}
       value={phoneValue}
       onChange={(value) => {
         const phone = text(value);
@@ -704,7 +704,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
 
     <StandardField
       id="sales-address"
-      field={headerField("install_address", "?????a ch??? giao / l???p ?????t")}
+      field={headerField("install_address", "\u0110\u1ecba ch\u1ec9 giao / l\u1eafp \u0111\u1eb7t")}
       value={header.install_address}
       onChange={(value) => setHeaderField("install_address", text(value) || undefined)}
       registry={registry}
@@ -713,13 +713,13 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
       docValues={header}
       roles={roles}
       required={metaRequired("install_address")}
-      label="?????a ch??? giao / l???p ?????t"
+      label="\u0110\u1ecba ch\u1ec9 giao / l\u1eafp \u0111\u1eb7t"
       className="md:col-span-2 xl:order-6 xl:col-span-5"
     />
 
     <StandardField
       id="sales-order-date"
-      field={headerField("transaction_date", "Ng??y ?????t h??ng", "Date")}
+      field={headerField("transaction_date", "Ng\u00e0y \u0111\u1eb7t h\u00e0ng", "Date")}
       value={header.transaction_date}
       onChange={(value) => setHeaderField("transaction_date", text(value), true)}
       registry={registry}
@@ -728,13 +728,13 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
       docValues={header}
       roles={roles}
       required={metaRequired("transaction_date")}
-      label="Ng??y ?????t h??ng"
+      label="Ng\u00e0y \u0111\u1eb7t h\u00e0ng"
       className="xl:order-4"
     />
 
     <StandardField
       id="sales-delivery-date"
-      field={headerField("delivery_date", "Ng??y giao", "Date")}
+      field={headerField("delivery_date", "Ng\u00e0y giao", "Date")}
       value={header.delivery_date}
       onChange={(value) => setHeaderField("delivery_date", text(value))}
       registry={registry}
@@ -743,13 +743,13 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
       docValues={header}
       roles={roles}
       required={metaRequired("delivery_date")}
-      label="Ng??y giao"
+      label="Ng\u00e0y giao"
       className="xl:order-5"
     />
 
     <StandardField
       id="sales-responsible-person"
-      field={headerField("responsible_person", "Nh??n vi??n b??n h??ng", "Link", "Employee")}
+      field={headerField("responsible_person", "Nh\u00e2n vi\u00ean b\u00e1n h\u00e0ng", "Link", "Employee")}
       value={header.responsible_person}
       onChange={(value) => setHeaderField("responsible_person", text(value) || undefined)}
       registry={registry}
@@ -758,7 +758,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
       docValues={header}
       roles={roles}
       required={metaRequired("responsible_person")}
-      label="Nh??n vi??n b??n h??ng"
+      label="Nh\u00e2n vi\u00ean b\u00e1n h\u00e0ng"
       className="md:col-span-2 xl:order-3 xl:col-span-1"
     />
   </div>
@@ -850,8 +850,8 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                   <div className="space-y-2 p-2.5">
                     <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-12">
             <StandardField
-              id={\`sales-line-\${index}-item\`}
-              field={lineBaseField("item_code", "M???t h??ng", "Link", "Item")}
+              id={`sales-line-${index}-item`}
+              field={lineBaseField("item_code", "M\u1eb7t h\u00e0ng", "Link", "Item")}
               value={line.item_code}
               onChange={(value) => {
                 const itemCode = text(value);
@@ -875,17 +875,17 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
               roles={roles}
               required
               compact
-              label="M???t h??ng"
+              label="M\u1eb7t h\u00e0ng"
               className={text(line.item_code) ? "md:col-span-2 xl:col-span-5" : "md:col-span-2 xl:col-span-8"}
             />
 
             {salesOptions.length ? (
               <StandardField
-                id={\`sales-line-\${index}-sales-option\`}
+                id={`sales-line-${index}-sales-option`}
                 field={selectField(
                   childField("sales_option"),
                   "sales_option",
-                  "Ph????ng ??n b??n",
+                  "Ph\u01b0\u01a1ng \u00e1n b\u00e1n",
                   salesOptions.map((option) => String(option.name)),
                   Object.fromEntries(salesOptions.map((option) => [String(option.name), text(option.option_label) || String(option.name)])),
                 )}
@@ -896,15 +896,15 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                 parentDoctype="Sales Order Item"
                 docValues={line}
                 roles={roles}
-                label="Ph????ng ??n b??n"
+                label="Ph\u01b0\u01a1ng \u00e1n b\u00e1n"
                 className="md:col-span-2 xl:col-span-3"
               />
             ) : null}
 
             {colors.length ? (
               <StandardField
-                id={\`sales-line-\${index}-color\`}
-                field={selectField(childField("color"), "color", "M??u", colors)}
+                id={`sales-line-${index}-color`}
+                field={selectField(childField("color"), "color", "M\u00e0u", colors)}
                 value={line.color}
                 onChange={(value) => commitLine(line._key, "color", text(value) || undefined)}
                 registry={registry}
@@ -912,15 +912,15 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                 parentDoctype="Sales Order Item"
                 docValues={line}
                 roles={roles}
-                label="M??u"
+                label="M\u00e0u"
                 className="xl:col-span-2"
               />
             ) : null}
 
             {uoms.length ? (
               <StandardField
-                id={\`sales-line-\${index}-uom\`}
-                field={selectField(childField("uom"), "uom", "??VT", uoms)}
+                id={`sales-line-${index}-uom`}
+                field={selectField(childField("uom"), "uom", "\u0110VT", uoms)}
                 value={line.uom}
                 onChange={(value) => commitLine(line._key, "uom", text(value) || undefined)}
                 registry={registry}
@@ -928,13 +928,13 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                 parentDoctype="Sales Order Item"
                 docValues={line}
                 roles={roles}
-                label="??VT"
+                label="\u0110VT"
                 className="xl:col-span-2"
               />
             ) : text(line.uom) ? (
               <StandardField
-                id={\`sales-line-\${index}-uom\`}
-                field={fallbackField("uom", "??VT")}
+                id={`sales-line-${index}-uom`}
+                field={fallbackField("uom", "\u0110VT")}
                 value={line.uom}
                 onChange={() => undefined}
                 registry={registry}
@@ -943,7 +943,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
                 docValues={line}
                 roles={roles}
                 readOnly
-                label="??VT"
+                label="\u0110VT"
                 className="xl:col-span-2"
               />
             ) : null}
@@ -953,20 +953,20 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
             <div className="grid gap-2 rounded-md border bg-muted/10 p-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
               {showWidth ? (
                 <StandardField
-                  id={\`sales-line-\${index}-width\`}
-                  field={lineBaseField("width_m", fieldLabel(line, "width_m", "R???ng (m)"), "Float")}
+                  id={`sales-line-${index}-width`}
+                  field={lineBaseField("width_m", fieldLabel(line, "width_m", "R\u1ed9ng (m)"), "Float")}
                   value={line.width_m}
                   onChange={(value) => patchLine(line._key, { width_m: value == null || value === "" ? undefined : Number(value) })}
                   onCommit={() => commitLine(line._key, "width_m", line.width_m)}
                   registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
                   required={area || fieldRequired(line, "width_m")} readOnly={fieldReadonly(line, "width_m")}
-                  label={fieldLabel(line, "width_m", "R???ng (m)")}
+                  label={fieldLabel(line, "width_m", "R\u1ed9ng (m)")}
                 />
               ) : null}
 
               {showHeight ? (
                 <StandardField
-                  id={\`sales-line-\${index}-height\`}
+                  id={`sales-line-${index}-height`}
                   field={lineBaseField("height_m", fieldLabel(line, "height_m", "Cao (m)"), "Float")}
                   value={line.height_m}
                   onChange={(value) => patchLine(line._key, { height_m: value == null || value === "" ? undefined : Number(value) })}
@@ -979,99 +979,99 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
 
               {showSets ? (
                 <StandardField
-                  id={\`sales-line-\${index}-sets\`}
-                  field={lineBaseField("set_count", fieldLabel(line, "set_count", area ? "S??? b???" : "S??? l?????ng"), "Int")}
+                  id={`sales-line-${index}-sets`}
+                  field={lineBaseField("set_count", fieldLabel(line, "set_count", area ? "S\u1ed1 b\u1ed9" : "S\u1ed1 l\u01b0\u1ee3ng"), "Int")}
                   value={line.set_count}
                   onChange={(value) => patchLine(line._key, { set_count: value == null || value === "" ? undefined : Number(value) })}
                   onCommit={() => commitLine(line._key, "set_count", line.set_count)}
                   registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
                   required={area || fieldRequired(line, "set_count")} readOnly={fieldReadonly(line, "set_count")}
-                  label={fieldLabel(line, "set_count", area ? "S??? b???" : "S??? l?????ng")}
+                  label={fieldLabel(line, "set_count", area ? "S\u1ed1 b\u1ed9" : "S\u1ed1 l\u01b0\u1ee3ng")}
                 />
               ) : null}
 
               {showSalesMode ? (
                 <StandardField
-                  id={\`sales-line-\${index}-sales-mode\`}
-                  field={selectField(childField("sales_mode"), "sales_mode", "C??ch b??n", salesModes)}
-                  value={line.sales_mode || "Tr???n b???"}
+                  id={`sales-line-${index}-sales-mode`}
+                  field={selectField(childField("sales_mode"), "sales_mode", "C\u00e1ch b\u00e1n", salesModes)}
+                  value={line.sales_mode || "Tr\u1ecdn b\u1ed9"}
                   onChange={(value) => commitLine(line._key, "sales_mode", text(value) || undefined)}
                   registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
-                  label="C??ch b??n"
+                  label="C\u00e1ch b\u00e1n"
                 />
               ) : null}
 
               {showLeafVariant ? (
                 <StandardField
-                  id={\`sales-line-\${index}-leaf-variant\`}
-                  field={selectField(childField("leaf_variant"), "leaf_variant", "Ki???u k??o / motor", leafVariants)}
+                  id={`sales-line-${index}-leaf-variant`}
+                  field={selectField(childField("leaf_variant"), "leaf_variant", "Ki\u1ec3u k\u00e9o / motor", leafVariants)}
                   value={line.leaf_variant}
                   onChange={(value) => commitLine(line._key, "leaf_variant", text(value) || undefined)}
                   registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
-                  label="Ki???u k??o / motor"
+                  label="Ki\u1ec3u k\u00e9o / motor"
                 />
               ) : null}
 
               {kind === "mesh" ? (
                 <StandardField
-                  id={\`sales-line-\${index}-mesh-height\`}
-                  field={lineBaseField("mesh_height_m", "Cao l?????i (m)", "Float")}
+                  id={`sales-line-${index}-mesh-height`}
+                  field={lineBaseField("mesh_height_m", "Cao l\u01b0\u1edbi (m)", "Float")}
                   value={line.mesh_height_m}
                   onChange={(value) => patchLine(line._key, { mesh_height_m: value == null || value === "" ? undefined : Number(value) })}
                   onCommit={() => commitLine(line._key, "mesh_height_m", line.mesh_height_m)}
                   registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
-                  label="Cao l?????i (m)"
+                  label="Cao l\u01b0\u1edbi (m)"
                 />
               ) : null}
 
               {fieldVisible(line, "has_butterfly_bracket") ? (
                 <StandardField
-                  id={\`sales-line-\${index}-butterfly\`}
-                  field={lineBaseField("has_butterfly_bracket", "C?? b???n b?????m", "Check")}
+                  id={`sales-line-${index}-butterfly`}
+                  field={lineBaseField("has_butterfly_bracket", "C\u00f3 b\u1ea3n b\u01b0\u1edbm", "Check")}
                   value={line.has_butterfly_bracket}
                   onChange={(value) => commitLine(line._key, "has_butterfly_bracket", value ? 1 : 0)}
                   registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
                   readOnly={fieldReadonly(line, "has_butterfly_bracket")}
-                  label="C?? b???n b?????m"
+                  label="C\u00f3 b\u1ea3n b\u01b0\u1edbm"
                 />
               ) : null}
 
               {showLength ? (
                 <StandardField
-                  id={\`sales-line-\${index}-length\`}
-                  field={lineBaseField("length_m", fieldLabel(line, "length_m", "D??i m???t c??y/??o???n (m)"), "Float")}
+                  id={`sales-line-${index}-length`}
+                  field={lineBaseField("length_m", fieldLabel(line, "length_m", "D\u00e0i m\u1ed9t c\u00e2y/\u0111o\u1ea1n (m)"), "Float")}
                   value={line.length_m}
                   onChange={(value) => patchLine(line._key, { length_m: value == null || value === "" ? undefined : Number(value) })}
                   onCommit={() => commitLine(line._key, "length_m", line.length_m)}
                   registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
                   required={fieldRequired(line, "length_m")} readOnly={fieldReadonly(line, "length_m")}
-                  label={fieldLabel(line, "length_m", "D??i m???t c??y/??o???n (m)")}
+                  label={fieldLabel(line, "length_m", "D\u00e0i m\u1ed9t c\u00e2y/\u0111o\u1ea1n (m)")}
                 />
               ) : null}
 
               {showBars ? (
                 <StandardField
-                  id={\`sales-line-\${index}-bars\`}
-                  field={lineBaseField("qty_bar", fieldLabel(line, "qty_bar", "S??? c??y/??o???n"), "Int")}
+                  id={`sales-line-${index}-bars`}
+                  field={lineBaseField("qty_bar", fieldLabel(line, "qty_bar", "S\u1ed1 c\u00e2y/\u0111o\u1ea1n"), "Int")}
                   value={line.qty_bar}
                   onChange={(value) => patchLine(line._key, { qty_bar: value == null || value === "" ? undefined : Number(value) })}
                   onCommit={() => commitLine(line._key, "qty_bar", line.qty_bar)}
                   registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
                   required={fieldRequired(line, "qty_bar")} readOnly={fieldReadonly(line, "qty_bar")}
-                  label={fieldLabel(line, "qty_bar", "S??? c??y/??o???n")}
+                  label={fieldLabel(line, "qty_bar", "S\u1ed1 c\u00e2y/\u0111o\u1ea1n")}
                 />
               ) : null}
 
               {!area && !showSets && !showBars ? (
                 <StandardField
-                  id={\`sales-line-\${index}-qty\`}
-                  field={lineBaseField("qty", "Kh???i l?????ng", "Float")}
+                  id={`sales-line-${index}-qty`}
+                  field={lineBaseField("qty", "Kh\u1ed1i l\u01b0\u1ee3ng", "Float")}
                   value={line.qty}
                   onChange={(value) => patchLine(line._key, { qty: value == null || value === "" ? undefined : Number(value) })}
                   onCommit={() => commitLine(line._key, "qty", line.qty)}
                   registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
                   required readOnly={fieldReadonly(line, "qty")}
-                  label="Kh???i l?????ng"
+                  label="Kh\u1ed1i l\u01b0\u1ee3ng"
                 />
               ) : null}
             </div>
