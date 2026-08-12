@@ -87,10 +87,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ALUMDOOR_VERSION="$(node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('briefs/alumdoor-v2.json','utf8')).version)")"
-          test -n "$ALUMDOOR_VERSION"
+          node --input-type=module <<'NODE'
+          import { readFile } from 'node:fs/promises';
+          import { compileBrief } from './scripts/lib/compile-brief.mjs';
+          const brief = JSON.parse(await readFile('./briefs/alumdoor-v2.json', 'utf8'));
+          const pkg = compileBrief(brief);
+          if (pkg.id !== brief.id) throw new Error(`compiled id ${pkg.id} != brief id ${brief.id}`);
+          if (pkg.version !== brief.version) throw new Error(`compiled version ${pkg.version} != brief version ${brief.version}`);
+          console.log(`PACKAGE_ID_VERSION_PASS ${pkg.id}@${pkg.version}`);
+          NODE
           node scripts/forge-app.mjs briefs/alumdoor-v2.json --dry-run | tee /tmp/r6-alumdoor-package.log
-          grep -Fq "app=alumdoor@${ALUMDOOR_VERSION}" /tmp/r6-alumdoor-package.log
           grep -q 'DRY_RUN_PASS alumdoor' /tmp/r6-alumdoor-package.log
       - name: Source diff hygiene
         shell: bash
