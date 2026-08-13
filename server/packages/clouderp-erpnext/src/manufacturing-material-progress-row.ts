@@ -1,14 +1,12 @@
 import type { CanonicalDocument, JsonObject } from "../../contracts/src/index.js";
-import type { StockEntryData } from "../../clouderp-core/src/types.js";
+import type { StockEntryData, StockEntryItem } from "../../clouderp-core/src/types.js";
 import { errors } from "../../core/src/index.js";
 import { fromScaledInt, toScaledInt } from "../../money/src/index.js";
 import type { WorkOrderData } from "./types.js";
 
-interface ProgressStockRow extends JsonObject {
+interface ProgressStockRow extends StockEntryItem {
   bom_row_id?: string;
   manufacturing_kind?: "Issue" | "Consumption" | "Scrap" | "Offcut";
-  qty?: string | number;
-  qty_micros?: number;
 }
 
 interface ProgressStockData extends StockEntryData {
