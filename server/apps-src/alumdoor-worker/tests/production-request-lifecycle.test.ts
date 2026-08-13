@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import "./production-request-lifecycle-api.test.js";
 import { deriveProductionRequestLifecycle } from "../src/production-request-lifecycle.js";
 
 const request = (state = "Đã tạo lệnh") => ({
