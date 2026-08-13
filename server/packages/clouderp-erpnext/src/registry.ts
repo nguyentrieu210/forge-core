@@ -84,6 +84,10 @@ import { VersionedBillOfMaterialsController } from "./manufacturing-lifecycle.js
 import { StockUomSnapshotWorkOrderController } from "./manufacturing-work-order-guard.js";
 import { StockEntryIntegrityController } from "./stock-entry-integrity.js";
 import {
+  SalesLinkedProductionPlanController,
+  SalesLinkedWorkOrderController,
+} from "./manufacturing-sales-lineage.js";
+import {
   CapaController, NonConformanceReportController,
   QualityPlanController, RootCauseAnalysisController,
 } from "./qms-controllers.js";
@@ -202,5 +206,9 @@ export function registerErpNextCoreControllers(registry: ControllerRegistry): Co
     .register(new AlumDoorAttendanceDeviceController())
     .register(new CutOrderReservationIntegrityController())
     .register(new StockReservationIntegrityController())
-    .register(new StockReconciliationIntegrityController());
+    .register(new StockReconciliationIntegrityController())
+    // Last registration wins: retain legacy controller construction above for compatibility
+    // while promoting exact source-row production lineage as the effective authority.
+    .register(new SalesLinkedProductionPlanController())
+    .register(new SalesLinkedWorkOrderController());
 }
