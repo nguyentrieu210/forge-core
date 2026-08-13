@@ -1,6 +1,6 @@
 # AlumDoor operational-screen convergence — Production Request vs Production Plan
 
-Status: ACTIVE DESIGN/IMPLEMENTATION  
+Status: ACTIVE DESIGN/IMPLEMENTATION
 Date: 2026-08-13
 
 ## Finding from the second deep audit
