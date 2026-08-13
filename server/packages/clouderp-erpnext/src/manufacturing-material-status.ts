@@ -4,12 +4,12 @@ import { errors } from "../../core/src/index.js";
 import { fromScaledInt, toScaledInt } from "../../money/src/index.js";
 import type { WorkOrderData, WorkOrderRequiredItem } from "./types.js";
 
-interface ManufacturingStockRow extends StockEntryItem {
+export interface ManufacturingStockRow extends StockEntryItem {
   bom_row_id?: string;
   manufacturing_kind?: "Issue" | "Consumption" | "Scrap" | "Offcut";
 }
 
-interface ManufacturingStockData extends StockEntryData {
+export interface ManufacturingStockData extends StockEntryData {
   items: ManufacturingStockRow[];
 }
 
@@ -20,7 +20,7 @@ interface LinkedWorkOrderData extends WorkOrderData {
   sales_order_row_id?: string;
 }
 
-export interface WorkOrderMaterialStatusRow extends JsonObject {
+export interface WorkOrderMaterialProgressRow extends JsonObject {
   bom_row_id: string;
   item_code: string;
   source_warehouse: string;
@@ -34,6 +34,17 @@ export interface WorkOrderMaterialStatusRow extends JsonObject {
   remaining_to_issue_micros: number;
   remaining_to_consume: string;
   remaining_to_consume_micros: number;
+}
+
+export interface WorkOrderMaterialProgressSummary extends JsonObject {
+  work_order: string;
+  required_qty_micros: number;
+  issued_qty_micros: number;
+  consumed_qty_micros: number;
+  rows: WorkOrderMaterialProgressRow[];
+}
+
+export interface WorkOrderMaterialStatusRow extends WorkOrderMaterialProgressRow {
   on_hand_qty: string;
   on_hand_qty_micros: number;
   available_to_issue: string;
@@ -54,25 +65,27 @@ export interface WorkOrderMaterialStatusResult extends JsonObject {
 }
 
 /**
- * Read-only material execution status for the Work Order / material issue screens.
+ * Canonical row-level material progress shared by lifecycle and operator read models.
  *
- * It derives issue/consumption progress from submitted Stock Entry documents and current
- * on-hand from the canonical stock balance callback. No WIP/material quantity is persisted
- * here, so the Stock Ledger/manufacturing progress path remains the only authority.
+ * Material Transfer contributes Issue progress. Manufacture contributes Consumption only
+ * for rows explicitly/defaulted as Consumption. Scrap and Offcut are recovery outputs and
+ * must never inflate consumed raw material.
  */
-export async function buildWorkOrderMaterialStatus(input: {
-  work_order: CanonicalDocument<LinkedWorkOrderData>;
-  stock_entries: Array<CanonicalDocument<ManufacturingStockData>>;
-  get_stock_balance_micros: (itemCode: string, warehouse: string) => Promise<number>;
-}): Promise<WorkOrderMaterialStatusResult> {
-  const workOrder = input.work_order;
+export function summarizeWorkOrderMaterialProgress(
+  workOrder: CanonicalDocument<LinkedWorkOrderData>,
+  stockEntries: Array<CanonicalDocument<ManufacturingStockData>>,
+): WorkOrderMaterialProgressSummary {
   if (workOrder.docstatus !== 1) throw errors.reference(`Submitted Work Order ${workOrder.name} is required`);
   if (!Array.isArray(workOrder.data.required_items) || workOrder.data.required_items.length === 0) {
     throw errors.reference(`Work Order ${workOrder.name} has no required material snapshot`);
   }
 
-  const progress = progressByBomRow(workOrder.name, input.stock_entries);
-  const rows: WorkOrderMaterialStatusRow[] = [];
+  const progress = progressByBomRow(workOrder.name, stockEntries);
+  const rows: WorkOrderMaterialProgressRow[] = [];
+  let requiredTotal = 0;
+  let issuedTotal = 0;
+  let consumedTotal = 0;
+
   for (const [index, required] of workOrder.data.required_items.entries()) {
     const rowId = text(required.row_id);
     if (!rowId) throw errors.reference(`Work Order ${workOrder.name} required item ${index + 1} has no stable row_id`);
@@ -80,9 +93,9 @@ export async function buildWorkOrderMaterialStatus(input: {
     const current = progress.get(rowId) ?? { issued: 0, consumed: 0 };
     const remainingIssue = Math.max(0, requiredQty - current.issued);
     const remainingConsume = Math.max(0, requiredQty - current.consumed);
-    const onHandRaw = await input.get_stock_balance_micros(required.item_code, required.source_warehouse);
-    if (!Number.isSafeInteger(onHandRaw)) throw errors.validation(`Stock balance for ${required.item_code} must be a safe integer`);
-    const available = Math.max(0, onHandRaw);
+    requiredTotal = safeAdd(requiredTotal, requiredQty, "required material quantity");
+    issuedTotal = safeAdd(issuedTotal, current.issued, "issued material quantity");
+    consumedTotal = safeAdd(consumedTotal, current.consumed, "consumed material quantity");
 
     rows.push({
       bom_row_id: rowId,
@@ -98,11 +111,46 @@ export async function buildWorkOrderMaterialStatus(input: {
       remaining_to_issue_micros: remainingIssue,
       remaining_to_consume: fromScaledInt(remainingConsume, 6),
       remaining_to_consume_micros: remainingConsume,
+    });
+  }
+
+  return {
+    work_order: workOrder.name,
+    required_qty_micros: requiredTotal,
+    issued_qty_micros: issuedTotal,
+    consumed_qty_micros: consumedTotal,
+    rows,
+  };
+}
+
+/**
+ * Read-only material execution status for the Work Order / material issue screens.
+ *
+ * It derives issue/consumption progress from submitted Stock Entry documents and current
+ * on-hand from the canonical stock balance callback. No WIP/material quantity is persisted
+ * here, so the Stock Ledger/manufacturing progress path remains the only authority.
+ */
+export async function buildWorkOrderMaterialStatus(input: {
+  work_order: CanonicalDocument<LinkedWorkOrderData>;
+  stock_entries: Array<CanonicalDocument<ManufacturingStockData>>;
+  get_stock_balance_micros: (itemCode: string, warehouse: string) => Promise<number>;
+}): Promise<WorkOrderMaterialStatusResult> {
+  const workOrder = input.work_order;
+  const progress = summarizeWorkOrderMaterialProgress(workOrder, input.stock_entries);
+  const rows: WorkOrderMaterialStatusRow[] = [];
+
+  for (const row of progress.rows) {
+    const onHandRaw = await input.get_stock_balance_micros(row.item_code, row.source_warehouse);
+    if (!Number.isSafeInteger(onHandRaw)) throw errors.validation(`Stock balance for ${row.item_code} must be a safe integer`);
+    const available = Math.max(0, onHandRaw);
+    const canIssue = Math.min(available, row.remaining_to_issue_micros);
+    rows.push({
+      ...row,
       on_hand_qty: fromScaledInt(onHandRaw, 6),
       on_hand_qty_micros: onHandRaw,
-      available_to_issue: fromScaledInt(Math.min(available, remainingIssue), 6),
-      available_to_issue_micros: Math.min(available, remainingIssue),
-      availability_status: available >= remainingIssue ? "AVAILABLE" : "SHORTAGE",
+      available_to_issue: fromScaledInt(canIssue, 6),
+      available_to_issue_micros: canIssue,
+      availability_status: available >= row.remaining_to_issue_micros ? "AVAILABLE" : "SHORTAGE",
     });
   }
 
@@ -133,8 +181,10 @@ function progressByBomRow(
       const qty = stockRowQuantity(row, document.name, index);
       const current = result.get(rowId) ?? { issued: 0, consumed: 0 };
       if (document.data.purpose === "Material Transfer") {
-        current.issued = safeAdd(current.issued, qty, `issued quantity for ${rowId}`);
-      } else if ((row.manufacturing_kind ?? "Consumption") !== "Issue") {
+        if ((row.manufacturing_kind ?? "Issue") === "Issue") {
+          current.issued = safeAdd(current.issued, qty, `issued quantity for ${rowId}`);
+        }
+      } else if ((row.manufacturing_kind ?? "Consumption") === "Consumption") {
         current.consumed = safeAdd(current.consumed, qty, `consumed quantity for ${rowId}`);
       }
       result.set(rowId, current);
