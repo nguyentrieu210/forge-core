@@ -25,21 +25,19 @@ jobs:
           from pathlib import Path
           p = Path('client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx')
           s = p.read_text(encoding='utf-8')
-          old = '''          const priceLists = await adapter.getList("Price List", {
-            fields: ["name", "price_list_name", "modified", "creation", "enabled", "selling"],
-            pageLength: 200,
-          });'''
-          new = '''          const priceLists = await adapter.getList("Price List", {
-            fields: ["name", "price_list_name", "modified", "creation", "enabled", "selling"],
-            orderBy: "modified desc",
-            pageLength: 200,
-          });'''
-          if s.count(old) != 1:
-              raise SystemExit(f'expected exactly 1 target block, got {s.count(old)}')
-          p.write_text(s.replace(old, new, 1), encoding='utf-8')
+          marker = 'const priceLists = await adapter.getList("Price List", {'
+          start = s.index(marker)
+          end = s.index('});', start)
+          block = s[start:end]
+          if 'orderBy:' not in block:
+              pos = s.index('pageLength: 200,', start, end)
+              line_start = s.rfind('\n', start, pos) + 1
+              indent = s[line_start:pos]
+              s = s[:line_start] + indent + 'orderBy: "modified desc",\n' + s[line_start:]
+          p.write_text(s, encoding='utf-8')
           PY
           git diff --check
-          grep -F 'orderBy: "modified desc"' client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx
+          grep -A4 -F 'adapter.getList("Price List"' client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx | grep -F 'orderBy: "modified desc"'
       - name: Commit fix and remove temporary workflow
         shell: bash
         run: |
