@@ -53,7 +53,7 @@ interface RowDraft {
   qty_bar: string;
 }
 interface ItemMeta extends Json { name?: string; item_name?: string; inventory_mode?: string; measurement_profile?: string; }
-interface BundleDoc extends Doc { total_qty?: unknown; item_code?: unknown; warehouse?: unknown; type?: unknown; posting_at?: unknown; docstatus?: unknown; }
+type BundleDoc = Doc;
 
 export interface AlumdoorManufacturingStockEntryCreateProps {
   workOrder: string;
@@ -165,7 +165,7 @@ export function AlumdoorManufacturingStockEntryCreate(props: AlumdoorManufacturi
       if (!source) { toast.error(`${row.item_code} thiếu kho nguồn.`); return; }
       const validation = validatePhysicalRow(meta, draft, submitNow);
       if (validation) { toast.error(`${row.item_code}: ${validation}`); return; }
-      const entry: Json = {
+      items.push({
         row_id: `MFG-${row.bom_row_id}`,
         item_code: row.item_code,
         qty: draft.qty,
@@ -177,8 +177,7 @@ export function AlumdoorManufacturingStockEntryCreate(props: AlumdoorManufacturi
         ...(draft.width_m ? { width_m: draft.width_m } : {}),
         ...(draft.height_m ? { height_m: draft.height_m } : {}),
         ...(draft.qty_bar ? { qty_bar: draft.qty_bar } : {}),
-      };
-      items.push(entry);
+      });
     }
 
     if (props.purpose === "Manufacture") {
@@ -201,7 +200,10 @@ export function AlumdoorManufacturingStockEntryCreate(props: AlumdoorManufacturi
       purpose: props.purpose,
       work_order: props.workOrder,
       items,
-      ...(props.purpose === "Material Transfer" ? { source_warehouse: text(workOrderDoc.source_warehouse), target_warehouse: wipWarehouse } : {
+      ...(props.purpose === "Material Transfer" ? {
+        source_warehouse: text(workOrderDoc.source_warehouse),
+        target_warehouse: wipWarehouse,
+      } : {
         source_warehouse: wipWarehouse || text(workOrderDoc.source_warehouse),
         target_warehouse: targetWarehouse,
         finished_good_item: productionItem,
