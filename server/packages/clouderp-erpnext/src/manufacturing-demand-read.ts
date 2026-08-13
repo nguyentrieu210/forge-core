@@ -45,6 +45,10 @@ export interface OpenSalesProductionDemandResult extends JsonObject {
  * "how much of this submitted Sales Order row has not yet been represented by a submitted
  * Production Plan?" and exposes active BOM candidates without silently choosing among
  * ambiguous alternatives.
+ *
+ * Sales Package SELECTABLE clusters are deliberately excluded until Selling exposes a
+ * canonical physical-obligation projection. A commercial parent residual and its priced
+ * child rows are not enough evidence to decide which physical item must be manufactured.
  */
 export function buildOpenSalesProductionDemand(input: {
   company: string;
@@ -74,11 +78,19 @@ export function buildOpenSalesProductionDemand(input: {
         warnings.add(`MISSING_SALES_ORDER_ROW_ID:${order.name}:${index + 1}`);
         continue;
       }
+
+      const packageProvenance = line as unknown as JsonObject;
+      const packageGroupKey = text(packageProvenance.sales_package_group_key);
+      const packageParentKey = text(packageProvenance.sales_package_parent_key);
+      if (packageGroupKey || packageParentKey) {
+        const clusterKey = packageGroupKey || packageParentKey;
+        warnings.add(`PHYSICAL_OBLIGATION_UNRESOLVED_SELECTABLE_PACKAGE:${order.name}:${rowId}:${clusterKey}`);
+        continue;
+      }
+
       const ordered = quantityMicros(line.qty_micros, line.qty, `${order.name}/${rowId}.qty`);
       const alreadyPlanned = planned.get(key(order.name, rowId)) ?? 0;
-      if (alreadyPlanned > ordered) {
-        warnings.add(`OVERPLANNED:${order.name}:${rowId}`);
-      }
+      if (alreadyPlanned > ordered) warnings.add(`OVERPLANNED:${order.name}:${rowId}`);
       const remaining = Math.max(0, ordered - alreadyPlanned);
       if (remaining === 0) continue;
 
@@ -122,10 +134,7 @@ export function buildOpenSalesProductionDemand(input: {
   };
 }
 
-function plannedBySalesRow(
-  company: string,
-  documents: Array<CanonicalDocument<ProductionPlanData>>,
-): Map<string, number> {
+function plannedBySalesRow(company: string, documents: Array<CanonicalDocument<ProductionPlanData>>): Map<string, number> {
   const result = new Map<string, number>();
   for (const document of documents) {
     if (document.docstatus !== 1 || document.data.company !== company) continue;
@@ -141,11 +150,7 @@ function plannedBySalesRow(
   return result;
 }
 
-function activeBomIndex(
-  company: string,
-  planningDate: string,
-  documents: Array<CanonicalDocument<VersionedBomData>>,
-): Map<string, Array<CanonicalDocument<VersionedBomData>>> {
+function activeBomIndex(company: string, planningDate: string, documents: Array<CanonicalDocument<VersionedBomData>>): Map<string, Array<CanonicalDocument<VersionedBomData>>> {
   const result = new Map<string, Array<CanonicalDocument<VersionedBomData>>>();
   for (const document of documents) {
     if (document.docstatus !== 1 || document.data.company !== company) continue;
@@ -157,16 +162,12 @@ function activeBomIndex(
     result.set(document.data.item, list);
   }
   for (const list of result.values()) {
-    list.sort((left, right) => (right.data.revision ?? 1) - (left.data.revision ?? 1)
-      || right.modified_at.localeCompare(left.modified_at));
+    list.sort((left, right) => (right.data.revision ?? 1) - (left.data.revision ?? 1) || right.modified_at.localeCompare(left.modified_at));
   }
   return result;
 }
 
-function key(salesOrder: string, rowId: string): string {
-  return `${salesOrder}\u0000${rowId}`;
-}
-
+function key(salesOrder: string, rowId: string): string { return `${salesOrder}\u0000${rowId}`; }
 function quantityMicros(micros: unknown, decimal: unknown, field: string): number {
   if (typeof micros === "number" && Number.isSafeInteger(micros)) {
     if (micros < 0) throw errors.validation(`${field} cannot be negative`);
@@ -177,28 +178,20 @@ function quantityMicros(micros: unknown, decimal: unknown, field: string): numbe
   if (result < 0) throw errors.validation(`${field} cannot be negative`);
   return result;
 }
-
 function safeAdd(left: number, right: number, field: string): number {
   if (!Number.isSafeInteger(left) || !Number.isSafeInteger(right)) throw errors.validation(`${field} must use safe integers`);
   const result = left + right;
   if (!Number.isSafeInteger(result)) throw errors.validation(`${field} exceeds safe integer range`);
   return result;
 }
-
 function requiredText(value: unknown, field: string): string {
   const result = text(value);
   if (!result) throw errors.validation(`${field} is required`);
   return result;
 }
-
 function validDate(value: string, field: string): string {
   const result = value.slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(result) || Number.isNaN(Date.parse(`${result}T00:00:00.000Z`))) {
-    throw errors.validation(`${field} must be an ISO date`);
-  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(result) || Number.isNaN(Date.parse(`${result}T00:00:00.000Z`))) throw errors.validation(`${field} must be an ISO date`);
   return result;
 }
-
-function text(value: unknown): string {
-  return typeof value === "string" || typeof value === "number" ? String(value).normalize("NFC").trim() : "";
-}
+function text(value: unknown): string { return typeof value === "string" || typeof value === "number" ? String(value).normalize("NFC").trim() : ""; }
