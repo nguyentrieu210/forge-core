@@ -1,0 +1,51 @@
+name: One-shot Sales Order latest price list by modified
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/one-shot-sales-price-list-modified.yml'
+permissions:
+  contents: write
+jobs:
+  patch-main:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+      - name: Patch file
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx')
+          s = p.read_text(encoding='utf-8')
+          start = s.index('        let sellingPriceLists: Doc[] = [];')
+          end = s.index('        if (!active) return;', start)
+          new = '''        let sellingPriceLists: Doc[] = [];
+        try {
+          sellingPriceLists = await adapter.getList("Price List", {
+            fields: ["name", "price_list_name", "modified", "enabled", "selling"],
+            filters: { enabled: 1, selling: 1 },
+            orderBy: "modified desc",
+            pageLength: 1,
+          });
+        } catch {
+          sellingPriceLists = [];
+        }
+'''
+          s = s[:start] + new + s[end:]
+          p.write_text(s, encoding='utf-8')
+          PY
+          git diff --check
+          grep -F 'orderBy: "modified desc"' client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx
+      - name: Verify and commit
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/one-shot-sales-price-list-modified.yml
+          git add client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx
+          git commit -m "fix(ui): pick latest modified active Sales price list"
+          git push origin HEAD:main
