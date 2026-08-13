@@ -385,17 +385,35 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
           (field) => field.fieldname === "items" && field.fieldtype === "Table",
         );
         const childDoctype = text(table?.options) || "Sales Order Item";
-        const [itemMeta, boot, caps, sellingPriceLists] = await Promise.all([
+        const [itemMeta, boot, caps] = await Promise.all([
           adapter.getMeta(childDoctype),
           adapter.getBoot(),
           adapter.getCapabilities("Sales Order"),
-          adapter.getList("Price List", {
+        ]);
+        let sellingPriceLists: Doc[] = [];
+        try {
+          sellingPriceLists = await adapter.getList("Price List", {
             fields: ["name", "price_list_name", "creation"],
             filters: { enabled: 1, selling: 1 },
             orderBy: "creation desc",
             pageLength: 1,
-          }).catch(() => []),
-        ]);
+          });
+        } catch {
+          // Fall through to Frappe's whitelisted list API below.
+        }
+        if (!sellingPriceLists.length) {
+          try {
+            sellingPriceLists = await adapter.callGet<Doc[]>("frappe.client.get_list", {
+              doctype: "Price List",
+              fields: JSON.stringify(["name", "price_list_name", "creation"]),
+              filters: JSON.stringify({ enabled: 1, selling: 1 }),
+              order_by: "creation desc",
+              limit_page_length: 1,
+            });
+          } catch {
+            sellingPriceLists = [];
+          }
+        }
         if (!active) return;
         const defaults: Json = {
           ...blankFromMeta(salesMeta),
