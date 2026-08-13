@@ -1,0 +1,89 @@
+name: One-shot Sales Order price-list fallback fix
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/one-shot-sales-price-list-fallback.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-main:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Patch Sales Order latest active Price List lookup
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx')
+          s = p.read_text(encoding='utf-8')
+
+          old = '''        const [itemMeta, boot, caps, sellingPriceLists] = await Promise.all([
+          adapter.getMeta(childDoctype),
+          adapter.getBoot(),
+          adapter.getCapabilities("Sales Order"),
+          adapter.getList("Price List", {
+            fields: ["name", "price_list_name", "creation"],
+            filters: { enabled: 1, selling: 1 },
+            orderBy: "creation desc",
+            pageLength: 1,
+          }).catch(() => []),
+        ]);'''
+
+          new = '''        const [itemMeta, boot, caps] = await Promise.all([
+          adapter.getMeta(childDoctype),
+          adapter.getBoot(),
+          adapter.getCapabilities("Sales Order"),
+        ]);
+        let sellingPriceLists: Doc[] = [];
+        try {
+          sellingPriceLists = await adapter.getList("Price List", {
+            fields: ["name", "price_list_name", "creation"],
+            filters: { enabled: 1, selling: 1 },
+            orderBy: "creation desc",
+            pageLength: 1,
+          });
+        } catch {
+          // Fall through to Frappe's whitelisted list API below.
+        }
+        if (!sellingPriceLists.length) {
+          try {
+            sellingPriceLists = await adapter.callGet<Doc[]>("frappe.client.get_list", {
+              doctype: "Price List",
+              fields: JSON.stringify(["name", "price_list_name", "creation"]),
+              filters: JSON.stringify({ enabled: 1, selling: 1 }),
+              order_by: "creation desc",
+              limit_page_length: 1,
+            });
+          } catch {
+            sellingPriceLists = [];
+          }
+        }'''
+
+          if s.count(old) != 1:
+            raise SystemExit(f'expected 1 old block, got {s.count(old)}')
+          s = s.replace(old, new, 1)
+          p.write_text(s, encoding='utf-8')
+          PY
+
+          git diff --check
+          grep -F 'frappe.client.get_list' client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx
+          grep -F 'order_by: "creation desc"' client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx
+
+      - name: Commit fix and remove temporary workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/one-shot-sales-price-list-fallback.yml
+          git add client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx
+          git commit -m "fix(ui): harden latest active Sales price list default"
+          git push origin HEAD:main
