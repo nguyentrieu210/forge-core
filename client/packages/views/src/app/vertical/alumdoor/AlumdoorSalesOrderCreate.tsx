@@ -33,6 +33,7 @@ type FieldOverride = {
 };
 type ItemContext = Json & {
   item_group?: string;
+  is_sales_package_component?: boolean;
   door_type?: string | null;
   inventory_mode?: string;
   selected_uom?: string;
@@ -55,6 +56,8 @@ interface SalesLine extends Json {
   _commercial?: Json;
   _itemPrices?: Doc[];
   _selectedItemPrice?: string;
+  _splitChildren?: SalesLine[];
+  _splitPackageChecksum?: string;
   item_code?: string;
   sales_option?: string;
   color?: string;
@@ -75,6 +78,9 @@ interface SalesLine extends Json {
   has_butterfly_bracket?: number;
   length_m?: number;
   qty_bar?: number;
+  sales_package_group_key?: string;
+  sales_package_parent_key?: string;
+  sales_package_component_key?: string;
 }
 
 const LAYOUT_TYPES = new Set(["Section Break", "Column Break", "Tab Break", "Heading", "HTML", "Button"]);
@@ -190,20 +196,161 @@ function money(value: unknown): string {
     : "—";
 }
 
+function salesGroupKey(): string {
+  return `SALE-GROUP-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
 function newLine(index: number): SalesLine {
   return {
     _key: `sales-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 7)}`,
+    sales_package_group_key: salesGroupKey(),
     qty: 1,
     set_count: 1,
   };
 }
 
+function hydrateSalesLines(rows: Json[]): SalesLine[] {
+  const parents: SalesLine[] = [];
+  const parentByGroup = new Map<string, SalesLine>();
+  const children: SalesLine[] = [];
+  for (const [index, row] of rows.entries()) {
+    const line = {
+      ...row,
+      _key: `sales-existing-${text(row.name) || index}-${Math.random().toString(36).slice(2, 7)}`,
+      _loading: false,
+      _error: "",
+      _pricingError: "",
+    } as SalesLine;
+    if (text(line.sales_package_parent_key)) {
+      children.push(line);
+      continue;
+    }
+    if (!text(line.sales_package_group_key)) line.sales_package_group_key = salesGroupKey();
+    line._splitChildren = [];
+    parents.push(line);
+    parentByGroup.set(text(line.sales_package_group_key), line);
+  }
+  for (const child of children) {
+    const parent = parentByGroup.get(text(child.sales_package_parent_key));
+    if (parent) parent._splitChildren = [...(parent._splitChildren ?? []), child];
+    else {
+      child._error = `Không tìm thấy dòng bộ cha ${text(child.sales_package_parent_key)} của món ${text(child.item_code)}.`;
+      parents.push(child);
+    }
+  }
+  return parents.length ? parents : [newLine(0)];
+}
+
+function splitChildFromComponent(parent: SalesLine, component: Json): SalesLine {
+  const groupKey = text(parent.sales_package_group_key) || salesGroupKey();
+  const inheritColor = component.inherit_color === true || component.inherit_color === 1;
+  const inheritDimensions = component.inherit_dimensions === true || component.inherit_dimensions === 1;
+  const inheritSetCount = component.inherit_set_count === true || component.inherit_set_count === 1;
+  return {
+    _key: `sales-child-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    item_code: text(component.item_code),
+    uom: text(component.uom),
+    qty: numberValue(component.qty) ?? 1,
+    ...(text(component.sales_option) ? { sales_option: text(component.sales_option) } : {}),
+    sales_package_parent_key: groupKey,
+    sales_package_component_key: text(component.component_key),
+    ...(inheritColor ? { color: parent.color } : {}),
+    ...(inheritDimensions ? {
+      width_m: parent.width_m,
+      height_m: parent.height_m,
+      billable_area_sqm: parent.billable_area_sqm,
+      length_m: parent.length_m,
+    } : {}),
+    ...(inheritSetCount ? { set_count: parent.set_count } : {}),
+    _loading: true,
+    _error: "",
+    _pricingError: "",
+  };
+}
+
+function splitSnapshot(line: SalesLine): Json | undefined {
+  const value = line.sales_package_snapshot ?? line._commercial?.sales_package_snapshot;
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Json : undefined;
+}
+
+function splitComponents(line: SalesLine): Json[] {
+  const snapshot = splitSnapshot(line);
+  if (text(snapshot?.selection_mode).toUpperCase() !== "SELECTABLE") return [];
+  return Array.isArray(snapshot?.components)
+    ? snapshot.components.filter((component): component is Json => Boolean(component) && typeof component === "object" && !Array.isArray(component))
+    : [];
+}
+
+type SplitLifecycleDescriptor = {
+  identity: string;
+  packageName: string;
+};
+
+function splitLifecycleDescriptor(line: SalesLine | undefined): SplitLifecycleDescriptor | undefined {
+  if (!line) return undefined;
+  const optionName = text(line.sales_option);
+  const option = (line._salesOptions ?? []).find((candidate) => text(candidate.name) === optionName);
+  const mode = text(option?.sales_mode) || text(option?.option_label) || text(line.sales_mode);
+  if (normalized(mode) !== "tach mon") return undefined;
+  const itemCode = text(line.item_code);
+  const packageName = text(option?.sales_package) || text(line.sales_package) || `PKG-SPLIT:${itemCode}`;
+  if (!itemCode || !optionName || !packageName) return undefined;
+  return {
+    identity: JSON.stringify([line._key, itemCode, optionName, packageName]),
+    packageName,
+  };
+}
+
+function splitParentProjection(line: SalesLine): { rate?: number; gross?: number; discount?: number; net?: number } {
+  const commercial = line._commercial ?? {};
+  if (!line._commercial) {
+    return {
+      rate: numberValue(line.rate),
+      gross: numberValue(line.amount),
+      discount: numberValue(line.discount_amount),
+      net: numberValue(line.net_amount),
+    };
+  }
+  const gross = numberValue(commercial.gross_amount);
+  const pricedQty = numberValue(commercial.priced_qty) ?? numberValue(line.qty);
+  if (gross === undefined || !pricedQty || pricedQty <= 0) return {};
+  const components = new Map(splitComponents(line).map((component) => [text(component.component_key), component]));
+  let grossDeduction = 0;
+  let basisDeduction = 0;
+  for (const child of line._splitChildren ?? []) {
+    const component = components.get(text(child.sales_package_component_key));
+    const childGross = numberValue(child._commercial?.gross_amount) ?? numberValue(child.amount) ?? 0;
+    if (component?.deduct_from_parent !== false && component?.deduct_from_parent !== 0) grossDeduction += childGross;
+    if (component?.deduct_from_discount_basis === true || component?.deduct_from_discount_basis === 1) basisDeduction += childGross;
+  }
+  const residualGross = Math.max(0, gross - grossDeduction);
+  const basis = Math.max(0, (numberValue(commercial.discount_basis_amount) ?? gross) - basisDeduction);
+  const discountPercentage = numberValue(commercial.discount_percentage) ?? 0;
+  const originalDiscount = numberValue(commercial.discount_amount) ?? 0;
+  const discount = discountPercentage > 0
+    ? Math.round(basis * discountPercentage / 100)
+    : Math.min(originalDiscount, residualGross);
+  const adjustment = numberValue(commercial.adjustment_amount) ?? 0;
+  return {
+    rate: residualGross / pricedQty,
+    gross: residualGross,
+    discount,
+    net: Math.max(0, residualGross - discount + adjustment),
+  };
+}
+
 function lineTotal(line: SalesLine): number {
+  const split = splitParentProjection(line);
+  if (split.net !== undefined) return split.net;
   const net = Number(line.net_amount);
   if (Number.isFinite(net)) return net;
   const gross = Number(line.amount);
   if (!Number.isFinite(gross)) return 0;
   return gross - Math.max(0, Number(line.discount_amount) || 0) + (Number(line.adjustment_amount) || 0);
+}
+
+function lineClusterTotal(line: SalesLine): number {
+  return lineTotal(line) + (line._splitChildren ?? []).reduce((sum, child) => sum + lineTotal(child), 0);
 }
 
 function isAreaDoor(line: SalesLine): boolean {
@@ -275,6 +422,34 @@ function priceVariant(value: unknown): string {
 function numberValue(value: unknown): number | undefined {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function areaQuantity(line: SalesLine): number | undefined {
+  const width = numberValue(line.width_m);
+  const height = numberValue(line.height_m);
+  const sets = numberValue(line.set_count) ?? 1;
+  if (!width || width <= 0 || !height || height <= 0 || sets <= 0) return undefined;
+  return Math.round(width * height * sets * 1_000_000) / 1_000_000;
+}
+
+function itemSearchScore(option: { value: string; description?: string }, query: string): number {
+  const needle = normalized(query);
+  if (!needle) return 0;
+  const code = normalized(option.value);
+  const label = normalized(option.description);
+  const haystack = `${label} ${code}`;
+  const tokens = needle.split(/\s+/).filter(Boolean);
+  let score = 0;
+  if (code === needle) score += 1_000;
+  if (label === needle) score += 900;
+  if (code.startsWith(needle)) score += 500;
+  if (label.startsWith(needle)) score += 450;
+  if (haystack.includes(needle)) score += 300;
+  for (const token of tokens) {
+    if (code.includes(token)) score += 80;
+    if (label.includes(token)) score += 60;
+  }
+  return score;
 }
 
 function optionConditions(value: unknown): Json[] {
@@ -460,6 +635,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
   const [customerPaymentTerms, setCustomerPaymentTerms] = useState("");
   const [headerOpen, setHeaderOpen] = useState(true);
   const [lines, setLines] = useState<SalesLine[]>([newLine(0)]);
+  const linesRef = useRef<SalesLine[]>(lines);
   const [selectedLineKey, setSelectedLineKey] = useState("");
   const [selectedLineKeys, setSelectedLineKeys] = useState<Set<string>>(() => new Set());
   const [loading, setLoading] = useState(true);
@@ -472,17 +648,46 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
   const closeSeen = useRef(props.closeRequest ?? 0);
   const skipCustomerAutofillOnce = useRef(false);
   const lineSeq = useRef(new Map<string, number>());
+  const splitLifecycleSeq = useRef(0);
+  const splitLifecycleState = useRef(new Map<string, { identity: string; token: number }>());
   const headerSeq = useRef(0);
   const documentName = text(props.name);
   const isExisting = Boolean(documentName);
   const formReadOnly = isExisting && (!canWrite || docstatus !== 0);
   const canSave = isExisting ? !formReadOnly : canCreate;
 
+  const salesServices = useMemo<FieldServices>(() => ({
+    ...services,
+    searchLink: async (doctype, query, options) => {
+      if (doctype !== "Item" || !services.searchLink) {
+        return services.searchLink?.(doctype, query, options) ?? [];
+      }
+      const raw = text(query);
+      const words = raw.split(/\s+/).map((word) => word.trim()).filter((word) => word.length >= 2);
+      const searches = [...new Set([raw, normalized(raw), ...words, ...words.map(normalized)].filter(Boolean))].slice(0, 8);
+      const batches = await Promise.all(searches.map((searchText) => services.searchLink!(doctype, searchText, {
+        ...options,
+        pageLength: 100,
+      }).catch(() => [])));
+      const merged = new Map<string, { value: string; description?: string }>();
+      for (const option of batches.flat()) {
+        if (!merged.has(option.value)) merged.set(option.value, option);
+      }
+      return [...merged.values()]
+        .sort((left, right) => itemSearchScore(right, raw) - itemSearchScore(left, raw)
+          || left.value.localeCompare(right.value, "vi"))
+        .slice(0, 100);
+    },
+  }), [services]);
+
   const childFields = useMemo(
     () => childMeta?.fields.map((field) => field.fieldname).filter(Boolean) ?? [],
     [childMeta],
   );
   const childFieldSet = useMemo(() => new Set(childFields), [childFields]);
+  const splitLifecycleFingerprint = useMemo(() => lines
+    .map((line) => splitLifecycleDescriptor(line)?.identity ?? `${line._key}:not-split`)
+    .join("\u001e"), [lines]);
   const leafVariants = useMemo(
     () => optionList(childMeta, "leaf_variant", ["Kéo tay", "Motor ngoài", "Motor trong"]),
     [childMeta],
@@ -542,17 +747,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
         const initialHeader = existingDoc
           ? { ...defaults, ...existingDoc, items: undefined }
           : defaults;
-        const initialLines = existingDoc
-          ? (existingItems.length
-              ? existingItems.map((row, index) => ({
-                  ...row,
-                  _key: `sales-existing-${text(row.name) || index}-${Math.random().toString(36).slice(2, 7)}`,
-                  _loading: false,
-                  _error: "",
-                  _pricingError: "",
-                } as SalesLine))
-              : [newLine(0)])
-          : [newLine(0)];
+        const initialLines = existingDoc ? hydrateSalesLines(existingItems) : [newLine(0)];
         setMeta(salesMeta);
         setChildMeta(itemMeta);
         setCanCreate(Boolean(caps.create));
@@ -709,10 +904,21 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
     return result;
   }, [childFieldSet, isExisting]);
 
+  const flattenLines = useCallback((source: SalesLine[]): SalesLine[] => source.flatMap((line) => [
+    line,
+    ...(line._splitChildren ?? []),
+  ]), []);
+
+  useEffect(() => {
+    linesRef.current = lines;
+  }, [lines]);
+
   const patchLine = useCallback((key: string, patch: Partial<SalesLine>) => {
-    setLines((current) => current.map((line) => (
+    const next = linesRef.current.map((line) => (
       line._key === key ? { ...line, ...patch } : line
-    )));
+    ));
+    linesRef.current = next;
+    setLines(next);
   }, []);
 
   const previewDocument = useCallback(async (
@@ -722,7 +928,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
   ): Promise<Json> => {
     const result = await adapter.callPost<Json>("alumdoor.ui.preview_document", {
       doctype: "Sales Order",
-      doc: { ...next, items: currentLines.map(cleanLine) },
+      doc: { ...next, items: flattenLines(currentLines).map(cleanLine) },
       changed_field: changedField,
     });
     const patch = result.patch && typeof result.patch === "object" && !Array.isArray(result.patch)
@@ -733,7 +939,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
       delete merged[field];
     }
     return merged;
-  }, [adapter, cleanLine, lines]);
+  }, [adapter, cleanLine, flattenLines, lines]);
 
   const setHeaderField = useCallback((field: string, value: unknown, preview = false) => {
     const seq = ++headerSeq.current;
@@ -801,11 +1007,15 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
     try {
       const rows = await adapter.getList("Item Price", {
         fields: ["name", "price_list", "item_code", "uom", "price_variant", "currency", "rate", "disabled"],
-        filters: { item_code: itemCode, price_list: priceList, disabled: 0 },
+        // Item Price.disabled is readable but is not an allowed server filter in the
+        // current DocType metadata. Filtering it here made the endpoint return 417 and
+        // silently emptied every price choice on this screen.
+        filters: { item_code: itemCode, price_list: priceList },
         pageLength: 200,
       });
       const currency = text(header.currency);
       return rows
+        .filter((row) => !(row.disabled === true || row.disabled === 1 || text(row.disabled) === "1" || text(row.disabled).toLowerCase() === "true"))
         .filter((row) => !currency || !text(row.currency) || text(row.currency) === currency)
         .sort((left, right) =>
           priceVariant(left.price_variant).localeCompare(priceVariant(right.price_variant))
@@ -817,6 +1027,46 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
       return [];
     }
   }, [adapter, header.currency, header.selling_price_list]);
+
+  const previewSplitChild = useCallback(async (source: SalesLine): Promise<SalesLine> => {
+    const child = { ...source, _loading: true, _pricingError: "", _error: "" } as SalesLine;
+    try {
+      const [commercial, itemResult] = await Promise.all([
+        adapter.callPost<Json>("metaforge.api.preview_sales_commercial_line", {
+          line: cleanLine(child),
+          price_list: text(header.selling_price_list),
+          currency: text(header.currency) || "VND",
+          posting_date: text(header.transaction_date) || today(),
+          customer: text(header.customer),
+          customer_group: text(header.customer_group),
+        }),
+        adapter.getDoc("Item", text(child.item_code)).catch(() => null),
+      ]);
+      const sellingRate = numberValue(commercial.selling_rate ?? commercial.rate);
+      const grossAmount = numberValue(commercial.gross_amount);
+      const discountPercentage = numberValue(commercial.discount_percentage);
+      const discountAmount = numberValue(commercial.discount_amount);
+      const adjustmentAmount = numberValue(commercial.adjustment_amount);
+      const netAmount = numberValue(commercial.net_before_tax ?? commercial.net_amount ?? commercial.amount);
+      return {
+        ...child,
+        ...(sellingRate === undefined ? {} : { rate: sellingRate }),
+        ...(grossAmount === undefined ? {} : { amount: grossAmount }),
+        ...(discountPercentage === undefined ? {} : { discount_percentage: discountPercentage }),
+        ...(discountAmount === undefined ? {} : { discount_amount: discountAmount }),
+        ...(adjustmentAmount === undefined ? {} : { adjustment_amount: adjustmentAmount }),
+        ...(netAmount === undefined ? {} : { net_amount: netAmount }),
+        ...(text(commercial.sales_option) ? { sales_option: text(commercial.sales_option) } : {}),
+        ...(text(commercial.sales_mode) ? { sales_mode: text(commercial.sales_mode) } : {}),
+        _commercial: commercial,
+        _itemLabel: text((itemResult?.doc as Json | undefined)?.item_name) || text(child.item_code),
+        _loading: false,
+        _pricingError: "",
+      };
+    } catch (error) {
+      return { ...child, _loading: false, _pricingError: mapError(error).message };
+    }
+  }, [adapter, cleanLine, header]);
 
   const previewLine = useCallback(async (
     source: SalesLine,
@@ -858,6 +1108,22 @@ changed_field: changedField,
       ]);
       if (lineSeq.current.get(row._key) !== seq) return;
 
+      if (changedField === "item_code" && context.is_sales_package_component) {
+        patchLine(row._key, {
+          ...patch,
+          _context: context,
+          _allowedColors: [],
+          _overrides: {},
+          _salesOptions: [],
+          _itemPrices: [],
+          _commercial: undefined,
+          _loading: false,
+          _error: "Đây là món tách của gói bán. Hãy chọn mặt hàng cửa trọn bộ làm dòng chính, rồi chọn cách bán Tách món.",
+          _pricingError: "",
+        });
+        return;
+      }
+
       const serverPatch = preview.patch && typeof preview.patch === "object" && !Array.isArray(preview.patch)
         ? preview.patch as Json
         : {};
@@ -882,6 +1148,18 @@ changed_field: changedField,
       };
       for (const field of Array.isArray(preview.clear) ? preview.clear.map(text) : []) {
         if (childFieldSet.has(field)) next[field] = undefined;
+      }
+
+      // Keep the Sales Order responsive while the customer/price context is still
+      // resolving. The detailed row already captures the billable width, height and
+      // number of sets, so an area-based item must not fall back to an empty quantity.
+      // A later authoritative preview can still replace this provisional value with
+      // the policy result (minimum area, deductions, etc.).
+      const provisionalLine = { ...row, ...next, _context: context } as SalesLine;
+      const provisionalAreaQty = isAreaDoor(provisionalLine) ? areaQuantity(provisionalLine) : undefined;
+      if (numberValue(next.qty) === undefined && provisionalAreaQty !== undefined) {
+        next.qty = provisionalAreaQty;
+        next.billable_area_sqm = provisionalAreaQty;
       }
       if (changedField === "item_code") {
         const defaultDiscount = family({ ...row, ...next, _context: context } as SalesLine) === "german" ? 15 : 0;
@@ -966,9 +1244,60 @@ if (discountAmount !== undefined) next.discount_amount = discountAmount;
 if (adjustmentAmount !== undefined) next.adjustment_amount = adjustmentAmount;
 if (netAmount !== undefined) next.net_amount = netAmount;
 if (text(commercial.sales_option)) next.sales_option = text(commercial.sales_option);
+if (text(commercial.sales_mode)) next.sales_mode = text(commercial.sales_mode);
 next._commercial = commercial;
 next._selectedItemPrice = text(commercial.item_price) || next._selectedItemPrice;
 next._pricingError = "";
+
+const snapshot = commercial.sales_package_snapshot;
+const snapshotData = snapshot && typeof snapshot === "object" && !Array.isArray(snapshot) ? snapshot as Json : undefined;
+const components = Array.isArray(snapshotData?.components)
+  ? snapshotData.components.filter((entry): entry is Json => Boolean(entry) && typeof entry === "object" && !Array.isArray(entry))
+  : [];
+const selectable = normalized(commercial.sales_mode) === "tach mon"
+  && text(snapshotData?.selection_mode).toUpperCase() === "SELECTABLE";
+if (selectable) {
+  const componentByKey = new Map(components.map((component) => [text(component.component_key), component]));
+  const packageChanged = text(source._splitPackageChecksum) !== text(snapshotData?.sales_package_checksum);
+  const existingChildren = (source._splitChildren ?? []).filter((child) => componentByKey.has(text(child.sales_package_component_key)));
+  const selectedKeys = new Set(existingChildren.map((child) => text(child.sales_package_component_key)));
+  if (packageChanged) {
+    for (const component of components) {
+      const shouldSelect = component.required === true || component.required === 1
+        || component.default_selected === true || component.default_selected === 1;
+      const componentKey = text(component.component_key);
+      if (!shouldSelect || !componentKey || selectedKeys.has(componentKey)) continue;
+      existingChildren.push(splitChildFromComponent(candidate, component));
+      selectedKeys.add(componentKey);
+    }
+  }
+  const synchronized = existingChildren.map((child) => {
+    const component = componentByKey.get(text(child.sales_package_component_key))!;
+    const inheritColor = component.inherit_color === true || component.inherit_color === 1;
+    const inheritDimensions = component.inherit_dimensions === true || component.inherit_dimensions === 1;
+    const inheritSetCount = component.inherit_set_count === true || component.inherit_set_count === 1;
+    return {
+      ...child,
+      item_code: text(component.item_code),
+      uom: text(component.uom),
+      qty: numberValue(component.qty) ?? child.qty,
+      ...(inheritColor ? { color: candidate.color } : {}),
+      ...(inheritDimensions ? {
+        width_m: candidate.width_m,
+        height_m: candidate.height_m,
+        billable_area_sqm: candidate.billable_area_sqm,
+        length_m: candidate.length_m,
+      } : {}),
+      ...(inheritSetCount ? { set_count: candidate.set_count } : {}),
+      ...(text(component.sales_option) ? { sales_option: text(component.sales_option) } : {}),
+    } as SalesLine;
+  });
+  next._splitChildren = await Promise.all(synchronized.map((child) => previewSplitChild(child)));
+  next._splitPackageChecksum = text(snapshotData?.sales_package_checksum);
+} else if ((source._splitChildren?.length ?? 0) === 0) {
+  next._splitChildren = [];
+  next._splitPackageChecksum = undefined;
+}
         } catch (error) {
 next._pricingError = mapError(error).message;
         }
@@ -984,14 +1313,115 @@ _error: mapError(error).message,
         });
       }
     }
-  }, [adapter, childFieldSet, childFields, childMeta, cleanLine, header, loadItemPrices, loadSalesOptions, patchLine]);
+  }, [adapter, childFieldSet, childFields, childMeta, cleanLine, header, loadItemPrices, loadSalesOptions, patchLine, previewSplitChild]);
+
+  useEffect(() => {
+    const liveKeys = new Set(linesRef.current.map((line) => line._key));
+    for (const key of splitLifecycleState.current.keys()) {
+      if (!liveKeys.has(key)) splitLifecycleState.current.delete(key);
+    }
+
+    for (const line of linesRef.current) {
+      const descriptor = splitLifecycleDescriptor(line);
+      if (!descriptor) {
+        splitLifecycleState.current.delete(line._key);
+        continue;
+      }
+      const previous = splitLifecycleState.current.get(line._key);
+      if (previous?.identity === descriptor.identity) continue;
+
+      const token = ++splitLifecycleSeq.current;
+      splitLifecycleState.current.set(line._key, { identity: descriptor.identity, token });
+      const isCurrent = () => {
+        const lifecycle = splitLifecycleState.current.get(line._key);
+        const current = linesRef.current.find((candidate) => candidate._key === line._key);
+        return lifecycle?.token === token
+          && lifecycle.identity === descriptor.identity
+          && splitLifecycleDescriptor(current)?.identity === descriptor.identity;
+      };
+
+      void (async () => {
+        try {
+          const currentSnapshot = splitSnapshot(line);
+          const snapshotPackage = text(currentSnapshot?.sales_package);
+          const snapshotComponents = Array.isArray(currentSnapshot?.components) ? currentSnapshot.components : [];
+          const hasCurrentSnapshot = snapshotPackage === descriptor.packageName
+            && text(currentSnapshot?.selection_mode).toUpperCase() === "SELECTABLE"
+            && snapshotComponents.length > 0;
+
+          if (!hasCurrentSnapshot) {
+            const { doc } = await adapter.getDoc("Sales Package", descriptor.packageName);
+            if (!isCurrent()) return;
+            const packageDoc = doc as Json;
+            const rows = Array.isArray(packageDoc.items) ? packageDoc.items : packageDoc.components;
+            const components = Array.isArray(rows)
+              ? rows.filter((entry): entry is Json => Boolean(entry) && typeof entry === "object" && !Array.isArray(entry))
+              : [];
+            if (text(packageDoc.selection_mode).toUpperCase() !== "SELECTABLE" || components.length === 0) {
+              throw new Error(`Gói bán ${descriptor.packageName} chưa có danh sách món tách hợp lệ.`);
+            }
+            patchLine(line._key, {
+              sales_package: descriptor.packageName,
+              sales_package_snapshot: {
+                sales_package: descriptor.packageName,
+                selection_mode: "SELECTABLE",
+                components,
+              },
+              _error: "",
+            });
+          }
+
+          if (!isCurrent()) return;
+          const current = linesRef.current.find((candidate) => candidate._key === line._key);
+          if (current) await previewLine(current, "sales_option");
+        } catch (error) {
+          if (!isCurrent()) return;
+          patchLine(line._key, {
+            _loading: false,
+            _error: `Không tải được món tách: ${mapError(error).message}`,
+          });
+        }
+      })();
+    }
+  }, [adapter, patchLine, previewLine, splitLifecycleFingerprint]);
 
   const commitLine = useCallback((key: string, field: string, value: unknown) => {
-    const current = lines.find((line) => line._key === key);
+    const current = linesRef.current.find((line) => line._key === key);
     if (!current) return;
     patchLine(key, { [field]: value });
     void previewLine(current, field, { [field]: value });
-  }, [lines, patchLine, previewLine]);
+  }, [patchLine, previewLine]);
+
+  const commitCurrentLineField = useCallback((key: string, field: string, fallback?: unknown) => {
+    const current = linesRef.current.find((line) => line._key === key);
+    commitLine(key, field, current?.[field] ?? fallback);
+  }, [commitLine]);
+
+  const toggleSplitComponent = useCallback((parentKey: string, component: Json, checked: boolean) => {
+    const parent = lines.find((line) => line._key === parentKey);
+    if (!parent) return;
+    const componentKey = text(component.component_key);
+    const currentChildren = parent._splitChildren ?? [];
+    if (!checked) {
+      patchLine(parentKey, {
+        _splitChildren: currentChildren.filter((child) => text(child.sales_package_component_key) !== componentKey),
+      });
+      return;
+    }
+    if (currentChildren.some((child) => text(child.sales_package_component_key) === componentKey)) return;
+    const groupKey = text(parent.sales_package_group_key) || salesGroupKey();
+    const child = splitChildFromComponent({ ...parent, sales_package_group_key: groupKey }, component);
+    patchLine(parentKey, {
+      sales_package_group_key: groupKey,
+      _splitChildren: [...currentChildren, child],
+    });
+    void previewSplitChild(child).then((priced) => {
+      setLines((current) => current.map((line) => line._key !== parentKey ? line : {
+        ...line,
+        _splitChildren: (line._splitChildren ?? []).map((candidate) => candidate._key === child._key ? priced : candidate),
+      }));
+    });
+  }, [lines, patchLine, previewSplitChild]);
 
   const chooseItemPrice = useCallback((key: string, priceName: string) => {
     const current = lines.find((line) => line._key === key);
@@ -1012,12 +1442,27 @@ _error: mapError(error).message,
       return;
     }
 
+    const optionMode = text(option?.sales_mode) || text(option?.option_label);
+    const splitMode = normalized(optionMode) === "tach mon";
+    const packageName = splitMode
+      ? text(option?.sales_package) || `PKG-SPLIT:${text(current.item_code)}`
+      : undefined;
     const patch: Partial<SalesLine> = {
       _selectedItemPrice: priceName,
       ...(text(price.uom) ? { uom: text(price.uom) } : {}),
       ...(option?.name ? { sales_option: text(option.name) } : {}),
+      ...(option?.name ? { sales_mode: optionMode || undefined } : {}),
       ...(salesOptionLeafVariant(option) ? { leaf_variant: salesOptionLeafVariant(option) } : {}),
+      sales_package: packageName,
+      sales_package_snapshot: undefined,
+      _splitChildren: [],
+      _splitPackageChecksum: undefined,
     };
+    if (splitMode) {
+      lineSeq.current.set(key, (lineSeq.current.get(key) ?? 0) + 1);
+      patchLine(key, { ...patch, _commercial: undefined, _pricingError: "", _error: "" });
+      return;
+    }
     patchLine(key, patch);
     void previewLine(current, option?.name ? "sales_option" : "uom", patch);
   }, [lines, patchLine, previewLine]);
@@ -1034,6 +1479,8 @@ _error: mapError(error).message,
       return;
     }
     if (field === "item_code") {
+      if ((current._splitChildren?.length ?? 0) > 0
+        && !window.confirm("Đổi mặt hàng sẽ bỏ các món tách đang chọn của dòng này. Tiếp tục?")) return;
       lineSeq.current.set(key, (lineSeq.current.get(key) ?? 0) + 1);
       const itemCode = text(value);
       const reset: Partial<SalesLine> = {
@@ -1051,6 +1498,10 @@ _error: mapError(error).message,
         _allowedColors: [],
         _overrides: {},
         _commercial: undefined,
+        sales_package: undefined,
+        sales_package_snapshot: undefined,
+        _splitChildren: [],
+        _splitPackageChecksum: undefined,
         discount_percentage: undefined,
         discount_amount: undefined,
         adjustment_amount: undefined,
@@ -1066,6 +1517,31 @@ _error: mapError(error).message,
       const optionName = text(value);
       const option = (current._salesOptions ?? []).find((candidate) => text(candidate.name) === optionName);
       const syncedLeafVariant = salesOptionLeafVariant(option);
+      const optionMode = text(option?.sales_mode) || text(option?.option_label);
+      const splitMode = normalized(optionMode) === "tach mon";
+      if (!splitMode && (current._splitChildren?.length ?? 0) > 0
+        && !window.confirm("Đổi cách bán sẽ bỏ các món tách đang chọn của dòng này. Tiếp tục?")) return;
+      if (splitMode) {
+        const configuredPackage = text(option?.sales_package);
+        const packageName = configuredPackage || `PKG-SPLIT:${text(current.item_code)}`;
+        lineSeq.current.set(key, (lineSeq.current.get(key) ?? 0) + 1);
+        const selectionPatch: Partial<SalesLine> = {
+          sales_option: optionName || undefined,
+          sales_mode: optionMode || "Tách món",
+          sales_package: packageName,
+          ...(syncedLeafVariant ? { leaf_variant: syncedLeafVariant } : {}),
+          _commercial: undefined,
+          sales_package_snapshot: undefined,
+          _splitChildren: [],
+          _splitPackageChecksum: undefined,
+          _pricingError: "",
+          _error: "",
+        };
+        // The split-package lifecycle reacts to this state transition and performs
+        // package hydration followed by commercial preview in a deterministic order.
+        patchLine(key, selectionPatch);
+        return;
+      }
       const targetItem = option ? salesOptionTargetItem(option, current) : "";
       const hasTargetRules = option ? salesOptionTargetRules(option.target_item_rules).length > 0 : false;
       if (hasTargetRules && !targetItem) {
@@ -1089,6 +1565,10 @@ _error: mapError(error).message,
           _allowedColors: [],
           _overrides: {},
           _commercial: undefined,
+          sales_package: undefined,
+          sales_package_snapshot: undefined,
+          _splitChildren: [],
+          _splitPackageChecksum: undefined,
           discount_percentage: undefined,
           discount_amount: undefined,
           adjustment_amount: undefined,
@@ -1103,12 +1583,28 @@ _error: mapError(error).message,
       if (syncedLeafVariant) {
         const patch: Partial<SalesLine> = {
           sales_option: optionName || undefined,
+          sales_mode: optionMode || undefined,
           leaf_variant: syncedLeafVariant,
+          sales_package: undefined,
+          sales_package_snapshot: undefined,
+          _splitChildren: [],
+          _splitPackageChecksum: undefined,
         };
         patchLine(key, patch);
         void previewLine({ ...current, ...patch } as SalesLine, "sales_option", patch);
         return;
       }
+      const patch: Partial<SalesLine> = {
+        sales_option: optionName || undefined,
+        sales_mode: optionMode || undefined,
+        sales_package: undefined,
+        sales_package_snapshot: undefined,
+        _splitChildren: [],
+        _splitPackageChecksum: undefined,
+      };
+      patchLine(key, patch);
+      void previewLine({ ...current, ...patch } as SalesLine, "sales_option", patch);
+      return;
     }
     const next = field === "qty" || field === "set_count"
       ? (value == null || value === "" ? undefined : Number(value))
@@ -1155,9 +1651,17 @@ _error: mapError(error).message,
   const duplicateSalesLine = useCallback((key: string) => {
     const source = lines.find((line) => line._key === key);
     if (!source) return;
+    const groupKey = salesGroupKey();
     const clone: SalesLine = {
       ...source,
       _key: newLine(lines.length)._key,
+      sales_package_group_key: groupKey,
+      _splitChildren: (source._splitChildren ?? []).map((child) => ({
+        ...child,
+        name: undefined,
+        _key: `sales-child-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        sales_package_parent_key: groupKey,
+      })),
       _loading: false,
       _error: "",
       _pricingError: "",
@@ -1216,6 +1720,16 @@ _error: mapError(error).message,
       if (line._loading) return `Dòng ${index + 1}: đang tính lại.`;
       if (line._error) return `Dòng ${index + 1}: ${line._error}`;
       if (line._pricingError) return `Dòng ${index + 1}: ${line._pricingError}`;
+      const components = splitComponents(line);
+      if (components.length && (line._splitChildren?.length ?? 0) === 0) {
+        return `Dòng ${index + 1}: hãy tích chọn ít nhất một món tách.`;
+      }
+      for (const child of line._splitChildren ?? []) {
+        if (child._loading) return `Dòng ${index + 1}: món ${text(child.item_code)} đang tính giá.`;
+        if (child._error || child._pricingError) {
+          return `Dòng ${index + 1} · ${text(child.item_code)}: ${salesLineErrorInVietnamese(child._error || child._pricingError, child)}`;
+        }
+      }
       for (const [field, rule] of Object.entries(line._overrides ?? {})) {
         if (!(rule.reqd === 1 || rule.reqd === true)) continue;
         if (rule.hidden === 1 || rule.hidden === true) continue;
@@ -1244,7 +1758,7 @@ _error: mapError(error).message,
       for (const [field, value] of Object.entries(header)) {
         if (parentFields.has(field) && value !== undefined) document[field] = value;
       }
-      document.items = lines.map(cleanLine);
+      document.items = flattenLines(lines).map(cleanLine);
       const finalPreview = await previewDocument(document, "items", lines);
       const payload = serializeCreateDocument(meta, finalPreview) as Partial<Doc>;
       const saved = isExisting
@@ -1260,13 +1774,7 @@ _error: mapError(error).message,
           : current,
       );
       const savedItems = Array.isArray(saved.items) ? saved.items as Json[] : [];
-      if (savedItems.length) {
-        setLines((current) => current.map((line, index) => ({
-          ...line,
-          ...(savedItems[index] ?? {}),
-          _key: line._key,
-        })));
-      }
+      if (savedItems.length) setLines(hydrateSalesLines(savedItems));
       void Promise.all([
         queryClient.invalidateQueries({
           queryKey: [scopeKey, "list-view", "Sales Order"],
@@ -1294,7 +1802,7 @@ _error: mapError(error).message,
     } finally {
       setSaving(false);
     }
-  }, [adapter, cleanLine, documentName, header, isExisting, lines, meta, previewDocument, props, queryClient, scopeKey, sourceModified, validate]);
+  }, [adapter, cleanLine, documentName, flattenLines, header, isExisting, lines, meta, previewDocument, props, queryClient, scopeKey, sourceModified, validate]);
 
   if (loading) {
     return (
@@ -1321,7 +1829,7 @@ _error: mapError(error).message,
   const paymentMethod = text(header.payment_method) || "Ghi công nợ";
   const salesRequiredClass = "[&_.mf-control]:bg-primary/[0.07]";
 
-  const displayedTotal = lines.reduce((sum, line) => sum + lineTotal(line), 0);
+  const displayedTotal = lines.reduce((sum, line) => sum + lineClusterTotal(line), 0);
 
   const gridRows = lines.map((line) => {
     const area = isAreaDoor(line);
@@ -1339,11 +1847,12 @@ _error: mapError(error).message,
       : quantityField === "qty"
         ? numberValue(line.qty)
         : numberValue(commercial.priced_qty) ?? numberValue(line.qty);
-    const sellingRate = numberValue(commercial.selling_rate) ?? numberValue(line.rate);
-    const discountAmount = numberValue(commercial.discount_amount) ?? numberValue(line.discount_amount) ?? 0;
+    const splitProjection = splitParentProjection(line);
+    const sellingRate = splitProjection.rate ?? numberValue(commercial.selling_rate) ?? numberValue(line.rate);
+    const discountAmount = splitProjection.discount ?? numberValue(commercial.discount_amount) ?? numberValue(line.discount_amount) ?? 0;
     const discountPercentage = numberValue(commercial.discount_percentage) ?? numberValue(line.discount_percentage) ?? 0;
     const adjustmentAmount = numberValue(commercial.adjustment_amount) ?? numberValue(line.adjustment_amount) ?? 0;
-    const netAmount = numberValue(commercial.net_before_tax) ?? lineTotal(line);
+    const netAmount = splitProjection.net ?? numberValue(commercial.net_before_tax) ?? lineTotal(line);
     const allOptions = line._salesOptions ?? [];
     const applicableOptions = allOptions.filter((option) => salesOptionApplicable(option, line));
     const optionChoices = allOptions.length > 0
@@ -1409,8 +1918,16 @@ _error: mapError(error).message,
   });
   const lineNotices = gridRows.flatMap((row, index) => {
     const message = row.error || row.pricingError;
-    if (!message) return [];
-    return [{ key: row.key, message: `Dòng ${index + 1}: ${salesLineErrorInVietnamese(message, lines[index]!)}` }];
+    const parentNotice = message
+      ? [{ key: row.key, message: `Dòng ${index + 1}: ${salesLineErrorInVietnamese(message, lines[index]!)}` }]
+      : [];
+    const childNotices = (lines[index]?._splitChildren ?? []).flatMap((child) => {
+      const childMessage = child._error || child._pricingError;
+      return childMessage
+        ? [{ key: `${row.key}-${child._key}`, message: `Dòng ${index + 1} · ${text(child._itemLabel) || text(child.item_code)}: ${salesLineErrorInVietnamese(childMessage, child)}` }]
+        : [];
+    });
+    return [...parentNotice, ...childNotices];
   });
 
   return (
@@ -1769,7 +2286,7 @@ _error: mapError(error).message,
             || detailShowLength
             || detailShowBars
           ));
-          const packageSnapshot = line._commercial?.sales_package_snapshot;
+          const packageSnapshot = line._commercial?.sales_package_snapshot ?? line.sales_package_snapshot;
           const packageComponents = packageSnapshot
             && typeof packageSnapshot === "object"
             && !Array.isArray(packageSnapshot)
@@ -1783,7 +2300,12 @@ _error: mapError(error).message,
               || normalized(data.component_key).includes("gift")
               || normalized(data.item_code).includes("tangray");
           });
-          const hasLinkedRows = hasInlineDetail || giftComponents.length > 0;
+          const selectableComponents = splitComponents(line);
+          const selectedSplitChildren = new Map((line._splitChildren ?? []).map((child) => [
+            text(child.sales_package_component_key),
+            child,
+          ]));
+          const hasLinkedRows = hasInlineDetail || giftComponents.length > 0 || selectableComponents.length > 0;
           const recordTone = rowIndex % 2 === 0 ? "!bg-card" : "!bg-secondary";
           // Item is a read-only catalog source for fast order entry. Selecting an
           // entry copies its code into this Sales Order Item; this screen must not
@@ -1791,6 +2313,11 @@ _error: mapError(error).message,
           const itemField: DocField = {
             ...lineBaseField("item_code", "Mặt hàng", "Link", "Item"),
             allow_create: false,
+            link_filters: JSON.stringify({
+              is_sales_item: 1,
+              disabled: 0,
+              is_sales_package_component: 0,
+            }),
           };
           const salesOptionChoices = row.salesOptionChoices;
           const selectedSalesOption = (line._salesOptions ?? []).find(
@@ -1844,7 +2371,7 @@ _error: mapError(error).message,
                   value={line.item_code}
                   onChange={(value) => handleGridChange(row.key, "item_code", value)}
                   registry={registry}
-                  services={services}
+                  services={salesServices}
                   parentDoctype="Sales Order Item"
                   docValues={line}
                   roles={roles}
@@ -1965,7 +2492,7 @@ _error: mapError(error).message,
               </TableCell>
             </TableRow>
             {hasInlineDetail ? (
-              <TableRow className={`${recordTone} ${giftComponents.length ? "[&>td]:!border-b-0" : "border-b-2"} [&>td]:!bg-inherit`} data-section="sales-line-detail-row">
+              <TableRow className={`${recordTone} ${giftComponents.length || selectableComponents.length ? "[&>td]:!border-b-0" : "border-b-2"} [&>td]:!bg-inherit`} data-section="sales-line-detail-row">
                 <TableCell className="px-1 py-2" />
                 <TableCell className="w-20 whitespace-nowrap px-2 py-2 text-center align-middle font-semibold text-foreground">
                   Chi tiết
@@ -1994,7 +2521,7 @@ _error: mapError(error).message,
                           field={lineBaseField("width_m", fieldLabel(line, "width_m", "Rộng (m)"), "Float")}
                           value={line.width_m}
                           onChange={(value) => patchLine(line._key, { width_m: value == null || value === "" ? undefined : Number(value) })}
-                          onCommit={() => commitLine(line._key, "width_m", line.width_m)}
+                          onCommit={() => commitCurrentLineField(line._key, "width_m")}
                           registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
                           required={detailArea || fieldRequired(line, "width_m")} readOnly={fieldReadonly(line, "width_m")} compact hideLabel className="min-w-20 flex-1"
                         />
@@ -2008,7 +2535,7 @@ _error: mapError(error).message,
                           field={lineBaseField("height_m", fieldLabel(line, "height_m", "Cao (m)"), "Float")}
                           value={line.height_m}
                           onChange={(value) => patchLine(line._key, { height_m: value == null || value === "" ? undefined : Number(value) })}
-                          onCommit={() => commitLine(line._key, "height_m", line.height_m)}
+                          onCommit={() => commitCurrentLineField(line._key, "height_m")}
                           registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
                           required={detailArea || fieldRequired(line, "height_m")} readOnly={fieldReadonly(line, "height_m")} compact hideLabel className="min-w-20 flex-1"
                         />
@@ -2022,7 +2549,7 @@ _error: mapError(error).message,
                           field={lineBaseField("set_count", fieldLabel(line, "set_count", detailArea ? "Số bộ" : "Số lượng"), "Int")}
                           value={line.set_count}
                           onChange={(value) => patchLine(line._key, { set_count: value == null || value === "" ? undefined : Number(value) })}
-                          onCommit={() => commitLine(line._key, "set_count", line.set_count)}
+                          onCommit={() => commitCurrentLineField(line._key, "set_count")}
                           registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
                           required={detailArea || fieldRequired(line, "set_count")} readOnly={fieldReadonly(line, "set_count")} compact hideLabel className="min-w-16 flex-1"
                         />
@@ -2051,7 +2578,7 @@ _error: mapError(error).message,
                           field={lineBaseField("mesh_height_m", fieldLabel(line, "mesh_height_m", "Cao lưới (m)"), "Float")}
                           value={line.mesh_height_m}
                           onChange={(value) => patchLine(line._key, { mesh_height_m: value == null || value === "" ? undefined : Number(value) })}
-                          onCommit={() => commitLine(line._key, "mesh_height_m", line.mesh_height_m)}
+                          onCommit={() => commitCurrentLineField(line._key, "mesh_height_m")}
                           registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
                           required={fieldRequired(line, "mesh_height_m")} readOnly={fieldReadonly(line, "mesh_height_m")} compact hideLabel className="min-w-20 flex-1"
                         />
@@ -2078,7 +2605,7 @@ _error: mapError(error).message,
                           field={lineBaseField("length_m", fieldLabel(line, "length_m", "Dài / cây (m)"), "Float")}
                           value={line.length_m}
                           onChange={(value) => patchLine(line._key, { length_m: value == null || value === "" ? undefined : Number(value) })}
-                          onCommit={() => commitLine(line._key, "length_m", line.length_m)}
+                          onCommit={() => commitCurrentLineField(line._key, "length_m")}
                           registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
                           required={fieldRequired(line, "length_m")} readOnly={fieldReadonly(line, "length_m")} compact hideLabel className="min-w-20 flex-1"
                         />
@@ -2092,7 +2619,7 @@ _error: mapError(error).message,
                           field={lineBaseField("qty_bar", fieldLabel(line, "qty_bar", "Số cây"), "Int")}
                           value={line.qty_bar}
                           onChange={(value) => patchLine(line._key, { qty_bar: value == null || value === "" ? undefined : Number(value) })}
-                          onCommit={() => commitLine(line._key, "qty_bar", line.qty_bar)}
+                          onCommit={() => commitCurrentLineField(line._key, "qty_bar")}
                           registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
                           required={fieldRequired(line, "qty_bar")} readOnly={fieldReadonly(line, "qty_bar")} compact hideLabel className="min-w-16 flex-1"
                         />
@@ -2105,7 +2632,7 @@ _error: mapError(error).message,
                         field={lineBaseField("discount_percentage", "Chiết khấu (%)", "Percent")}
                         value={line.discount_percentage ?? 0}
                         onChange={(value) => patchLine(line._key, { discount_percentage: value == null || value === "" ? 0 : Number(value) })}
-                        onCommit={() => commitLine(line._key, "discount_percentage", line.discount_percentage ?? 0)}
+                        onCommit={() => commitCurrentLineField(line._key, "discount_percentage", 0)}
                         registry={registry} services={services} parentDoctype="Sales Order Item" docValues={line} roles={roles}
                         compact hideLabel className="min-w-16 flex-1"
                       />
@@ -2115,6 +2642,64 @@ _error: mapError(error).message,
                 </TableCell>
               </TableRow>
             ) : null}
+            {selectableComponents.map((component, componentIndex) => {
+              const componentKey = text(component.component_key);
+              const child = selectedSplitChildren.get(componentKey);
+              const required = component.required === true || component.required === 1;
+              const childCommercial = child?._commercial ?? {};
+              const childRate = numberValue(childCommercial.selling_rate) ?? numberValue(child?.rate);
+              const childQty = numberValue(component.qty) ?? numberValue(child?.qty);
+              const childDiscount = numberValue(childCommercial.discount_amount) ?? numberValue(child?.discount_amount) ?? 0;
+              const childDiscountPct = numberValue(childCommercial.discount_percentage) ?? numberValue(child?.discount_percentage) ?? 0;
+              const childAdjustment = numberValue(childCommercial.adjustment_amount) ?? numberValue(child?.adjustment_amount) ?? 0;
+              const childNet = child ? lineTotal(child) : undefined;
+              const isLast = componentIndex === selectableComponents.length - 1 && giftComponents.length === 0;
+              return (
+                <TableRow
+                  key={`${row.key}-split-${componentKey || componentIndex}`}
+                  className={`${recordTone} ${isLast ? "border-b-2" : "[&>td]:!border-b-0"} [&>td]:!bg-inherit`}
+                  data-section="sales-line-split-child-row"
+                >
+                  <TableCell className="px-1 py-1.5 text-center align-middle" />
+                  <TableCell className="w-20 whitespace-nowrap px-2 py-1.5 text-center align-middle font-semibold text-foreground">
+                    Món tách
+                  </TableCell>
+                  <TableCell className="px-2 py-1.5 text-left align-middle">
+                    <label className="flex min-h-8 items-center gap-2 rounded-md border border-input bg-card px-2">
+                      <Checkbox
+                        checked={Boolean(child)}
+                        disabled={required && Boolean(child)}
+                        onCheckedChange={(checked) => toggleSplitComponent(row.key, component, checked === true)}
+                        aria-label={`Chọn món ${text(component.display_label) || text(component.item_code)}`}
+                      />
+                      <span className="min-w-0 truncate font-medium text-foreground">
+                        {text(component.display_label) || text(child?._itemLabel) || text(component.item_code)}
+                      </span>
+                    </label>
+                  </TableCell>
+                  <TableCell className="px-2 py-1.5 text-center align-middle text-xs">
+                    {text(component.role) || "Theo gói"}
+                  </TableCell>
+                  <TableCell className="px-2 py-1.5 text-center align-middle tabular-nums">
+                    {child?._loading ? "Đang tính…" : childRate === undefined ? "—" : `${money(childRate)} ₫ / ${text(component.uom)}`}
+                  </TableCell>
+                  <TableCell className="px-2 py-1.5 text-center align-middle">{text(component.uom) || "—"}</TableCell>
+                  <TableCell className="px-2 py-1.5 text-center align-middle font-medium tabular-nums">
+                    {childQty === undefined ? "—" : childQty.toLocaleString("vi-VN", { maximumFractionDigits: 6 })}
+                  </TableCell>
+                  <TableCell className="px-2 py-1.5 text-center align-middle tabular-nums text-muted-foreground">
+                    {!child || childDiscount <= 0 ? "—" : `-${money(childDiscount)} ₫${childDiscountPct > 0 ? ` · ${childDiscountPct}%` : ""}`}
+                  </TableCell>
+                  <TableCell className="px-2 py-1.5 text-center align-middle tabular-nums text-muted-foreground">
+                    {!child || childAdjustment === 0 ? "—" : `${money(childAdjustment)} ₫`}
+                  </TableCell>
+                  <TableCell className="px-2 py-1.5 text-center align-middle font-semibold tabular-nums text-foreground">
+                    {childNet === undefined ? "—" : `${money(childNet)} ₫`}
+                  </TableCell>
+                  <TableCell className="px-1 py-1.5 text-center align-middle text-xs text-muted-foreground">{componentKey}</TableCell>
+                </TableRow>
+              );
+            })}
             {giftComponents.map((component, giftIndex) => {
               const giftQty = numberValue(component.qty) ?? 0;
               const giftUom = text(component.uom);

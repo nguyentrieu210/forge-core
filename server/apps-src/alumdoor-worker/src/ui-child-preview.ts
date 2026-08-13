@@ -248,7 +248,16 @@ function applyAverageWeight(patch: Json, clear: Set<string>, fields: Set<string>
 async function formulaPreview(call: PlatformCall, row: Json, parent: Json, item: Json): Promise<Json | null> {
   if (text(item.inventory_mode) !== "Thành phẩm theo m2") return null;
   if (!positive(row.width_m) || !positive(row.height_m)) return null;
-  const customerGroup = text(parent.customer_group);
+  let customerGroup = text(parent.customer_group);
+  // The Sales Order header normally receives this from Customer.price_group. During fast
+  // entry that fetch can finish after the line preview, while the selected Price List already
+  // carries the same authoritative Đại lý/Lẻ scope. Use that scope instead of silently
+  // clearing qty and leaving an apparently complete dimension row at "—".
+  if (customerGroup !== "Đại lý" && customerGroup !== "Lẻ") {
+    const priceListName = text(parent.selling_price_list);
+    const priceList = priceListName ? await readDoc(call, "Price List", priceListName) : null;
+    customerGroup = text(priceList?.customer_group);
+  }
   if (customerGroup !== "Đại lý" && customerGroup !== "Lẻ") return null;
   const response = await calculateSalesProductionLine(call, {
     ...row,
@@ -286,12 +295,16 @@ async function previewSales(call: PlatformCall, args: Json, row: Json, parent: J
   });
   const context = contextResponse.ok ? await contextResponse.json() as Json : {};
 
-  if (text(row.sales_option) && fields.has("leaf_variant")) {
+  if (text(row.sales_option)) {
     const option = await readDoc(call, "Sales Option", text(row.sales_option));
-    const syncedLeafVariant = leafVariantFromSalesOption(option);
-    if (syncedLeafVariant) {
-      patch.leaf_variant = syncedLeafVariant;
-      fieldOverride(overrides, fields, "leaf_variant", { read_only: 1 });
+    const salesMode = text(option?.sales_mode) || text(option?.option_label);
+    if (salesMode) setIfField(patch, fields, "sales_mode", salesMode);
+    if (fields.has("leaf_variant")) {
+      const syncedLeafVariant = leafVariantFromSalesOption(option);
+      if (syncedLeafVariant) {
+        patch.leaf_variant = syncedLeafVariant;
+        fieldOverride(overrides, fields, "leaf_variant", { read_only: 1 });
+      }
     }
   }
 

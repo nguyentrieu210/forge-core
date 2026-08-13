@@ -68,93 +68,74 @@ Nguồn đối chiếu xác nhận các mã `TRỌN BỘ`/`TÁCH MÓN` và các 
 
 Hai trường điều hướng `target_item_code` và `target_item_rules` chỉ phục vụ thao tác chọn nhanh. Máy chủ vẫn xác thực tổ hợp cuối `Item + Sales Option + Item Price + Sales Package` trước khi lưu.
 
-## Audit màn `Tách món` và yêu cầu xổ các món
+## Chốt lại cơ chế `Tách món` — triển khai migration 0130
 
-### Hiện trạng đã đối chiếu
+Quyết định nghiệp vụ mới thay thế đề xuất `Sales Line Template` trước đó:
 
-Đối chiếu trực tiếp dữ liệu local sau migration 0129 cho thấy:
+- `Sales Package` là nguồn cấu hình duy nhất cho danh sách món thuộc một bộ và công thức số lượng; không tạo thêm master trung gian;
+- dòng chính luôn giữ mã hàng chuẩn/trọn bộ, không đổi `item_code` sang SKU tách món;
+- khi Sales Option có `sales_mode = Tách món`, Package phải dùng `selection_mode = SELECTABLE` và giao diện xổ các component ngay dưới dòng chi tiết;
+- món được tích vẫn đi qua Item Price/Pricing Rule của chính mã món để lấy giá, chiết khấu và phụ thu hiện hành;
+- món được tích là **child thương mại** của dòng bộ qua `sales_package_group_key`, `sales_package_parent_key` và `sales_package_component_key`, không phải một dòng rời không có nguồn gốc;
+- Package không lưu đơn giá. Snapshot chỉ đóng băng thành phần, ĐVT, công thức số lượng, chính sách chọn và phiên bản cấu hình.
+- Từng component tự khai có kế thừa màu, kích thước và số bộ từ dòng cha hay không; client chỉ đồng bộ các trường đã bật và server đối chiếu lại trước khi lưu.
 
-- có **89** Sales Option mang nghĩa `Tách món`: 63 Cửa Đài Loan, 12 Cửa Lưới, 4 Cửa Đài Loan Inox và 10 Cửa siêu trường;
-- 27 Option gắn trực tiếp vào SKU bán rời, 62 Option làm cầu nối từ SKU trọn bộ sang **13 SKU bán rời**;
-- cả 89 Option đều có Item Price đang hoạt động cho Item cuối cùng;
-- không Option `Tách món` nào có Sales Package — đây là đúng kiến trúc hiện tại;
-- màn đơn hàng chỉ có dữ liệu để hiện dòng Package/tặng kèm từ `sales_package_snapshot`. Vì `Tách món` không có Package nên hiện tại không có nguồn dữ liệu hợp lệ để xổ ray, trục, motor, khóa hoặc phụ kiện;
-- danh mục có ít nhất **138** mặt hàng ray/trục/motor/khóa/phụ kiện có giá, nhưng chưa có quan hệ cấu hình cho biết món nào phù hợp với từng loại cửa. Không được xổ toàn bộ 138 món hoặc suy quan hệ theo tên/nhóm hàng.
+### Công thức tiền
 
-Nguồn nghiệp vụ cũng xác nhận `Tách món` của Cửa Lưới là chỉ lấy lưới, còn `Tách món` của Cửa Đài Loan là chỉ lấy lá. Ray, trục, motor và phụ kiện mua thêm phải là các dòng thương mại độc lập, có giá và thành tiền riêng; không phải dòng Package 0 đồng và không lấy từ BOM.
+Máy chủ tính và kiểm lại theo thứ tự:
 
-### Kết luận audit
+```text
+Giá gộp dòng cha = giá chuẩn trọn bộ × SL tính giá của dòng cha
+Giá gộp child = giá hiện hành của Item child × SL theo quy cách Package
+Giá còn lại dòng cha = Giá gộp dòng cha − tổng Giá gộp child có deduct_from_parent
+Tổng cụm = Giá còn lại dòng cha sau chính sách + tổng child sau chính sách riêng
+```
 
-Màn hiện tại **đúng về tính giá**, nhưng **chưa có trợ lý chọn món bán kèm**. Việc chỉ sửa TSX để xổ danh mục sẽ tạo dữ liệu sai vì thiếu quan hệ cấu hình. Cần bổ sung một lớp cấu hình riêng cho các dòng bán độc lập, tách hoàn toàn khỏi Sales Package và BOM.
+`deduct_from_discount_basis` khai trên từng component để xử lý đúng chính sách như Cửa Đức: món nào thuộc cơ sở chiết khấu của bộ thì khi tách phải trừ khỏi cơ sở đó; món không thuộc cơ sở giữ nguyên cơ sở chiết khấu. Client chỉ preview, server là nguồn quyết định.
 
-## Phương án triển khai được đề xuất
+### Dữ liệu được materialize an toàn
 
-### 1. Cấu hình nguồn sự thật
+Migration 0130 tạo Package `SELECTABLE` cho các cầu nối full-set → split SKU đã có bằng chứng trong Sales Option 0127. Mỗi Package ban đầu chứa đúng component đã được chứng minh bởi `target_item_code`; không suy thêm ray/trục/motor/khóa theo tên.
 
-Thêm master dùng chung `Sales Line Template` và child `Sales Line Template Item`:
+Các SKU tách trực tiếp chưa có mã bộ cha đã chứng minh vẫn bán như dòng trực tiếp hiện hành và chưa xổ component. Khi bổ sung đủ ma trận món, chỉ cần thêm component vào Sales Package; không sửa TypeScript.
 
-- phạm vi áp dụng: Item, Item Group và/hoặc Sales Option;
-- ngày hiệu lực, trạng thái, độ ưu tiên;
-- mỗi món: `choice_key`, Item, nhóm hiển thị, bắt buộc/tùy chọn, chọn mặc định, thứ tự;
-- cách tính số lượng: `FIXED`, `HEIGHT`, `WIDTH`, `AREA`, `SET_COUNT` cùng hệ số;
-- cờ kế thừa màu/kích thước/số bộ từ dòng cửa khi thật sự phù hợp;
-- không lưu giá trong template — giá luôn đọc qua Item Price/Pricing Rule của chính món.
+### Giao diện và lưu chứng từ
 
-Tên `Sales Line Template` tránh nhập nhằng với `Sales Package`: Template chỉ hỗ trợ tạo nhiều dòng bán độc lập; Package đóng băng nghĩa vụ giao hàng của một dòng thương mại.
+- Dòng `Món tách` nằm ngay dưới dòng `Chi tiết`, cùng màu với bản ghi cha.
+- Tích món sẽ xem ngay ĐVT, số lượng theo Package, đơn giá, chiết khấu, phụ thu và thành tiền.
+- Mở lại đơn sẽ gom child về đúng dòng cha theo khóa nhóm.
+- Đổi mặt hàng hoặc đổi từ Tách món sang cách bán khác khi đang có child phải xác nhận trước khi bỏ lựa chọn.
+- Tổng cuối màn cộng phần còn lại của cha và tất cả child, cùng logic với máy chủ.
 
-### 2. API preview và kiểm tra phía máy chủ
+### Điều kiện nghiệm thu
 
-Khi dòng chính chọn `Tách món`, API preview trả về danh sách món phù hợp kèm:
+- chọn Tách món không đổi mã dòng cha;
+- chỉ xổ component thuộc Sales Package của đúng dòng cha;
+- tích món nào thì món đó được tính giá/chính sách hiện hành và lưu làm child;
+- giá cha không âm và không tính trùng doanh thu với child;
+- component không thuộc Package, sai Item/UOM/số lượng hoặc sai chính sách bán bị máy chủ từ chối;
+- không suy component từ BOM hoặc từ tên danh mục;
+- lưu rồi mở lại vẫn giữ đúng cụm cha–child và snapshot Package.
 
-- Item, tên, ĐVT, nhóm hiển thị;
-- số lượng gợi ý đã tính từ thông số dòng cửa;
-- Item Price/Pricing Rule hiện hành;
-- cảnh báo thiếu giá hoặc thiếu thông số;
-- khóa cấu hình và phiên bản để máy chủ kiểm lại khi lưu.
+## Audit lại sau migration 0130 và sửa picker — migration 0131
 
-Máy chủ phải tính lại từng dòng đã chọn. Client không được gửi giá tự quyết và không được chèn Item ngoài template bằng cách sửa payload.
+Đối chiếu trực tiếp database local sau khi materialize Package:
 
-### 3. Giao diện đơn hàng
+- 62 Item trọn bộ có đúng 62 Sales Option `Tách món` và 62 Package `SELECTABLE`;
+- 62 Package dùng 13 Item child đã được chứng minh từ dữ liệu nguồn;
+- không có Package thiếu Item child, thiếu Item Price, sai Item cha hoặc trùng Option `Tách món` trên cùng Item cha;
+- mọi Item cha đều có cách bán trọn bộ tương ứng và có Item Price đang hoạt động;
+- 27 Option `Tách món` không có Package là các SKU bán rời/component (6 Lưới, 7 Đài Loan, 10 Siêu trường, 4 Đài Loan Inox), không phải dòng bộ cha để xổ tiếp.
 
-Ngay dưới dòng `Chi tiết`, nếu Sales Option cuối cùng có `sales_mode = Tách món`, hiện một dòng ngang `Món bán riêng`:
+Lỗi giao diện là picker `Mặt hàng` vẫn gợi ý 13 Item component làm dòng chính. Ví dụ
+`NVL-TON-DL5.2Dx124-XNVK — TP LÁ ĐÀI LOAN 6D` là child của các mã cửa Đài Loan 6D trọn bộ;
+chọn trực tiếp mã này rồi chọn `Tách món` không thể xổ thêm món con.
 
-- chia nhóm Lá/Lưới, Ray, Trục, Motor, Khóa và Phụ kiện;
-- chỉ hiện các món được cấu hình cho dòng hiện tại;
-- tick món cần mua, nhập/chỉnh số lượng trong phạm vi cho phép và nhìn thấy ĐVT + đơn giá + thành tiền ngay;
-- nút `Thêm các món đã chọn` tạo các **Sales Order Item anh em**, mỗi món là một dòng tính tiền bình thường;
-- các dòng sinh từ cùng lựa chọn giữ chung `selection_group_key`, có `selection_parent_key` và `selection_choice_key` để mở lại đơn vẫn gom đúng cụm;
-- đổi từ `Tách món` sang `Trọn bộ` phải hỏi người dùng giữ hay bỏ các dòng đã sinh; tuyệt đối không xóa âm thầm dòng đã sửa tay;
-- desktop dùng dòng con trong bảng hiện tại; mobile dùng card/accordion riêng, không ép bảng cuộn ngang.
+Migration 0131 bổ sung cờ nội bộ `Item.is_sales_package_component`, đánh dấu đúng 13 Item đang
+được tham chiếu bởi Package `SELECTABLE`. Màn Sales Order lọc cờ này bằng `0`, nên:
 
-### 4. Phạm vi dữ liệu cần xác nhận trước khi bật production
-
-Lập ma trận cho từng họ cửa, tối thiểu:
-
-| Họ cửa | Dòng chính khi tách | Ray được chọn | Trục được chọn | Motor/khóa/phụ kiện | Công thức số lượng |
-| --- | --- | --- | --- | --- | --- |
-| Cửa Lưới | SKU lưới tách món | Chưa có quan hệ duyệt | Chưa có quan hệ duyệt | Chưa có quan hệ duyệt | Theo quy cách từng món |
-| Cửa Đài Loan | SKU lá Đài Loan | Chưa có quan hệ duyệt | Chưa có quan hệ duyệt | Chưa có quan hệ duyệt | Theo quy cách từng món |
-| Cửa Đài Loan Inox | SKU lá Inox | Chưa có quan hệ duyệt | Chưa có quan hệ duyệt | Chưa có quan hệ duyệt | Theo quy cách từng món |
-| Cửa siêu trường | SKU lá siêu trường | Chưa có quan hệ duyệt | Chưa có quan hệ duyệt | Chưa có quan hệ duyệt | Theo quy cách từng món |
-
-Không triển khai mapping tự động trước khi các ô `Chưa có quan hệ duyệt` được chốt từ bảng quy cách/danh mục bán hàng.
-
-### 5. Thứ tự triển khai
-
-1. Chốt ma trận món theo họ cửa và công thức số lượng.
-2. Thêm metadata/migration cho Template và ba khóa liên kết dòng đơn.
-3. Thêm resolver + API preview, kiểm quyền và kiểm giá server-side.
-4. Thêm dòng `Món bán riêng` ở desktop và card/accordion mobile.
-5. Bổ sung lưu/mở lại/đổi cách bán/xóa cụm, audit log và cảnh báo dữ liệu thay đổi.
-6. Chạy Golden Flow cho Cửa Lưới, Đài Loan, Đài Loan Inox và siêu trường.
-
-### 6. Điều kiện nghiệm thu
-
-- chọn `Tách món` chỉ xổ đúng món được cấu hình cho Item/họ cửa hiện tại;
-- mỗi món được chọn tạo dòng Sales Order độc lập và tính đúng giá hiện hành;
-- không có dòng phụ 0 đồng trừ chính sách quà tặng có Package riêng;
-- không sao chép BOM và không gắn Sales Package cho Option `Tách món`;
-- lưu rồi mở lại từ danh sách vẫn thấy đúng cụm dòng;
-- đổi cách bán không làm mất dòng đã chỉnh mà không có xác nhận;
-- thiếu giá/thiếu mapping báo tiếng Việt tại cụm dòng và chặn lưu đúng chỗ;
-- desktop và mobile đều có luồng chọn món riêng phù hợp kích thước màn hình.
+- picker chỉ gợi ý Item chính/trọn bộ làm dòng cha;
+- Item component vẫn hoạt động và vẫn lấy Item Price/Pricing Rule của chính nó khi sinh làm child;
+- nếu một chứng từ cũ hoặc dữ liệu stale đưa component vào dòng cha, màn hình báo rõ phải chọn mã cửa
+  trọn bộ thay vì im lặng hiển thị cách bán không có gì để xổ;
+- việc phân loại dựa trên quan hệ Package, không dựa vào chuỗi tên hoặc hard-code mã hàng.
