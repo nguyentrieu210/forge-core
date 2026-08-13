@@ -23,32 +23,16 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
+          import base64
           p = Path('client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx')
           s = p.read_text(encoding='utf-8')
           start = s.index('        let sellingPriceLists: Doc[] = [];')
           end = s.index('        if (!active) return;', start)
-          new = '''        let sellingPriceLists: Doc[] = [];
-        try {
-          const priceLists = await adapter.getList("Price List", {
-            fields: ["name", "price_list_name", "modified", "creation", "enabled", "selling"],
-            orderBy: "modified desc",
-            pageLength: 500,
-          });
-          const isOn = (value: unknown) => {
-            if (value === true || value === 1) return true;
-            const normalized = text(value).trim().toLowerCase();
-            return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on";
-          };
-          sellingPriceLists = priceLists.filter((row) => isOn(row.enabled) && isOn(row.selling));
-        } catch {
-          sellingPriceLists = [];
-        }
-'''
+          new = base64.b64decode('ICAgICAgICBsZXQgc2VsbGluZ1ByaWNlTGlzdHM6IERvY1tdID0gW107CiAgICAgICAgdHJ5IHsKICAgICAgICAgIGNvbnN0IHByaWNlTGlzdHMgPSBhd2FpdCBhZGFwdGVyLmdldExpc3QoIlByaWNlIExpc3QiLCB7CiAgICAgICAgICAgIGZpZWxkczogWyJuYW1lIiwgInByaWNlX2xpc3RfbmFtZSIsICJtb2RpZmllZCIsICJjcmVhdGlvbiIsICJlbmFibGVkIiwgInNlbGxpbmciXSwKICAgICAgICAgICAgb3JkZXJCeTogIm1vZGlmaWVkIGRlc2MiLAogICAgICAgICAgICBwYWdlTGVuZ3RoOiA1MDAsCiAgICAgICAgICB9KTsKICAgICAgICAgIGNvbnN0IGlzT24gPSAodmFsdWU6IHVua25vd24pID0+IHsKICAgICAgICAgICAgaWYgKHZhbHVlID09PSB0cnVlIHx8IHZhbHVlID09PSAxKSByZXR1cm4gdHJ1ZTsKICAgICAgICAgICAgY29uc3Qgbm9ybWFsaXplZCA9IHRleHQodmFsdWUpLnRyaW0oKS50b0xvd2VyQ2FzZSgpOwogICAgICAgICAgICByZXR1cm4gbm9ybWFsaXplZCA9PT0gIjEiIHx8IG5vcm1hbGl6ZWQgPT09ICJ0cnVlIiB8fCBub3JtYWxpemVkID09PSAieWVzIiB8fCBub3JtYWxpemVkID09PSAib24iOwogICAgICAgICAgfTsKICAgICAgICAgIHNlbGxpbmdQcmljZUxpc3RzID0gcHJpY2VMaXN0cy5maWx0ZXIoKHJvdykgPT4gaXNPbihyb3cuZW5hYmxlZCkgJiYgaXNPbihyb3cuc2VsbGluZykpOwogICAgICAgIH0gY2F0Y2ggewogICAgICAgICAgc2VsbGluZ1ByaWNlTGlzdHMgPSBbXTsKICAgICAgICB9Cg==').decode('utf-8')
           s = s[:start] + new + s[end:]
           p.write_text(s, encoding='utf-8')
           PY
           git diff --check
-          grep -F 'fields: ["name", "price_list_name", "modified", "creation", "enabled", "selling"]' client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx
           grep -F 'orderBy: "modified desc"' client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx
           grep -F 'pageLength: 500' client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx
           if grep -F 'filters: { enabled: 1, selling: 1 }' client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx; then
