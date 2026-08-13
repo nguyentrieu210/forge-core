@@ -1,0 +1,41 @@
+name: One-shot Sales Order Price List limit/filter fix
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/one-shot-sales-price-list-limit100.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-main:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+      - name: Patch Sales Order Price List request
+        shell: bash
+        run: |
+          echo 'ZnJvbSBwYXRobGliIGltcG9ydCBQYXRoCnAgPSBQYXRoKCJjbGllbnQvcGFja2FnZXMvdmlld3Mvc3JjL2FwcC92ZXJ0aWNhbC9hbHVtZG9vci9BbHVtZG9vclNhbGVzT3JkZXJDcmVhdGUudHN4IikKcyA9IHAucmVhZF90ZXh0KGVuY29kaW5nPSJ1dGYtOCIpCm9sZDEgPSAiIiIgICAgICAgICAgICBvcmRlckJ5OiAibW9kaWZpZWQgZGVzYyIsCiAgICAgICAgICAgIHBhZ2VMZW5ndGg6IDUwMCwKIiIiCm5ldzEgPSAiIiIgICAgICAgICAgICBmaWx0ZXJzOiB7IHNlbGxpbmc6IDEgfSwKICAgICAgICAgICAgb3JkZXJCeTogIm1vZGlmaWVkIGRlc2MiLAogICAgICAgICAgICBwYWdlTGVuZ3RoOiAxMDAsCiIiIgppZiBvbGQxIG5vdCBpbiBzOgogICAgcmFpc2UgU3lzdGVtRXhpdCgicHJpY2UgbGlzdCByZXF1ZXN0IGJsb2NrIG5vdCBmb3VuZCIpCnMgPSBzLnJlcGxhY2Uob2xkMSwgbmV3MSwgMSkKb2xkMiA9ICJzZWxsaW5nUHJpY2VMaXN0cyA9IHByaWNlTGlzdHMuZmlsdGVyKChyb3cpID0+IGlzT24ocm93LmVuYWJsZWQpICYmIGlzT24ocm93LnNlbGxpbmcpKTsiCm5ldzIgPSAic2VsbGluZ1ByaWNlTGlzdHMgPSBwcmljZUxpc3RzLmZpbHRlcigocm93KSA9PiBpc09uKHJvdy5lbmFibGVkKSk7IgppZiBvbGQyIG5vdCBpbiBzOgogICAgcmFpc2UgU3lzdGVtRXhpdCgicHJpY2UgbGlzdCBjbGllbnQgZmlsdGVyIGJsb2NrIG5vdCBmb3VuZCIpCnMgPSBzLnJlcGxhY2Uob2xkMiwgbmV3MiwgMSkKcC53cml0ZV90ZXh0KHMsIGVuY29kaW5nPSJ1dGYtOCIpCg==' | base64 -d > /tmp/patch.py
+          python /tmp/patch.py
+          git diff --check
+          grep -F 'filters: { selling: 1 }' client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx
+          grep -F 'pageLength: 100' client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx
+          if grep -F 'pageLength: 500' client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx; then
+            echo 'old Price List limit still present' >&2
+            exit 1
+          fi
+      - name: Commit fix and remove temporary workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/one-shot-sales-price-list-limit100.yml
+          git add client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx
+          git commit -m "fix(ui): respect Price List query whitelist and limit"
+          git push origin HEAD:main
