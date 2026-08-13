@@ -394,6 +394,7 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
         try {
           const priceLists = await adapter.getList("Price List", {
             fields: ["name", "price_list_name", "modified", "creation", "enabled", "selling"],
+            orderBy: "modified desc",
             pageLength: 200,
           });
           const isOn = (value: unknown) => value === true || value === 1 || text(value) === "1";
