@@ -7,6 +7,7 @@ import {
   type WorkOrderData,
 } from "../../../packages/clouderp-erpnext/src/index.js";
 import { buildWorkOrderLifecycleProjection } from "../../../packages/clouderp-erpnext/src/manufacturing-work-order-lifecycle.js";
+import { buildDimensionSafeMaterialProgress } from "../../../packages/clouderp-erpnext/src/manufacturing-material-progress-row.js";
 import type { ManufacturingStockData } from "../../../packages/clouderp-erpnext/src/manufacturing-material-status.js";
 import { errors, jsonResponse, readJson } from "../../../packages/core/src/index.js";
 import type { MetadataPermissionService } from "../../../packages/frappe-model/src/index.js";
@@ -56,16 +57,13 @@ export async function routeManufacturingCostingApi(
 
   const related = (await context.listStockEntries()).filter((doc) => doc.data.work_order === name);
   const effectiveDocuments: Array<CanonicalDocument<StockEntryData>> = [];
-  const effectiveWithLedger = [];
   const cancelled: string[] = [];
   for (const document of related) {
     if (!await readable(context, document)) {
       throw errors.permission("Manufacturing evidence contains a Stock Entry outside the current read scope");
     }
     if (document.docstatus === 2) { cancelled.push(document.name); continue; }
-    if (document.docstatus !== 1) continue;
-    effectiveDocuments.push(document);
-    effectiveWithLedger.push({ document, stock_entries: await context.getVoucherStockEntries(document.name, document.version) });
+    if (document.docstatus === 1) effectiveDocuments.push(document);
   }
 
   if (url.pathname === LIFECYCLE_PATH) {
@@ -73,8 +71,27 @@ export async function routeManufacturingCostingApi(
       work_order: workOrder,
       stock_entries: effectiveDocuments as Array<CanonicalDocument<ManufacturingStockData>>,
     });
+    const executionDocuments = effectiveDocuments.filter((document) =>
+      ["Material Transfer", "Manufacture"].includes(document.data.purpose));
+    const materialRows = workOrder.docstatus === 1 && (workOrder.data.required_items?.length ?? 0) > 0
+      ? buildDimensionSafeMaterialProgress(workOrder, executionDocuments as never)
+      : [];
+    const remaining = Number(lifecycle.remaining_qty_micros ?? 0);
+    const submittedOpen = workOrder.docstatus === 1 && lifecycle.canonical_status !== "Completed";
     return jsonResponse(
-      { message: lifecycle },
+      {
+        message: {
+          ...lifecycle,
+          material_rows: materialRows,
+          actions: {
+            can_issue_materials: submittedOpen && materialRows.some((row) => row.remaining_to_issue_micros > 0),
+            can_manufacture: submittedOpen && remaining > 0,
+            can_cancel_work_order: workOrder.docstatus === 1
+              && Number(lifecycle.produced_qty_micros ?? 0) === 0
+              && executionDocuments.length === 0,
+          },
+        },
+      },
       200,
       { "cache-control": "private, no-store", "x-content-type-options": "nosniff", "x-cloudforge-trace-id": context.traceId },
     );
@@ -83,6 +100,10 @@ export async function routeManufacturingCostingApi(
   const bomName = requiredText(workOrder.data.bom_no, "Work Order bom_no");
   const bom = await context.loadBom(bomName);
   if (!bom || !await readable(context, bom)) throw errors.permission("Work Order BOM is outside the current read scope");
+  const effectiveWithLedger = [];
+  for (const document of effectiveDocuments) {
+    effectiveWithLedger.push({ document, stock_entries: await context.getVoucherStockEntries(document.name, document.version) });
+  }
   const genealogy = buildWorkOrderGenealogy(name, workOrder, effectiveWithLedger, cancelled);
   const evidence = buildManufacturingCostEvidence(workOrder, bom, genealogy);
   return jsonResponse(
