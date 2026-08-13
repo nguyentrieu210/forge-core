@@ -1,7 +1,7 @@
 /** @jsxImportSource react */
 import { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, Boxes, ExternalLink, Factory, Loader2, RefreshCw } from "lucide-react";
-import { Badge, Button, Progress, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, toast } from "@metaforge/ui";
+import { Badge, Button, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, toast } from "@metaforge/ui";
 import { useMetaForge } from "../../../container/provider.js";
 
 type Json = Record<string, unknown>;
@@ -46,7 +46,7 @@ export function AlumdoorWorkOrderDetail({ name, onNavigate }: AlumdoorWorkOrderD
     </div>
 
     {lifecycle && <div className="mb-4 grid gap-3 lg:grid-cols-[1.2fr_1fr]">
-      <div className="rounded-xl border bg-card p-4"><div className="flex items-center justify-between gap-3"><div><div className="text-xs text-muted-foreground">Tiến độ thành phẩm</div><div className="mt-1 text-lg font-semibold tabular-nums">{qty(lifecycle.produced_qty)} / {qty(lifecycle.target_qty)}</div></div><Factory className="size-5 text-muted-foreground" /></div><Progress value={progress} className="mt-3" /><div className="mt-2 flex justify-between text-xs text-muted-foreground"><span>{progress}%</span><span>Còn {qty(lifecycle.remaining_qty)}</span></div></div>
+      <div className="rounded-xl border bg-card p-4"><div className="flex items-center justify-between gap-3"><div><div className="text-xs text-muted-foreground">Tiến độ thành phẩm</div><div className="mt-1 text-lg font-semibold tabular-nums">{qty(lifecycle.produced_qty)} / {qty(lifecycle.target_qty)}</div></div><Factory className="size-5 text-muted-foreground" /></div><div className="mt-3 h-2 overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}><div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${progress}%` }} /></div><div className="mt-2 flex justify-between text-xs text-muted-foreground"><span>{progress}%</span><span>Còn {qty(lifecycle.remaining_qty)}</span></div></div>
       <div className="rounded-xl border bg-card p-4"><div className="text-xs text-muted-foreground">Nguồn phát hành</div><div className="mt-1 font-medium">{lineageLabel(lifecycle)}</div><div className="mt-3 text-xs text-muted-foreground">Trạng thái canonical</div><div className="mt-1 font-medium">{lifecycle.canonical_status}</div></div>
     </div>}
 
