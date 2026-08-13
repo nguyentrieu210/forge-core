@@ -1,0 +1,51 @@
+name: One-shot Sales Order Price List orderBy fix
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/one-shot-sales-price-list-orderby.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-main:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+      - name: Patch Price List request
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx')
+          s = p.read_text(encoding='utf-8')
+          old = '''          const priceLists = await adapter.getList("Price List", {
+            fields: ["name", "price_list_name", "modified", "creation", "enabled", "selling"],
+            pageLength: 200,
+          });'''
+          new = '''          const priceLists = await adapter.getList("Price List", {
+            fields: ["name", "price_list_name", "modified", "creation", "enabled", "selling"],
+            orderBy: "modified desc",
+            pageLength: 200,
+          });'''
+          if s.count(old) != 1:
+              raise SystemExit(f'expected exactly 1 target block, got {s.count(old)}')
+          p.write_text(s.replace(old, new, 1), encoding='utf-8')
+          PY
+          git diff --check
+          grep -F 'orderBy: "modified desc"' client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx
+      - name: Commit fix and remove temporary workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/one-shot-sales-price-list-orderby.yml
+          git add client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx
+          git commit -m "fix(ui): send non-empty Price List order_by"
+          git push origin HEAD:main
