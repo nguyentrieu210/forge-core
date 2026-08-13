@@ -1,0 +1,66 @@
+name: One-shot Sales Order Price List client filter final
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/one-shot-sales-price-list-client-filter-final.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-main:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+      - name: Patch Sales Order Price List loading
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx')
+          s = p.read_text(encoding='utf-8')
+          start = s.index('        let sellingPriceLists: Doc[] = [];')
+          end = s.index('        if (!active) return;', start)
+          new = '''        let sellingPriceLists: Doc[] = [];
+        try {
+          const priceLists = await adapter.getList("Price List", {
+            fields: ["name", "price_list_name", "modified", "creation", "enabled", "selling"],
+            orderBy: "modified desc",
+            pageLength: 500,
+          });
+          const isOn = (value: unknown) => {
+            if (value === true || value === 1) return true;
+            const normalized = text(value).trim().toLowerCase();
+            return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on";
+          };
+          sellingPriceLists = priceLists.filter((row) => isOn(row.enabled) && isOn(row.selling));
+        } catch {
+          sellingPriceLists = [];
+        }
+'''
+          s = s[:start] + new + s[end:]
+          p.write_text(s, encoding='utf-8')
+          PY
+          git diff --check
+          grep -F 'fields: ["name", "price_list_name", "modified", "creation", "enabled", "selling"]' client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx
+          grep -F 'orderBy: "modified desc"' client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx
+          grep -F 'pageLength: 500' client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx
+          if grep -F 'filters: { enabled: 1, selling: 1 }' client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx; then
+            echo 'server-side Price List filter still present' >&2
+            exit 1
+          fi
+      - name: Commit fix and remove temporary workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/one-shot-sales-price-list-client-filter-final.yml
+          git add client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx
+          git commit -m "fix(ui): avoid forbidden Price List filters"
+          git push origin HEAD:main
