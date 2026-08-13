@@ -385,10 +385,16 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
           (field) => field.fieldname === "items" && field.fieldtype === "Table",
         );
         const childDoctype = text(table?.options) || "Sales Order Item";
-        const [itemMeta, boot, caps] = await Promise.all([
+        const [itemMeta, boot, caps, sellingPriceLists] = await Promise.all([
           adapter.getMeta(childDoctype),
           adapter.getBoot(),
           adapter.getCapabilities("Sales Order"),
+          adapter.getList("Price List", {
+            fields: ["name", "price_list_name", "creation"],
+            filters: { enabled: 1, selling: 1 },
+            orderBy: "creation desc",
+            pageLength: 1,
+          }).catch(() => []),
         ]);
         if (!active) return;
         const defaults: Json = {
@@ -398,6 +404,9 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
         if (!defaults.transaction_date) defaults.transaction_date = today();
         if (!defaults.delivery_date) defaults.delivery_date = today();
         if (!defaults.currency) defaults.currency = boot.sysdefaults.currency || "VND";
+        const latestSellingPriceList = text(sellingPriceLists[0]?.name)
+          || text(sellingPriceLists[0]?.price_list_name);
+        if (latestSellingPriceList) defaults.selling_price_list = latestSellingPriceList;
         setMeta(salesMeta);
         setChildMeta(itemMeta);
         setCanCreate(Boolean(caps.create));
@@ -1056,7 +1065,7 @@ _error: mapError(error).message,
 
     <StandardField
       id="sales-price-list"
-      field={headerField("selling_price_list", "B\u1ea3ng gi\u00e1", "Link", "Price List")}
+      field={headerField("selling_price_list", "Bảng giá", "Link", "Price List")}
       value={header.selling_price_list}
       onChange={(value) => setHeaderField("selling_price_list", text(value) || undefined, true)}
       registry={registry}
@@ -1065,7 +1074,7 @@ _error: mapError(error).message,
       docValues={header}
       roles={roles}
       required={metaRequired("selling_price_list")}
-      label="B\u1ea3ng gi\u00e1"
+      label="Bảng giá"
       className="xl:order-2"
     />
 
