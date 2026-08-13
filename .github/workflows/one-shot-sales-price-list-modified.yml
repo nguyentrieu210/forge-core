@@ -1,11 +1,15 @@
-name: One-shot Sales Order latest price list by modified
+name: One-shot Sales Order price list client-side selection
+
 on:
   push:
-    branches: [main]
+    branches:
+      - main
     paths:
-      - '.github/workflows/one-shot-sales-price-list-modified.yml'
+      - .github/workflows/one-shot-sales-price-list-modified.yml
+
 permissions:
   contents: write
+
 jobs:
   patch-main:
     runs-on: ubuntu-latest
@@ -16,36 +20,16 @@ jobs:
           ref: main
       - name: Patch file
         shell: bash
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          p = Path('client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx')
-          s = p.read_text(encoding='utf-8')
-          start = s.index('        let sellingPriceLists: Doc[] = [];')
-          end = s.index('        if (!active) return;', start)
-          new = '''        let sellingPriceLists: Doc[] = [];
-        try {
-          sellingPriceLists = await adapter.getList("Price List", {
-            fields: ["name", "price_list_name", "modified", "enabled", "selling"],
-            filters: { enabled: 1, selling: 1 },
-            orderBy: "modified desc",
-            pageLength: 1,
-          });
-        } catch {
-          sellingPriceLists = [];
-        }
-'''
-          s = s[:start] + new + s[end:]
-          p.write_text(s, encoding='utf-8')
-          PY
-          git diff --check
-          grep -F 'orderBy: "modified desc"' client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx
+        run: python -c "import base64;exec(base64.b64decode('CmZyb20gcGF0aGxpYiBpbXBvcnQgUGF0aApwID0gUGF0aCgiY2xpZW50L3BhY2thZ2VzL3ZpZXdzL3NyYy9hcHAvdmVydGljYWwvYWx1bWRvb3IvQWx1bWRvb3JTYWxlc09yZGVyQ3JlYXRlLnRzeCIpCnMgPSBwLnJlYWRfdGV4dChlbmNvZGluZz0idXRmLTgiKQpzdGFydCA9IHMuaW5kZXgoIiAgICAgICAgbGV0IHNlbGxpbmdQcmljZUxpc3RzOiBEb2NbXSA9IFtdOyIpCmVuZCA9IHMuaW5kZXgoIiAgICAgICAgaWYgKCFhY3RpdmUpIHJldHVybjsiLCBzdGFydCkKbmV3ID0gJycnICAgICAgICBsZXQgc2VsbGluZ1ByaWNlTGlzdHM6IERvY1tdID0gW107CiAgICAgICAgdHJ5IHsKICAgICAgICAgIGNvbnN0IHByaWNlTGlzdHMgPSBhd2FpdCBhZGFwdGVyLmdldExpc3QoIlByaWNlIExpc3QiLCB7CiAgICAgICAgICAgIGZpZWxkczogWyJuYW1lIiwgInByaWNlX2xpc3RfbmFtZSIsICJtb2RpZmllZCIsICJjcmVhdGlvbiIsICJlbmFibGVkIiwgInNlbGxpbmciXSwKICAgICAgICAgICAgcGFnZUxlbmd0aDogMjAwLAogICAgICAgICAgfSk7CiAgICAgICAgICBjb25zdCBpc09uID0gKHZhbHVlOiB1bmtub3duKSA9PiB2YWx1ZSA9PT0gdHJ1ZSB8fCB2YWx1ZSA9PT0gMSB8fCB0ZXh0KHZhbHVlKSA9PT0gIjEiOwogICAgICAgICAgc2VsbGluZ1ByaWNlTGlzdHMgPSBwcmljZUxpc3RzCiAgICAgICAgICAgIC5maWx0ZXIoKHJvdykgPT4gaXNPbihyb3cuZW5hYmxlZCkgJiYgaXNPbihyb3cuc2VsbGluZykpCiAgICAgICAgICAgIC5zb3J0KChsZWZ0LCByaWdodCkgPT4gewogICAgICAgICAgICAgIGNvbnN0IGxlZnRUaW1lID0gRGF0ZS5wYXJzZSh0ZXh0KGxlZnQubW9kaWZpZWQpIHx8IHRleHQobGVmdC5jcmVhdGlvbikpIHx8IDA7CiAgICAgICAgICAgICAgY29uc3QgcmlnaHRUaW1lID0gRGF0ZS5wYXJzZSh0ZXh0KHJpZ2h0Lm1vZGlmaWVkKSB8fCB0ZXh0KHJpZ2h0LmNyZWF0aW9uKSkgfHwgMDsKICAgICAgICAgICAgICByZXR1cm4gcmlnaHRUaW1lIC0gbGVmdFRpbWUgfHwgdGV4dChyaWdodC5uYW1lKS5sb2NhbGVDb21wYXJlKHRleHQobGVmdC5uYW1lKSwgInZpIik7CiAgICAgICAgICAgIH0pOwogICAgICAgIH0gY2F0Y2ggewogICAgICAgICAgc2VsbGluZ1ByaWNlTGlzdHMgPSBbXTsKICAgICAgICB9CicnJwpzID0gc1s6c3RhcnRdICsgbmV3ICsgc1tlbmQ6XQpwLndyaXRlX3RleHQocywgZW5jb2Rpbmc9InV0Zi04IikK'))"
       - name: Verify and commit
         shell: bash
         run: |
+          git diff --check
+          grep -F 'pageLength: 200' client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx
+          grep -F '.filter((row) => isOn(row.enabled) && isOn(row.selling))' client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git rm .github/workflows/one-shot-sales-price-list-modified.yml
           git add client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx
-          git commit -m "fix(ui): pick latest modified active Sales price list"
+          git commit -m "fix(ui): select latest active Sales price list client-side"
           git push origin HEAD:main
