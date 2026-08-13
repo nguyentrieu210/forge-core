@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import "./manufacturing-lifecycle-api-boundary.test.mjs";
 
 import { buildWorkOrderLifecycleProjection } from "../dist/packages/clouderp-erpnext/src/manufacturing-work-order-lifecycle.js";
 
