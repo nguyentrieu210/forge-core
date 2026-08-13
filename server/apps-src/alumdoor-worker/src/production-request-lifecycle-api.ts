@@ -2,6 +2,7 @@ import { deriveProductionRequestLifecycle } from "./production-request-lifecycle
 import type { ProductionPlatformCall } from "./sales-production.js";
 
 type Json = Record<string, unknown>;
+const WORK_ORDER_READ_LIMIT = 500;
 
 /**
  * Permission-preserving read seam for the Production Request operator screen.
@@ -28,13 +29,19 @@ export async function readProductionRequestLifecycle(
         "qty", "qty_micros", "produced_qty", "produced_qty_micros",
       ]),
       filters: JSON.stringify([["production_request", "=", name]]),
-      limit_page_length: "500",
+      limit_page_length: String(WORK_ORDER_READ_LIMIT + 1),
     });
     const workOrderResponse = await call(`resource/Work%20Order?${query}`);
     if (!workOrderResponse.ok) {
       return answer({ message: `Không đọc được Work Order của ${name} (HTTP ${workOrderResponse.status}).` }, 422);
     }
     const workOrders = ((await workOrderResponse.json()) as { data?: Json[] }).data ?? [];
+    if (workOrders.length > WORK_ORDER_READ_LIMIT) {
+      return answer({
+        message: `Production Request ${name} có hơn ${WORK_ORDER_READ_LIMIT} Work Order; từ chối dựng lifecycle bị cắt cụt.`,
+        code: "PRODUCTION_REQUEST_LIFECYCLE_EVIDENCE_TRUNCATED",
+      }, 409);
+    }
     return answer({ message: deriveProductionRequestLifecycle(request, workOrders) });
   } catch (error) {
     return answer({ message: error instanceof Error ? error.message : "Không đọc được vòng đời yêu cầu sản xuất." }, 422);
