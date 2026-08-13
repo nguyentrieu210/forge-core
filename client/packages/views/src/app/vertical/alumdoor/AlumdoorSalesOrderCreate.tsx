@@ -392,19 +392,12 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
         ]);
         let sellingPriceLists: Doc[] = [];
         try {
-          const priceLists = await adapter.getList("Price List", {
-            fields: ["name", "price_list_name", "modified", "creation", "enabled", "selling"],
+          sellingPriceLists = await adapter.getList("Price List", {
+            fields: ["name", "price_list_name", "modified", "creation"],
+            filters: { enabled: 1, selling: 1 },
             orderBy: "modified desc",
-            pageLength: 200,
+            pageLength: 1,
           });
-          const isOn = (value: unknown) => value === true || value === 1 || text(value) === "1";
-          sellingPriceLists = priceLists
-            .filter((row) => isOn(row.enabled) && isOn(row.selling))
-            .sort((left, right) => {
-              const leftTime = Date.parse(text(left.modified) || text(left.creation)) || 0;
-              const rightTime = Date.parse(text(right.modified) || text(right.creation)) || 0;
-              return rightTime - leftTime || text(right.name).localeCompare(text(left.name), "vi");
-            });
         } catch {
           sellingPriceLists = [];
         }
