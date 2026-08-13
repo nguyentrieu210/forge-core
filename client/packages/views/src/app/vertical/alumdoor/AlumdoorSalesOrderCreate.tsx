@@ -392,12 +392,17 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
         ]);
         let sellingPriceLists: Doc[] = [];
         try {
-          sellingPriceLists = await adapter.getList("Price List", {
-            fields: ["name", "price_list_name", "modified", "creation"],
-            filters: { enabled: 1, selling: 1 },
+          const priceLists = await adapter.getList("Price List", {
+            fields: ["name", "price_list_name", "modified", "creation", "enabled", "selling"],
             orderBy: "modified desc",
-            pageLength: 1,
+            pageLength: 500,
           });
+          const isOn = (value: unknown) => {
+            if (value === true || value === 1) return true;
+            const normalized = text(value).trim().toLowerCase();
+            return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on";
+          };
+          sellingPriceLists = priceLists.filter((row) => isOn(row.enabled) && isOn(row.selling));
         } catch {
           sellingPriceLists = [];
         }
