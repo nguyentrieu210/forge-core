@@ -1,8 +1,8 @@
 # ERP Operational Screens — Backend Bridge
 
-Status: ACTIVE  
-Date: 2026-08-13  
-Branch: `feat/erp-operational-screens-backend-bridge-20260813`  
+Status: ACTIVE
+Date: 2026-08-13
+Branch: `feat/erp-operational-screens-backend-bridge-20260813`
 Baseline: `main@c9d3a771c625e1d13d10206b996d365939e5e0bf`
 
 ## Decision
