@@ -74,7 +74,8 @@ export async function resolveSalesPackage(
     const componentKey = text(row.component_key) || `COMP-${String(index + 1).padStart(3, "0")}`;
     if (componentKeys.has(componentKey)) throw errors.validation(`Sales Package ${packageName} has duplicate component_key ${componentKey}`);
     componentKeys.add(componentKey);
-    const itemCode = text(row.item_code);
+    const configuredItemCode = text(row.item_code);
+    const itemCode = configuredItemCode === "$SOURCE_ITEM" ? input.itemCode : configuredItemCode;
     const uom = text(row.uom);
     if (!itemCode) throw errors.validation(`Sales Package ${packageName} component ${componentKey} requires item_code`);
     if (!uom) throw errors.validation(`Sales Package ${packageName} component ${componentKey} requires uom`);
