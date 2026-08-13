@@ -60,7 +60,7 @@ export async function routeManufacturingPlanningApi(
 
   const evidenceCount = relevantSales.length + relevantPlans.length + relevantBoms.length;
   if (evidenceCount > MAX_RELEVANT_DOCUMENTS) {
-    throw errors.conflict(`Manufacturing planning evidence exceeds bounded read (${MAX_RELEVANT_DOCUMENTS})`);
+    throw errors.lifecycle(`Manufacturing planning evidence exceeds bounded read (${MAX_RELEVANT_DOCUMENTS})`);
   }
   await assertAllReadable(context, relevantSales, "Sales Order");
   await assertAllReadable(context, relevantPlans, "Production Plan");
