@@ -87,6 +87,7 @@ import {
   SalesLinkedProductionPlanController,
   SalesLinkedWorkOrderController,
 } from "./manufacturing-sales-lineage.js";
+import { ManufacturingReleaseAuthorityWorkOrderController } from "./manufacturing-release-authority.js";
 import {
   CapaController, NonConformanceReportController,
   QualityPlanController, RootCauseAnalysisController,
@@ -207,8 +208,9 @@ export function registerErpNextCoreControllers(registry: ControllerRegistry): Co
     .register(new CutOrderReservationIntegrityController())
     .register(new StockReservationIntegrityController())
     .register(new StockReconciliationIntegrityController())
-    // Last registration wins: retain legacy controller construction above for compatibility
-    // while promoting exact source-row production lineage as the effective authority.
     .register(new SalesLinkedProductionPlanController())
-    .register(new SalesLinkedWorkOrderController());
+    .register(new SalesLinkedWorkOrderController())
+    // Final selector preserves the established AlumDoor Production Request authority while
+    // using SalesLinkedWorkOrderController only for generic Production Plan releases.
+    .register(new ManufacturingReleaseAuthorityWorkOrderController());
 }
