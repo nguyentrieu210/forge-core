@@ -20,35 +20,14 @@ jobs:
           ref: main
       - name: Patch Sales Order Price List selection
         shell: bash
+        run: python -c "import base64;exec(base64.b64decode('CmZyb20gcGF0aGxpYiBpbXBvcnQgUGF0aApwID0gUGF0aCgiY2xpZW50L3BhY2thZ2VzL3ZpZXdzL3NyYy9hcHAvdmVydGljYWwvYWx1bWRvb3IvQWx1bWRvb3JTYWxlc09yZGVyQ3JlYXRlLnRzeCIpCnMgPSBwLnJlYWRfdGV4dChlbmNvZGluZz0idXRmLTgiKQpzdGFydCA9IHMuaW5kZXgoIiAgICAgICAgbGV0IHNlbGxpbmdQcmljZUxpc3RzOiBEb2NbXSA9IFtdOyIpCmVuZCA9IHMuaW5kZXgoIiAgICAgICAgaWYgKCFhY3RpdmUpIHJldHVybjsiLCBzdGFydCkKbmV3ID0gJycnICAgICAgICBsZXQgc2VsbGluZ1ByaWNlTGlzdHM6IERvY1tdID0gW107CiAgICAgICAgdHJ5IHsKICAgICAgICAgIHNlbGxpbmdQcmljZUxpc3RzID0gYXdhaXQgYWRhcHRlci5nZXRMaXN0KCJQcmljZSBMaXN0IiwgewogICAgICAgICAgICBmaWVsZHM6IFsibmFtZSIsICJwcmljZV9saXN0X25hbWUiLCAibW9kaWZpZWQiLCAiY3JlYXRpb24iXSwKICAgICAgICAgICAgZmlsdGVyczogeyBlbmFibGVkOiAxLCBzZWxsaW5nOiAxIH0sCiAgICAgICAgICAgIG9yZGVyQnk6ICJtb2RpZmllZCBkZXNjIiwKICAgICAgICAgICAgcGFnZUxlbmd0aDogMSwKICAgICAgICAgIH0pOwogICAgICAgIH0gY2F0Y2ggewogICAgICAgICAgc2VsbGluZ1ByaWNlTGlzdHMgPSBbXTsKICAgICAgICB9CicnJwpwLndyaXRlX3RleHQoc1s6c3RhcnRdICsgbmV3ICsgc1tlbmQ6XSwgZW5jb2Rpbmc9InV0Zi04IikK'))"
+      - name: Verify and commit
+        shell: bash
         run: |
-          python - <<'PY'
-          from pathlib import Path
-          p = Path('client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx')
-          s = p.read_text(encoding='utf-8')
-          start = s.index('        let sellingPriceLists: Doc[] = [];')
-          end = s.index('        if (!active) return;', start)
-          new = '''        let sellingPriceLists: Doc[] = [];
-        try {
-          sellingPriceLists = await adapter.getList("Price List", {
-            fields: ["name", "price_list_name", "modified", "creation"],
-            filters: { enabled: 1, selling: 1 },
-            orderBy: "modified desc",
-            pageLength: 1,
-          });
-        } catch {
-          sellingPriceLists = [];
-        }
-'''
-          s = s[:start] + new + s[end:]
-          p.write_text(s, encoding='utf-8')
-          PY
           git diff --check
           grep -F 'filters: { enabled: 1, selling: 1 }' client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx
           grep -F 'orderBy: "modified desc"' client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx
           grep -F 'pageLength: 1' client/packages/views/src/app/vertical/alumdoor/AlumdoorSalesOrderCreate.tsx
-      - name: Commit fix and remove temporary workflow
-        shell: bash
-        run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git rm .github/workflows/one-shot-sales-price-list-server-filter.yml
