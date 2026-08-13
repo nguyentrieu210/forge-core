@@ -30,6 +30,7 @@ import {
 const AlumdoorSalesOrderCreate = lazy(() => import("./vertical/alumdoor/AlumdoorSalesOrderCreate.js").then((module) => ({ default: module.AlumdoorSalesOrderCreate })));
 const AlumdoorProductionRequestDetail = lazy(() => import("./vertical/alumdoor/AlumdoorProductionRequestDetail.js").then((module) => ({ default: module.AlumdoorProductionRequestDetail })));
 const AlumdoorWorkOrderDetail = lazy(() => import("./vertical/alumdoor/AlumdoorWorkOrderDetail.js").then((module) => ({ default: module.AlumdoorWorkOrderDetail })));
+const AlumdoorManufacturingStockEntryCreate = lazy(() => import("./vertical/alumdoor/AlumdoorManufacturingStockEntryCreate.js").then((module) => ({ default: module.AlumdoorManufacturingStockEntryCreate })));
 
 export interface DoctypeWorkspaceProps {
   doctype: string;
@@ -67,6 +68,10 @@ export function DoctypeWorkspace(props: DoctypeWorkspaceProps) {
   const useAlumdoorSalesCreate = isNew && doctype === "Sales Order" && isAlumdoorProfile;
   const useAlumdoorProductionRequestDetail = Boolean(decoded) && doctype === "Production Request" && isAlumdoorProfile;
   const useAlumdoorWorkOrderDetail = Boolean(decoded) && doctype === "Work Order" && isAlumdoorProfile;
+  const manufacturingWorkOrder = bridge.get("f_work_order")?.trim() ?? "";
+  const requestedStockPurpose = bridge.get("f_purpose");
+  const manufacturingPurpose = requestedStockPurpose === "Material Transfer" || requestedStockPurpose === "Manufacture" ? requestedStockPurpose : undefined;
+  const useAlumdoorManufacturingStockEntryContext = !isNew && !decoded && doctype === "Stock Entry" && isAlumdoorProfile && Boolean(manufacturingWorkOrder && manufacturingPurpose);
   /**
    * Kích cỡ màn tạo mới đi theo PHẠM VI của chứng từ, không phải theo khai báo riêng của từng app.
    *
@@ -81,9 +86,9 @@ export function DoctypeWorkspace(props: DoctypeWorkspaceProps) {
   const bulkPolicy = useMemo(() => titleMeta.data ? resolveBulkRenderPolicy(titleMeta.data) : undefined, [titleMeta.data]);
   const bulkEnabled = Boolean(bulkPolicy?.enabled && !isTree);
   const bulkOnly = Boolean(bulkPolicy?.rowSource);
-  const bulkActive = !decoded && !isNew && bulkEnabled && (bulkOnly || bridge.get("view") === "bulk");
+  const bulkActive = !decoded && !isNew && !useAlumdoorManufacturingStockEntryContext && bulkEnabled && (bulkOnly || bridge.get("view") === "bulk");
 
-  const modeTabs = bulkEnabled && !bulkOnly && !decoded && !isNew ? (
+  const modeTabs = bulkEnabled && !bulkOnly && !decoded && !isNew && !useAlumdoorManufacturingStockEntryContext ? (
     <div className={V3_VIEW_SWITCHER_CLASS} role="navigation" aria-label={t("common.view", "Chế độ xem")}>
       <Button variant={bulkActive ? "ghost" : "secondary"} size="sm" className="h-8 rounded-md" onClick={() => {
         if (bulkActive && bulkDirty) { setConfirmBulkExit(true); return; }
@@ -93,7 +98,18 @@ export function DoctypeWorkspace(props: DoctypeWorkspaceProps) {
     </div>
   ) : null;
 
-  const detail = decoded ? (
+  const detail = useAlumdoorManufacturingStockEntryContext && manufacturingPurpose ? (
+    <Suspense fallback={<div className="grid h-full place-items-center text-sm text-muted-foreground">Đang mở phiếu kho sản xuất…</div>}>
+      <AlumdoorManufacturingStockEntryCreate
+        key={`alumdoor-stock-entry/${manufacturingWorkOrder}/${manufacturingPurpose}`}
+        workOrder={manufacturingWorkOrder}
+        purpose={manufacturingPurpose}
+        onCreated={(newName) => onNavigate(`${listPath}/${encodeURIComponent(newName)}`)}
+        onCancel={() => onNavigate(`${base}/${encodeURIComponent("Work Order")}/${encodeURIComponent(manufacturingWorkOrder)}`)}
+        onNavigate={onNavigate}
+      />
+    </Suspense>
+  ) : decoded ? (
     useAlumdoorProductionRequestDetail ? (
       <Suspense fallback={<div className="grid h-full place-items-center text-sm text-muted-foreground">Đang mở yêu cầu sản xuất…</div>}>
         <AlumdoorProductionRequestDetail key={`alumdoor-production-request/${decoded}`} name={decoded} onNavigate={onNavigate} />
@@ -127,9 +143,11 @@ export function DoctypeWorkspace(props: DoctypeWorkspaceProps) {
           {bulkActive ? <BulkGridContainer doctype={doctype} bridge={bridge} title={displayTitle} onDirtyChange={setBulkDirty} /> : (
             <SplitView
               autoSaveId={`mf-split-v3-${doctype}`}
-              hasDetail={isTree || Boolean(decoded)}
-              contextTitle={decoded}
-              onCloseDetail={() => onNavigate(listPath)}
+              hasDetail={isTree || Boolean(decoded) || useAlumdoorManufacturingStockEntryContext}
+              contextTitle={decoded ?? (useAlumdoorManufacturingStockEntryContext ? manufacturingWorkOrder : undefined)}
+              onCloseDetail={() => useAlumdoorManufacturingStockEntryContext
+                ? onNavigate(`${base}/${encodeURIComponent("Work Order")}/${encodeURIComponent(manufacturingWorkOrder)}`)
+                : onNavigate(listPath)}
               list={isTree ? (
                 <TreeContainer doctype={doctype} title={displayTitle} selected={decoded} editable renameField={titleMeta.data?.title_field} onSelect={(nodeName) => onNavigate(`${listPath}/${encodeURIComponent(nodeName)}`)} />
               ) : (
