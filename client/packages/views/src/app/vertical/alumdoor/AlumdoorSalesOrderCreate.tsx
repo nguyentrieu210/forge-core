@@ -392,27 +392,20 @@ export function AlumdoorSalesOrderCreate(props: AlumdoorSalesOrderCreateProps) {
         ]);
         let sellingPriceLists: Doc[] = [];
         try {
-          sellingPriceLists = await adapter.getList("Price List", {
-            fields: ["name", "price_list_name", "creation"],
-            filters: { enabled: 1, selling: 1 },
-            orderBy: "creation desc",
-            pageLength: 1,
+          const priceLists = await adapter.getList("Price List", {
+            fields: ["name", "price_list_name", "modified", "creation", "enabled", "selling"],
+            pageLength: 200,
           });
-        } catch {
-          // Fall through to Frappe's whitelisted list API below.
-        }
-        if (!sellingPriceLists.length) {
-          try {
-            sellingPriceLists = await adapter.callGet<Doc[]>("frappe.client.get_list", {
-              doctype: "Price List",
-              fields: JSON.stringify(["name", "price_list_name", "creation"]),
-              filters: JSON.stringify({ enabled: 1, selling: 1 }),
-              order_by: "creation desc",
-              limit_page_length: 1,
+          const isOn = (value: unknown) => value === true || value === 1 || text(value) === "1";
+          sellingPriceLists = priceLists
+            .filter((row) => isOn(row.enabled) && isOn(row.selling))
+            .sort((left, right) => {
+              const leftTime = Date.parse(text(left.modified) || text(left.creation)) || 0;
+              const rightTime = Date.parse(text(right.modified) || text(right.creation)) || 0;
+              return rightTime - leftTime || text(right.name).localeCompare(text(left.name), "vi");
             });
-          } catch {
-            sellingPriceLists = [];
-          }
+        } catch {
+          sellingPriceLists = [];
         }
         if (!active) return;
         const defaults: Json = {
