@@ -1,0 +1,49 @@
+name: Local Self-Hosted Validation
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: forge-local-main
+  cancel-in-progress: true
+
+jobs:
+  validate-local:
+    name: Validate Forge on local Windows runner
+    runs-on: [self-hosted, windows, x64, forge-local]
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout exact main revision
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          clean: true
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        shell: pwsh
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Run Forge fast validation gate
+        shell: pwsh
+        run: pnpm run validate:fast
