@@ -112,8 +112,6 @@ try {
     }
     $backendProcess = Start-Process @backendStart
 
-    # Wrangler root may intentionally return 404. Any normal HTTP response means
-    # the local worker is listening; API semantics are checked by the app itself.
     if (-not (Wait-Http "http://127.0.0.1:$BackendPort/" 45 @(200,400,401,403,404,405))) {
         Get-Content $backendOut -Tail 100 -ErrorAction SilentlyContinue | Out-Host
         Get-Content $backendErr -Tail 100 -ErrorAction SilentlyContinue | Out-Host
@@ -125,7 +123,7 @@ try {
     Write-Host "Starting Desk on :$UiPort..."
     $uiStart = @{
         FilePath = "cmd.exe"
-        ArgumentList = @("/d", "/c", "pnpm run dev -- --host 0.0.0.0 --port $UiPort")
+        ArgumentList = @("/d", "/c", "pnpm exec vite --host 0.0.0.0 --port $UiPort")
         WorkingDirectory = $RuntimeRoot
         RedirectStandardOutput = $uiOut
         RedirectStandardError = $uiErr
