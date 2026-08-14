@@ -127,17 +127,19 @@ $env:RUNNER_TRACKING_ID = ""
 
 try {
     Write-Host "Starting Forge backend on http://127.0.0.1:$BackendPort ..."
-    $backendProcess = Start-Process \
-        -FilePath "cmd.exe" \
-        -ArgumentList @(
+    $backendStart = @{
+        FilePath = "cmd.exe"
+        ArgumentList = @(
             "/d", "/c",
             "pnpm exec wrangler dev --config apps/tenant-worker/wrangler.jsonc --port $BackendPort --local"
-        ) \
-        -WorkingDirectory $ServerRoot \
-        -RedirectStandardOutput $backendOut \
-        -RedirectStandardError $backendErr \
-        -WindowStyle Hidden \
-        -PassThru
+        )
+        WorkingDirectory = $ServerRoot
+        RedirectStandardOutput = $backendOut
+        RedirectStandardError = $backendErr
+        WindowStyle = "Hidden"
+        PassThru = $true
+    }
+    $backendProcess = Start-Process @backendStart
 
     if (-not (Wait-ForBackend -Port $BackendPort)) {
         Write-Host "Backend stdout tail:"
@@ -154,17 +156,19 @@ try {
 
     $env:VITE_FORGE_BACKEND = "http://127.0.0.1:$BackendPort"
     Write-Host "Starting MetaForge Desk on http://127.0.0.1:$UiPort ..."
-    $uiProcess = Start-Process \
-        -FilePath "cmd.exe" \
-        -ArgumentList @(
+    $uiStart = @{
+        FilePath = "cmd.exe"
+        ArgumentList = @(
             "/d", "/c",
             "pnpm run dev -- --host 0.0.0.0 --port $UiPort"
-        ) \
-        -WorkingDirectory $RuntimeRoot \
-        -RedirectStandardOutput $uiOut \
-        -RedirectStandardError $uiErr \
-        -WindowStyle Hidden \
-        -PassThru
+        )
+        WorkingDirectory = $RuntimeRoot
+        RedirectStandardOutput = $uiOut
+        RedirectStandardError = $uiErr
+        WindowStyle = "Hidden"
+        PassThru = $true
+    }
+    $uiProcess = Start-Process @uiStart
 
     if (-not (Wait-ForUi -Port $UiPort)) {
         Write-Host "UI stdout tail:"
