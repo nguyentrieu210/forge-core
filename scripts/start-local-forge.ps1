@@ -2,7 +2,7 @@
 param(
     [int]$BackendPort = 8799,
     [int]$UiPort = 5173,
-    [string]$LocalRoot = "C:\forge-local"
+    [string]$LocalRoot = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -10,8 +10,19 @@ $ErrorActionPreference = "Stop"
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $ServerRoot = Join-Path $RepoRoot "server"
 $RuntimeRoot = Join-Path $RepoRoot "client\apps\runtime"
-$LogRoot = Join-Path $LocalRoot "logs"
 
+if ([string]::IsNullOrWhiteSpace($LocalRoot)) {
+    if ($env:RUNNER_TEMP) {
+        $runnerWorkRoot = Split-Path $env:RUNNER_TEMP -Parent
+        $runnerRoot = Split-Path $runnerWorkRoot -Parent
+        $LocalRoot = Join-Path $runnerRoot "_local"
+    }
+    else {
+        $LocalRoot = Join-Path $RepoRoot ".local-runner"
+    }
+}
+
+$LogRoot = Join-Path $LocalRoot "logs"
 New-Item -ItemType Directory -Force -Path $LocalRoot | Out-Null
 New-Item -ItemType Directory -Force -Path $LogRoot | Out-Null
 
