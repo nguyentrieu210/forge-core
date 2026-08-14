@@ -134,7 +134,7 @@ const metadataStatements = [
    VALUES('${quote(tenant)}','Field Visit','Custom',1,1,'${quote(JSON.stringify(visitMeta))}','Administrator','${now}')
    ON CONFLICT(tenant_id,doctype) DO UPDATE SET metadata_json=excluded.metadata_json;`,
   `INSERT INTO installed_apps(tenant_id,app_id,app_name,version,content_hash,manifest_json,installed_by,installed_at,modified_at)
-   VALUES('${quote(tenant)}','local-demo','Local Demo','0.1.0','local-demo-seed-v1','${quote(JSON.stringify(demoAppManifest))}','Administrator','${now}','${now}')
+   VALUES('${quote(tenant)}','local-demo','Local Demo','0.1.0','0000000000000000000000000000000000000000000000000000000000000000','${quote(JSON.stringify(demoAppManifest))}','Administrator','${now}','${now}')
    ON CONFLICT(tenant_id,app_id) DO UPDATE SET
      app_name=excluded.app_name,version=excluded.version,content_hash=excluded.content_hash,
      manifest_json=excluded.manifest_json,modified_at=excluded.modified_at;`,
