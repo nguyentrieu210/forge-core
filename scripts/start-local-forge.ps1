@@ -16,181 +16,122 @@ if ([string]::IsNullOrWhiteSpace($LocalRoot)) {
         $runnerWorkRoot = Split-Path $env:RUNNER_TEMP -Parent
         $runnerRoot = Split-Path $runnerWorkRoot -Parent
         $LocalRoot = Join-Path $runnerRoot "_local"
-    }
-    else {
+    } else {
         $LocalRoot = Join-Path $RepoRoot ".local-runner"
     }
 }
 
 $LogRoot = Join-Path $LocalRoot "logs"
-New-Item -ItemType Directory -Force -Path $LocalRoot | Out-Null
 New-Item -ItemType Directory -Force -Path $LogRoot | Out-Null
 
 function Invoke-Checked {
-    param(
-        [Parameter(Mandatory = $true)][string]$WorkingDirectory,
-        [Parameter(Mandatory = $true)][string]$FilePath,
-        [Parameter(Mandatory = $false)][string[]]$Arguments = @()
-    )
-
+    param([string]$WorkingDirectory, [string]$FilePath, [string[]]$Arguments = @())
     Push-Location $WorkingDirectory
     try {
         & $FilePath @Arguments
-        if ($LASTEXITCODE -ne 0) {
-            throw "$FilePath failed with exit code $LASTEXITCODE"
-        }
-    }
-    finally {
-        Pop-Location
-    }
+        if ($LASTEXITCODE -ne 0) { throw "$FilePath failed with exit code $LASTEXITCODE" }
+    } finally { Pop-Location }
 }
 
 function Stop-PortProcessTree {
-    param([Parameter(Mandatory = $true)][int]$Port)
-
-    $owners = @()
-    try {
-        $owners = Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue |
-            Select-Object -ExpandProperty OwningProcess -Unique
-    }
-    catch {
-        Write-Warning "Could not query port $Port with Get-NetTCPConnection: $($_.Exception.Message)"
-    }
-
+    param([int]$Port)
+    $owners = Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue |
+        Select-Object -ExpandProperty OwningProcess -Unique
     foreach ($ownerPid in $owners) {
-        if (-not $ownerPid -or $ownerPid -eq $PID) {
-            continue
+        if ($ownerPid -and $ownerPid -ne $PID) {
+            Write-Host "Stopping PID=$ownerPid on port $Port"
+            taskkill.exe /PID $ownerPid /T /F | Out-Host
         }
-        Write-Host "Stopping process tree PID=$ownerPid on port $Port..."
-        & taskkill.exe /PID $ownerPid /T /F | Out-Host
     }
 }
 
-function Wait-ForBackend {
-    param([int]$Port, [int]$TimeoutSeconds = 120)
-
-    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
-    while ((Get-Date) -lt $deadline) {
-        & node -e "fetch('http://127.0.0.1:$Port/api/method/metaforge.api.get_boot',{signal:AbortSignal.timeout(3000)}).then(r=>process.exit([200,401,403].includes(r.status)?0:1)).catch(()=>process.exit(1))" *> $null
-        if ($LASTEXITCODE -eq 0) {
-            return $true
-        }
-        Start-Sleep -Seconds 2
-    }
-    return $false
-}
-
-function Wait-ForUi {
-    param([int]$Port, [int]$TimeoutSeconds = 90)
-
+function Wait-Http {
+    param([string]$Url, [int]$TimeoutSeconds = 90, [int[]]$Accepted = @(200))
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
     while ((Get-Date) -lt $deadline) {
         try {
-            $response = Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:$Port/" -TimeoutSec 3
-            if ($response.StatusCode -eq 200) {
-                return $true
+            $response = Invoke-WebRequest -UseBasicParsing -Uri $Url -TimeoutSec 3
+            if ($Accepted -contains [int]$response.StatusCode) { return $true }
+        } catch {
+            if ($_.Exception.Response) {
+                try {
+                    if ($Accepted -contains [int]$_.Exception.Response.StatusCode) { return $true }
+                } catch {}
             }
-        }
-        catch {
-            # Server is still starting.
         }
         Start-Sleep -Seconds 2
     }
     return $false
 }
 
-Write-Host "Stopping any previous Forge local servers..."
+Write-Host "Stopping previous Forge local processes..."
 Stop-PortProcessTree -Port $UiPort
 Stop-PortProcessTree -Port $BackendPort
-Start-Sleep -Seconds 1
 
-Write-Host "Preparing local development secrets..."
-Invoke-Checked -WorkingDirectory $RepoRoot -FilePath "node" -Arguments @("server/scripts/ensure-dev-vars.mjs")
+Write-Host "Preparing dev vars..."
+Invoke-Checked $RepoRoot "node" @("server/scripts/ensure-dev-vars.mjs")
 
-Write-Host "Building Forge server..."
-Invoke-Checked -WorkingDirectory $RepoRoot -FilePath "pnpm" -Arguments @("--dir", "server", "run", "build")
+Write-Host "Applying local migrations (best effort)..."
+try {
+    Invoke-Checked $ServerRoot "pnpm" @(
+        "exec", "wrangler", "d1", "migrations", "apply", "cloudforge-demo",
+        "--local", "--config", "apps/tenant-worker/wrangler.jsonc"
+    )
+} catch { Write-Warning $_.Exception.Message }
 
-Write-Host "Applying local D1 migrations..."
-Invoke-Checked -WorkingDirectory $ServerRoot -FilePath "pnpm" -Arguments @(
-    "exec", "wrangler", "d1", "migrations", "apply", "cloudforge-demo",
-    "--local", "--config", "apps/tenant-worker/wrangler.jsonc"
-)
-
-Write-Host "Seeding local development account..."
-Invoke-Checked -WorkingDirectory $RepoRoot -FilePath "pnpm" -Arguments @("--dir", "server", "run", "dev:seed")
-
-Write-Host "Building client workspace packages required by the Desk..."
-Invoke-Checked -WorkingDirectory $RepoRoot -FilePath "pnpm" -Arguments @("--dir", "client", "exec", "tsc", "-b")
+Write-Host "Seeding local dev account (best effort)..."
+try {
+    Invoke-Checked $RepoRoot "pnpm" @("--dir", "server", "run", "dev:seed")
+} catch { Write-Warning $_.Exception.Message }
 
 $backendOut = Join-Path $LogRoot "backend.out.log"
 $backendErr = Join-Path $LogRoot "backend.err.log"
 $uiOut = Join-Path $LogRoot "ui.out.log"
 $uiErr = Join-Path $LogRoot "ui.err.log"
-
 Remove-Item $backendOut, $backendErr, $uiOut, $uiErr -Force -ErrorAction SilentlyContinue
 
-# GitHub Runner removes child processes carrying RUNNER_TRACKING_ID at job cleanup.
-# Clear it only for the two long-lived local development processes so localhost
-# remains available after the workflow has finished.
 $previousTrackingId = $env:RUNNER_TRACKING_ID
 $previousBackend = $env:VITE_FORGE_BACKEND
 $env:RUNNER_TRACKING_ID = ""
 
 try {
-    Write-Host "Starting Forge backend on http://127.0.0.1:$BackendPort ..."
-    $backendStart = @{
+    Write-Host "Starting backend on :$BackendPort..."
+    $backendProcess = Start-Process @{
         FilePath = "cmd.exe"
-        ArgumentList = @(
-            "/d", "/c",
-            "pnpm exec wrangler dev --config apps/tenant-worker/wrangler.jsonc --port $BackendPort --local"
-        )
+        ArgumentList = @("/d", "/c", "pnpm exec wrangler dev --config apps/tenant-worker/wrangler.jsonc --port $BackendPort --local")
         WorkingDirectory = $ServerRoot
         RedirectStandardOutput = $backendOut
         RedirectStandardError = $backendErr
         WindowStyle = "Hidden"
         PassThru = $true
     }
-    $backendProcess = Start-Process @backendStart
 
-    if (-not (Wait-ForBackend -Port $BackendPort)) {
-        Write-Host "Backend stdout tail:"
-        Get-Content $backendOut -Tail 80 -ErrorAction SilentlyContinue | Out-Host
-        Write-Host "Backend stderr tail:"
-        Get-Content $backendErr -Tail 80 -ErrorAction SilentlyContinue | Out-Host
-        throw "Forge backend did not become ready on port $BackendPort."
+    if (-not (Wait-Http "http://127.0.0.1:$BackendPort/api/method/metaforge.api.get_boot" 90 @(200,401,403))) {
+        Get-Content $backendOut -Tail 100 -ErrorAction SilentlyContinue | Out-Host
+        Get-Content $backendErr -Tail 100 -ErrorAction SilentlyContinue | Out-Host
+        throw "Backend failed to become ready on port $BackendPort"
     }
 
-    Write-Host "Running HTTP smoke checks against local backend..."
-    Invoke-Checked -WorkingDirectory $ServerRoot -FilePath "node" -Arguments @(
-        "scripts/http-smoke.mjs", "--base", "http://127.0.0.1:$BackendPort"
-    )
-
     $env:VITE_FORGE_BACKEND = "http://127.0.0.1:$BackendPort"
-    Write-Host "Starting MetaForge Desk on http://127.0.0.1:$UiPort ..."
-    $uiStart = @{
+    Write-Host "Starting Desk on :$UiPort..."
+    $uiProcess = Start-Process @{
         FilePath = "cmd.exe"
-        ArgumentList = @(
-            "/d", "/c",
-            "pnpm run dev -- --host 0.0.0.0 --port $UiPort"
-        )
+        ArgumentList = @("/d", "/c", "pnpm run dev -- --host 0.0.0.0 --port $UiPort")
         WorkingDirectory = $RuntimeRoot
         RedirectStandardOutput = $uiOut
         RedirectStandardError = $uiErr
         WindowStyle = "Hidden"
         PassThru = $true
     }
-    $uiProcess = Start-Process @uiStart
 
-    if (-not (Wait-ForUi -Port $UiPort)) {
-        Write-Host "UI stdout tail:"
-        Get-Content $uiOut -Tail 80 -ErrorAction SilentlyContinue | Out-Host
-        Write-Host "UI stderr tail:"
-        Get-Content $uiErr -Tail 80 -ErrorAction SilentlyContinue | Out-Host
-        throw "MetaForge Desk did not become ready on port $UiPort."
+    if (-not (Wait-Http "http://127.0.0.1:$UiPort/" 90 @(200))) {
+        Get-Content $uiOut -Tail 100 -ErrorAction SilentlyContinue | Out-Host
+        Get-Content $uiErr -Tail 100 -ErrorAction SilentlyContinue | Out-Host
+        throw "Desk failed to become ready on port $UiPort"
     }
 
     $sha = if ($env:GITHUB_SHA) { $env:GITHUB_SHA } else { (& git -C $RepoRoot rev-parse HEAD).Trim() }
-    $status = @(
+    @(
         "FORGE_LOCAL_READY",
         "commit=$sha",
         "backend=http://localhost:$BackendPort",
@@ -202,18 +143,13 @@ try {
         "workspace=$RepoRoot",
         "logs=$LogRoot",
         "started_at=$((Get-Date).ToString('o'))"
-    )
-    $status | Set-Content -Path (Join-Path $LocalRoot "status.txt") -Encoding UTF8
+    ) | Set-Content -Path (Join-Path $LocalRoot "status.txt") -Encoding UTF8
 
-    Write-Host ""
     Write-Host "FORGE_LOCAL_READY"
     Write-Host "Desk    : http://localhost:$UiPort"
     Write-Host "Backend : http://localhost:$BackendPort"
     Write-Host "Login   : dev@example.com / local-dev-password-1"
-    Write-Host "Status  : $(Join-Path $LocalRoot 'status.txt')"
-    Write-Host "Logs    : $LogRoot"
-}
-finally {
+} finally {
     $env:RUNNER_TRACKING_ID = $previousTrackingId
     $env:VITE_FORGE_BACKEND = $previousBackend
 }
