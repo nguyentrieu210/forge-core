@@ -21,7 +21,7 @@ jobs:
 
     steps:
       - name: Stop previous local Forge before checkout
-        shell: pwsh
+        shell: powershell
         run: |
           foreach ($port in @(8799, 5173)) {
             $owners = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue |
@@ -57,20 +57,20 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
-        shell: pwsh
+        shell: powershell
         run: pnpm install --frozen-lockfile --prefer-offline
 
       - name: Build backend, migrate local D1, seed and start Desk
-        shell: pwsh
+        shell: powershell
         run: powershell -ExecutionPolicy Bypass -File .\scripts\start-local-forge.ps1
 
       - name: Run Forge fast validation gate
-        shell: pwsh
+        shell: powershell
         run: pnpm run validate:fast
 
       - name: Show local endpoints
         if: always()
-        shell: pwsh
+        shell: powershell
         run: |
           $runnerRoot = Split-Path (Split-Path $env:RUNNER_TEMP -Parent) -Parent
           $status = Join-Path $runnerRoot "_local\status.txt"
