@@ -1,0 +1,91 @@
+name: Convergence Finalize Selectable Production
+
+on:
+  push:
+    branches:
+      - converge/main-tsx-20260814
+    paths:
+      - .github/workflows/convergence-finalize-selectable-production.yml
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: converge/main-tsx-20260814
+      - uses: pnpm/action-setup@v4
+        with: { version: 9.15.0, run_install: false }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm, cache-dependency-path: pnpm-lock.yaml }
+
+      - name: Patch canonical production authority and regression gate
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          core = Path('server/apps-src/alumdoor-worker/src/sales-production-core.ts')
+          text = core.read_text()
+          marker = 'export function buildSalesProductionLines(input: BuildInputs): SalesProductionLine[] {'
+          helper = '''/**\n * A SELECTABLE Sales Package child is a commercial pricing/provenance row only.\n * The package parent retains the canonical physical production obligation so selected\n * children can never multiply manufacturing demand or Work Orders.\n */\nexport function isCanonicalProductionObligationRow(row: Json): boolean {\n  return !text(row.sales_package_parent_key);\n}\n\n'''
+          if 'export function isCanonicalProductionObligationRow' not in text:
+              if marker not in text:
+                  raise SystemExit('buildSalesProductionLines marker not found')
+              text = text.replace(marker, helper + marker, 1)
+          loop = '  for (const [index, row] of (sales.items ?? []).entries()) {\n    const itemCode = text(row.item_code);'
+          guarded = '  for (const [index, row] of (sales.items ?? []).entries()) {\n    if (!isCanonicalProductionObligationRow(row)) continue;\n    const itemCode = text(row.item_code);'
+          if guarded not in text:
+              if loop not in text:
+                  raise SystemExit('sales production loop marker not found')
+              text = text.replace(loop, guarded, 1)
+          core.write_text(text)
+
+          test = Path('server/tests/alumdoor-sales-production-package-convergence.test.mjs')
+          test.write_text('''import test from "node:test";\nimport assert from "node:assert/strict";\n\nimport { isCanonicalProductionObligationRow } from "../dist/apps-src/alumdoor-worker/src/sales-production-core.js";\n\ntest("SELECTABLE package children are commercial-only production projections", () => {\n  const parent = {\n    item_code: "DOOR-FULL",\n    sales_mode: "Tách món",\n    sales_package_group_key: "PKG-ROW-1",\n  };\n  const selectedChildren = [\n    { item_code: "MOTOR", sales_package_parent_key: "PKG-ROW-1", sales_package_component_key: "motor" },\n    { item_code: "SLAT", sales_package_parent_key: "PKG-ROW-1", sales_package_component_key: "slat" },\n  ];\n\n  const obligations = [parent, ...selectedChildren].filter(isCanonicalProductionObligationRow);\n  assert.deepEqual(obligations, [parent]);\n});\n\ntest("legacy direct split rows remain valid physical production sources", () => {\n  assert.equal(isCanonicalProductionObligationRow({ item_code: "DOOR", sales_mode: "Tách món" }), true);\n});\n''')
+
+          r6 = Path('.github/workflows/r6-pass-convergence.yml')
+          workflow = r6.read_text()
+          needle = '''      - name: Verify Alumdoor package composition\n        working-directory: server\n        shell: bash\n        run: |\n          set -euo pipefail\n          node scripts/forge-app.mjs briefs/alumdoor-v2.json --dry-run | tee /tmp/r6-alumdoor-package.log\n'''
+          replacement = '''      - name: Verify Alumdoor package composition\n        working-directory: server\n        shell: bash\n        run: |\n          set -euo pipefail\n          node --test tests/alumdoor-sales-production-package-convergence.test.mjs\n          node scripts/forge-app.mjs briefs/alumdoor-v2.json --dry-run | tee /tmp/r6-alumdoor-package.log\n'''
+          if 'node --test tests/alumdoor-sales-production-package-convergence.test.mjs' not in workflow:
+              if needle not in workflow:
+                  raise SystemExit('R6 package gate marker not found')
+              workflow = workflow.replace(needle, replacement, 1)
+              r6.write_text(workflow)
+          PY
+
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build CloudForge
+        run: pnpm --filter cloudforge run build
+      - name: Verify selectable physical production invariant
+        working-directory: server
+        run: node --test tests/alumdoor-sales-production-package-convergence.test.mjs
+      - name: Verify Sales Package pricing regressions
+        working-directory: server
+        run: node --test tests/sales-package-split-pricing.test.mjs
+      - name: Verify Alumdoor package composition
+        working-directory: server
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/forge-app.mjs briefs/alumdoor-v2.json --dry-run | tee /tmp/convergence-alumdoor-package.log
+          grep -q 'app=alumdoor@2.2.3' /tmp/convergence-alumdoor-package.log
+          grep -q 'DRY_RUN_PASS alumdoor' /tmp/convergence-alumdoor-package.log
+      - name: Commit final semantic convergence and remove one-shot workflow
+        shell: bash
+        run: |
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/convergence-finalize-selectable-production.yml
+          git add server/apps-src/alumdoor-worker/src/sales-production-core.ts \
+                  server/tests/alumdoor-sales-production-package-convergence.test.mjs \
+                  .github/workflows/r6-pass-convergence.yml
+          git commit -m "fix(convergence): keep selectable package production on parent"
+          git push origin HEAD:converge/main-tsx-20260814
