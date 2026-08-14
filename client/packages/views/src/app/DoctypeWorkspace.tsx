@@ -65,7 +65,9 @@ export function DoctypeWorkspace(props: DoctypeWorkspaceProps) {
    * màn nghiệp vụ của app khác. Màn chuyên biệt vẫn lazy-load, nên app khác không tải code cửa.
    */
   const isAlumdoorProfile = Boolean(formProfiles?.["Item Group"]?.keep?.includes("default_measurement_profile"));
-  const useAlumdoorSalesCreate = isNew && doctype === "Sales Order" && isAlumdoorProfile;
+  const useAlumdoorSalesForm = doctype === "Sales Order" && isAlumdoorProfile;
+  const useAlumdoorSalesCreate = isNew && useAlumdoorSalesForm;
+  const useAlumdoorSalesDetail = Boolean(decoded) && useAlumdoorSalesForm;
   const useAlumdoorProductionRequestDetail = Boolean(decoded) && doctype === "Production Request" && isAlumdoorProfile;
   const useAlumdoorWorkOrderDetail = Boolean(decoded) && doctype === "Work Order" && isAlumdoorProfile;
   const manufacturingWorkOrder = bridge.get("f_work_order")?.trim() ?? "";
@@ -110,7 +112,20 @@ export function DoctypeWorkspace(props: DoctypeWorkspaceProps) {
       />
     </Suspense>
   ) : decoded ? (
-    useAlumdoorProductionRequestDetail ? (
+    useAlumdoorSalesDetail ? (
+      <Suspense fallback={<div className="grid h-full place-items-center text-sm text-muted-foreground">Đang mở đơn hàng AlumDoor…</div>}>
+        <AlumdoorSalesOrderCreate
+          key={`${doctype}/${decoded}`}
+          name={decoded}
+          onCreated={(newName) => onNavigate(`${listPath}/${encodeURIComponent(newName)}`)}
+          onSaved={() => {}}
+          onPreviewCreated={(currentName) => onNavigate(printBase === "/print"
+            ? buildPrintPath(doctype, currentName)
+            : `${printBase}/${encodeURIComponent(doctype)}/${encodeURIComponent(currentName)}`)}
+          onCancel={() => onNavigate(listPath)}
+        />
+      </Suspense>
+    ) : useAlumdoorProductionRequestDetail ? (
       <Suspense fallback={<div className="grid h-full place-items-center text-sm text-muted-foreground">Đang mở yêu cầu sản xuất…</div>}>
         <AlumdoorProductionRequestDetail key={`alumdoor-production-request/${decoded}`} name={decoded} onNavigate={onNavigate} />
       </Suspense>
