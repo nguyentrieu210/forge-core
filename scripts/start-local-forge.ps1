@@ -84,8 +84,9 @@ try {
     Invoke-Checked $RepoRoot "pnpm" @("--dir", "server", "run", "dev:seed")
 } catch { Write-Warning $_.Exception.Message }
 
-Write-Host "Building client workspace packages..."
-Invoke-Checked $RepoRoot "pnpm" @("--dir", "client", "exec", "tsc", "-b")
+Write-Host "Building Desk packages that publish dist entrypoints..."
+Invoke-Checked $RepoRoot "pnpm" @("--dir", "client", "--filter", "@metaforge/charts", "run", "build")
+Invoke-Checked $RepoRoot "pnpm" @("--dir", "client", "--filter", "@metaforge/visual", "run", "build")
 
 $backendOut = Join-Path $LogRoot "backend.out.log"
 $backendErr = Join-Path $LogRoot "backend.err.log"
@@ -95,6 +96,7 @@ Remove-Item $backendOut, $backendErr, $uiOut, $uiErr -Force -ErrorAction Silentl
 
 $previousTrackingId = $env:RUNNER_TRACKING_ID
 $previousBackend = $env:VITE_FORGE_BACKEND
+$previousReleaseSha = $env:VITE_FORGE_RELEASE_SHA
 $env:RUNNER_TRACKING_ID = ""
 
 try {
@@ -158,4 +160,5 @@ try {
 } finally {
     $env:RUNNER_TRACKING_ID = $previousTrackingId
     $env:VITE_FORGE_BACKEND = $previousBackend
+    $env:VITE_FORGE_RELEASE_SHA = $previousReleaseSha
 }
