@@ -36,17 +36,12 @@
       { "binding": "OUTBOX_QUEUE", "queue": "cloudforge-outbox" }
     ]
   },
-  // Attachments and product photographs. One bucket for every tenant, with the tenant id
-  // as the first path segment of each key: a per-tenant bucket would mean provisioning a
-  // customer could fail on a bucket-count limit long before anything about their data
-  // was a problem. Reads are still scoped by the `files` table, which is per tenant.
   "r2_buckets": [
     { "binding": "FILES", "bucket_name": "cloudforge-files" }
   ],
-  // CFMAX-06: trusted server-side PDF generation. Browser Run Quick Actions require a
-  // browser binding and compatibility_date >= 2026-03-24; this worker is already newer.
   "browser": { "binding": "BROWSER" },
   "services": [
-    { "binding": "SOCIAL_INGRESS", "service": "cloudforge-social-ingress" }
+    { "binding": "SOCIAL_INGRESS", "service": "cloudforge-social-ingress" },
+    { "binding": "DISPATCHER", "service": "alumdoor-worker" }
   ]
 }
