@@ -1,9 +1,10 @@
 {
   "id": "alumdoor",
   "name": "AlumDoor",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "requires": [],
   "custom_fields": [],
+  "worker": "alumdoor-worker",
   "nav": [
     {
       "key": "AlumDoor Sales Order",
@@ -12,6 +13,14 @@
       "permission_doctype": "AlumDoor Sales Order",
       "group": "Bán hàng",
       "icon": "shopping-cart"
+    },
+    {
+      "key": "action:tinh-quy-cach-cua-duc",
+      "label": "Tính quy cách Cửa Đức",
+      "kind": "experience",
+      "permission_doctype": "Production Specification",
+      "group": "Sản xuất",
+      "icon": "calculator"
     },
     {
       "key": "Production Specification",
@@ -35,7 +44,69 @@
   "reports": [],
   "externalDocTypes": [],
   "charts": [],
-  "actions": [],
+  "actions": [
+    {
+      "name": "tinh-quy-cach-cua-duc",
+      "label": "Tính quy cách Cửa Đức",
+      "icon": "calculator",
+      "group": "Sản xuất",
+      "description": "P1: tính rộng cắt theo quy cách Cửa Đức và nhận diện vật tư THÔ cần sơn.",
+      "permission_doctype": "Production Specification",
+      "fields": [
+        {
+          "fieldname": "product_group",
+          "label": "Nhóm sản phẩm",
+          "fieldtype": "Select",
+          "options": "ĐỨC",
+          "required": true,
+          "default": "ĐỨC"
+        },
+        {
+          "fieldname": "material_code",
+          "label": "Tên vật tư / SP",
+          "fieldtype": "Data",
+          "required": true,
+          "default": "AL548"
+        },
+        {
+          "fieldname": "height_pb",
+          "label": "Cao PB (m)",
+          "fieldtype": "Float",
+          "required": true
+        },
+        {
+          "fieldname": "width_basis",
+          "label": "Căn rộng theo",
+          "fieldtype": "Select",
+          "options": "RAY\nNHỰA",
+          "required": true,
+          "default": "RAY"
+        },
+        {
+          "fieldname": "width_pb",
+          "label": "Rộng phủ bì (m)",
+          "fieldtype": "Float",
+          "required": true
+        },
+        {
+          "fieldname": "color",
+          "label": "Màu",
+          "fieldtype": "Select",
+          "options": "THÔ\nCAFÉ\nXANH NGỌC\nMIDNIGHT BLUE\nTRẮNG\nXÁM MỜ\nVÀNG KEM\nGHI SẦN\nNÂU XINGFA\nXÁM XINGFA\nĐEN XINGFA",
+          "required": true,
+          "default": "THÔ"
+        }
+      ],
+      "preview": {
+        "method": "alumdoor.production.preview",
+        "label": "Xem kết quả"
+      },
+      "commit": {
+        "method": "alumdoor.production.commit",
+        "label": "Chốt kết quả"
+      }
+    }
+  ],
   "screens": [],
   "client": {
     "domain": "alumdoor",
