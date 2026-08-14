@@ -76,6 +76,38 @@ const visitMeta = {
   revision: 1,
 };
 
+// The generic Desk builds its navigation from installed app manifests, not directly
+// from DocType metadata. A metadata-only seed therefore produced nav=[] while the
+// server still fell back home to /catalog; the client correctly rejected that pair
+// because /catalog was unreachable and would redirect forever. Register a tiny local
+// app around the demo DocType so a fresh local tenant always has one real route.
+const demoAppManifest = {
+  id: "local-demo",
+  name: "Local Demo",
+  version: "0.1.0",
+  requires: [],
+  doctypes: [],
+  workflows: [],
+  print_formats: [],
+  roles: [],
+  fixtures: [],
+  custom_fields: [],
+  nav: [
+    { key: "Field Visit", label: "Field Visit", kind: "doctype", permission_doctype: "Field Visit", group: "Demo" },
+  ],
+  hooks: [],
+  validators: [],
+  reports: [],
+  externalDocTypes: [],
+  charts: [],
+  actions: [],
+  screens: [],
+  client: {
+    home: { route: "/app/field-visit" },
+    catalog_mode: "manifest",
+  },
+};
+
 const masters = [
   ["Company", "Demo", { default_currency: "USD" }],
   ["Currency", "USD", { currency_scale: 2 }],
@@ -101,6 +133,11 @@ const metadataStatements = [
   `INSERT INTO doctype_definitions(tenant_id,doctype,module,is_submittable,revision,metadata_json,modified_by,modified_at)
    VALUES('${quote(tenant)}','Field Visit','Custom',1,1,'${quote(JSON.stringify(visitMeta))}','Administrator','${now}')
    ON CONFLICT(tenant_id,doctype) DO UPDATE SET metadata_json=excluded.metadata_json;`,
+  `INSERT INTO installed_apps(tenant_id,app_id,app_name,version,content_hash,manifest_json,installed_by,installed_at,modified_at)
+   VALUES('${quote(tenant)}','local-demo','Local Demo','0.1.0','local-demo-seed-v1','${quote(JSON.stringify(demoAppManifest))}','Administrator','${now}','${now}')
+   ON CONFLICT(tenant_id,app_id) DO UPDATE SET
+     app_name=excluded.app_name,version=excluded.version,content_hash=excluded.content_hash,
+     manifest_json=excluded.manifest_json,modified_at=excluded.modified_at;`,
   `INSERT INTO translations(tenant_id,language,source_text,translated_text,context,modified_at)
    VALUES('${quote(tenant)}','vi','Subject','Chủ đề','','${now}')
    ON CONFLICT(tenant_id,language,context,source_text) DO UPDATE SET translated_text=excluded.translated_text;`,
@@ -137,7 +174,7 @@ if (result.status !== 0) {
 
 const target = remote ? "REMOTE" : "local";
 const mode = authOnly ? "auth-only" : "demo-metadata";
-console.log(`SEED_PASS target=${target} mode=${mode} tenant=${tenant}${authOnly ? "" : ' doctype="Field Visit"'}${withUser ? ` user=${user} password=${password}` : " (metadata only, no account)"}`);
+console.log(`SEED_PASS target=${target} mode=${mode} tenant=${tenant}${authOnly ? "" : ' doctype="Field Visit" app="local-demo"'}${withUser ? ` user=${user} password=${password}` : " (metadata only, no account)"}`);
 if (!remote) {
   console.log("next: npx wrangler dev --config apps/tenant-worker/wrangler.jsonc --port 8799 --local");
   console.log("then: npm run smoke:http");
