@@ -96,7 +96,7 @@ $env:RUNNER_TRACKING_ID = ""
 
 try {
     Write-Host "Starting backend on :$BackendPort..."
-    $backendProcess = Start-Process @{
+    $backendStart = @{
         FilePath = "cmd.exe"
         ArgumentList = @("/d", "/c", "pnpm exec wrangler dev --config apps/tenant-worker/wrangler.jsonc --port $BackendPort --local")
         WorkingDirectory = $ServerRoot
@@ -105,6 +105,7 @@ try {
         WindowStyle = "Hidden"
         PassThru = $true
     }
+    $backendProcess = Start-Process @backendStart
 
     if (-not (Wait-Http "http://127.0.0.1:$BackendPort/api/method/metaforge.api.get_boot" 90 @(200,401,403))) {
         Get-Content $backendOut -Tail 100 -ErrorAction SilentlyContinue | Out-Host
@@ -114,7 +115,7 @@ try {
 
     $env:VITE_FORGE_BACKEND = "http://127.0.0.1:$BackendPort"
     Write-Host "Starting Desk on :$UiPort..."
-    $uiProcess = Start-Process @{
+    $uiStart = @{
         FilePath = "cmd.exe"
         ArgumentList = @("/d", "/c", "pnpm run dev -- --host 0.0.0.0 --port $UiPort")
         WorkingDirectory = $RuntimeRoot
@@ -123,6 +124,7 @@ try {
         WindowStyle = "Hidden"
         PassThru = $true
     }
+    $uiProcess = Start-Process @uiStart
 
     if (-not (Wait-Http "http://127.0.0.1:$UiPort/" 90 @(200))) {
         Get-Content $uiOut -Tail 100 -ErrorAction SilentlyContinue | Out-Host
