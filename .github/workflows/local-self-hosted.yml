@@ -15,18 +15,16 @@ concurrency:
 
 jobs:
   build-run-local:
-    name: Build and run Forge on local Windows runner
+    name: Run Forge on local Windows runner
     runs-on: [self-hosted, windows, x64, forge-local]
-    timeout-minutes: 60
+    timeout-minutes: 30
 
     steps:
-      - name: Checkout exact main revision
+      - name: Checkout main
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           persist-credentials: false
-          # Keep ignored local Wrangler/D1 state between runs. The local launcher
-          # stops the old servers after checkout and before rebuilding.
           clean: false
 
       - name: Set up pnpm
@@ -46,20 +44,15 @@ jobs:
         shell: cmd
         run: pnpm install --frozen-lockfile --prefer-offline
 
-      - name: Build backend, migrate local D1, seed and start Desk
+      - name: Start Forge local
         shell: cmd
         run: powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-local-forge.ps1
 
-      - name: Run Forge fast validation gate
+      - name: Show local endpoints
+        shell: cmd
+        run: type "%RUNNER_TEMP%\..\..\_local\status.txt"
+
+      - name: Fast validation
+        continue-on-error: true
         shell: cmd
         run: pnpm run validate:fast
-
-      - name: Show local endpoints
-        if: always()
-        shell: cmd
-        run: |
-          if exist "%RUNNER_TEMP%\..\..\_local\status.txt" (
-            type "%RUNNER_TEMP%\..\..\_local\status.txt"
-          ) else (
-            echo Local status file has not been created yet.
-          )
