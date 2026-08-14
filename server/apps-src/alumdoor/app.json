@@ -1,0 +1,57 @@
+{
+  "id": "alumdoor",
+  "name": "AlumDoor",
+  "version": "0.1.0",
+  "requires": [],
+  "custom_fields": [],
+  "nav": [
+    {
+      "key": "AlumDoor Sales Order",
+      "label": "Đơn bán hàng",
+      "kind": "doctype",
+      "permission_doctype": "AlumDoor Sales Order",
+      "group": "Bán hàng",
+      "icon": "shopping-cart"
+    },
+    {
+      "key": "Production Specification",
+      "label": "Quy cách sản xuất",
+      "kind": "doctype",
+      "permission_doctype": "Production Specification",
+      "group": "Sản xuất",
+      "icon": "ruler"
+    },
+    {
+      "key": "AlumDoor Customer",
+      "label": "Khách hàng",
+      "kind": "doctype",
+      "permission_doctype": "AlumDoor Customer",
+      "group": "Danh mục",
+      "icon": "users"
+    }
+  ],
+  "hooks": [],
+  "validators": [],
+  "reports": [],
+  "externalDocTypes": [],
+  "charts": [],
+  "actions": [],
+  "screens": [],
+  "client": {
+    "domain": "alumdoor",
+    "catalog_mode": "manifest",
+    "home": {
+      "doctype": "AlumDoor Sales Order"
+    },
+    "locale": {
+      "numberFormat": "vi-VN",
+      "currency": "VND",
+      "dateFormat": "dd/MM/yyyy"
+    },
+    "design": {
+      "density": "compact",
+      "radius": "soft",
+      "width": "wide"
+    }
+  }
+}
