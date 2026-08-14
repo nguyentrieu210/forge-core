@@ -1,9 +1,0 @@
-{
-  "name": "Duyệt điều chuyển",
-  "document_type": "Employee Transfer",
-  "state_field": "workflow_state",
-  "is_active": true,
-  "states": [{"state":"Nháp","docstatus":0,"allow_edit":"HR User"},{"state":"Chờ duyệt","docstatus":0,"allow_edit":"HR Manager"},{"state":"Đã duyệt","docstatus":1,"allow_edit":"HR Manager"},{"state":"Từ chối","docstatus":2,"allow_edit":"HR Manager"}],
-  "transitions": [{"state":"Nháp","action":"Gửi duyệt","next_state":"Chờ duyệt","allowed_role":"HR User"},{"state":"Chờ duyệt","action":"Phê duyệt","next_state":"Đã duyệt","allowed_role":"HR Manager","allow_self_approval":false},{"state":"Chờ duyệt","action":"Từ chối","next_state":"Từ chối","allowed_role":"HR Manager"}],
-  "revision": 1
-}

@@ -17,7 +17,6 @@ import {
 import type { TrustedIdentityKey } from "../../../packages/auth/src/index.js";
 import type { Actor, CanonicalDocument, DomainEvent, JsonObject, MutationCommand, MutationReceipt } from "../../../packages/contracts/src/index.js";
 import { parseMutationCommandInput } from "../../../packages/contracts/src/index.js";
-import { previewPurchaseReceiptSubmission } from "../../../packages/clouderp-core/src/index.js";
 import { D1CommercialReconciliationService, D1DocumentListStore, D1MutationStore, D1PurchaseAllocationTimelineService, D1RolloutPurchaseAllocationDomainStore, DocumentListService } from "../../../packages/document-kernel/src/index.js";
 import { asCloudForgeError, commandPayloadHash, errorResponse, errors, jsonResponse, randomId, readJson } from "../../../packages/core/src/index.js";
 import {
@@ -26,51 +25,14 @@ import {
   metadataSummary, parseCsvImport, parseDocTypeMeta, renderPrintFormat, validateWorkflow,
 } from "../../../packages/frappe-model/src/index.js";
 import { AggregateCoordinator } from "./aggregate-do.js";
-import { askAssistant, readReceiptImage } from "./ai-assistant.js";
 import { publishPendingOutbox } from "../../../packages/outbox/src/index.js";
 import { AppReportService, D1ReportService } from "../../../packages/query/src/index.js";
-import { ingestFacebookMessage, storeFacebookOAuthPages, type FacebookOAuthPage } from "../../../packages/social-commerce/src/tenant-handler.js";
-import type { SocialQueueMessage } from "../../../packages/social-commerce/src/index.js";
-import { routeSocialCommerceApi } from "../../../packages/social-commerce/src/api.js";
-import { D1OrganizationSecurityGuard } from "../../../packages/organization-security/src/index.js";
 import type { TenantEnv } from "./env.js";
 
 export { AggregateCoordinator };
 
 interface AggregateStub extends DurableObjectStub {
   mutate<T extends JsonObject>(command: MutationCommand<T>): Promise<unknown>;
-  commitAlumDoorAttendanceScan(input: {
-    tenantId: string;
-    actor: Actor;
-    station: string;
-    stationTokenHash: string;
-    requestId: string;
-    latitude: number;
-    longitude: number;
-    accuracy: number;
-    deviceId?: string;
-    credentialHash?: string;
-    employeeCode?: string;
-    newCredentialHash?: string;
-    deviceLabel?: string;
-  }): Promise<JsonObject>;
-  submitAlumDoorAttendanceCorrection(input: {
-    tenantId: string; actor: Actor; workDate: string; segmentCode: string;
-    requestedIn?: string; requestedOut?: string; reason: string; attachment?: string;
-  }): Promise<JsonObject>;
-  reviewAlumDoorAttendanceCorrection(input: {
-    tenantId: string; actor: Actor; request: string; action: "approve" | "reject"; note?: string;
-  }): Promise<JsonObject>;
-  approveAlumDoorPayroll(input: { tenantId: string; actor: Actor; payrollEntry: string }): Promise<JsonObject>;
-}
-
-const PUBLIC_ATTENDANCE_METHOD_PATHS = new Set([
-  "/api/method/alumdoor.attendance.resolve_station",
-  "/api/method/alumdoor.attendance.scan",
-]);
-
-function isPublicAttendanceMethodPath(pathname: string): boolean {
-  return PUBLIC_ATTENDANCE_METHOD_PATHS.has(pathname);
 }
 
 /**
@@ -139,30 +101,6 @@ export default {
         if (!tenant) throw new Error("Missing tenant context");
         const report = await new D1CommercialReconciliationService(env.DB).run(tenant);
         return jsonResponse(report, report.ok ? 200 : 409, { "x-cloudforge-trace-id": traceId });
-      }
-
-      if (request.method === "POST" && url.pathname === "/internal/social/events") {
-        assertInternalService(request, env.INTERNAL_SERVICE_TOKEN);
-        const tenant = resolveTenant(request, env);
-        if (!tenant) throw new Error("Missing tenant context");
-        const message = await readJson<JsonObject>(request, 1_100_000) as unknown as SocialQueueMessage;
-        const idempotencyKey = request.headers.get("x-cloudforge-idempotency-key");
-        if (!idempotencyKey || idempotencyKey !== message.event_id) throw new Error("Social event idempotency key mismatch");
-        const result = await ingestFacebookMessage(env.DB, tenant, message);
-        return jsonResponse({ committed: true, event_id: message.event_id, ...result }, 200, {
-          "x-cloudforge-social-event-committed": message.event_id,
-          "x-cloudforge-trace-id": traceId,
-        });
-      }
-
-      if (request.method === "POST" && url.pathname === "/internal/social/oauth/facebook") {
-        assertInternalService(request, env.INTERNAL_SERVICE_TOKEN);
-        const tenant = resolveTenant(request, env);
-        if (!tenant) throw new Error("Missing tenant context");
-        if (!env.SOCIAL_CREDENTIAL_KEK) throw new Error("SOCIAL_CREDENTIAL_KEK is not configured");
-        const body = await readJson<JsonObject>(request, 1_000_000) as unknown as { actor_id: string; pages: FacebookOAuthPage[] };
-        const result = await storeFacebookOAuthPages(env.DB, tenant, body.actor_id, body.pages, env.SOCIAL_CREDENTIAL_KEK);
-        return jsonResponse({ committed: true, ...result });
       }
 
       if (request.method === "POST" && url.pathname === "/internal/events") {
@@ -240,26 +178,12 @@ export default {
       const access = new D1DocumentAccessStore(env.DB);
       const permissions = new MetadataPermissionService(metadata, undefined, access);
       const documentStore = new D1MutationStore(env.DB);
-      const organizationSecurity = new D1OrganizationSecurityGuard(env.DB, metadata);
-
-      if (request.method === "POST" && url.pathname === "/api/v1/social/facebook/oauth/start") {
-        requireSystemManager(actor);
-        if (!env.SOCIAL_INGRESS || !env.PUBLIC_ORIGIN) throw errors.misconfigured("Facebook OAuth service is not configured");
-        const response = await env.SOCIAL_INGRESS.fetch("https://social-ingress.internal/internal/oauth/facebook/start", {
-          method: "POST", headers: { "content-type": "application/json", "authorization": `Bearer ${env.INTERNAL_SERVICE_TOKEN}` },
-          body: JSON.stringify({ tenant_id: tenantId, actor_id: actor.user_id, return_url: `${env.PUBLIC_ORIGIN}/x/social-commerce` }),
-        });
-        return new Response(response.body, { status: response.status, headers: response.headers });
-      }
-      const socialResponse = await routeSocialCommerceApi(request, url, env.DB, tenantId, actor);
-      if (socialResponse) return socialResponse;
 
       if (request.method === "POST" && url.pathname === "/api/v1/commands") {
         const raw = await readJson<JsonObject>(request);
         const input = parseMutationCommandInput(raw);
         if (input.tenant_id !== tenantId) throw errors.authentication("Command tenant does not match authenticated tenant");
         const command: MutationCommand = { ...input, actor };
-        await organizationSecurity.assertMutation(tenantId, actor, command);
         const key = `${tenantId}:${command.aggregate.doctype}:${command.aggregate.name}`;
         const stub = env.AGGREGATES.getByName(key) as AggregateStub;
         const result = typeof stub.mutate === "function" ? await stub.mutate(command) : await callDoFetch(stub, command);
@@ -658,7 +582,6 @@ export async function runMaintenance(
   hooks: number;
   auto_repeat: AutoRepeatRunResult;
   reservations: { expired: number; failed: number };
-  alumdoor: { reconciliation_reminders: number; daily_reports: number };
 }> {
   const startedAt = new Date().toISOString();
   await recordMaintenanceState(env.DB, tenantId, { last_started_at: startedAt, last_error: null });
@@ -714,9 +637,8 @@ export async function runMaintenance(
   });
 
   const reservations = await expireStockReservations(env, tenantId, now);
-  const alumdoor = await runAlumdoorMaintenance(env.DB, tenantId, now);
   await recordMaintenanceState(env.DB, tenantId, { last_success_at: new Date().toISOString(), last_error: null });
-  return { outbox, hooks, auto_repeat, reservations, alumdoor };
+  return { outbox, hooks, auto_repeat, reservations };
   } catch (error) {
     await recordMaintenanceState(env.DB, tenantId, {
       last_error: error instanceof Error ? error.message.slice(0, 1000) : String(error).slice(0, 1000),
@@ -761,91 +683,6 @@ async function maintenanceHealth(
     failed: Boolean(row?.last_error),
     stale: !successAt || Date.now() - Date.parse(successAt) > 5 * 60_000,
   };
-}
-
-export async function runAlumdoorMaintenance(
-  db: D1Database,
-  tenantId: string,
-  now: string,
-): Promise<{ reconciliation_reminders: number; daily_reports: number }> {
-  const installed = await db.prepare(
-    `SELECT version FROM installed_apps WHERE tenant_id=?1 AND app_id='alumdoor'`,
-  ).bind(tenantId).first<{ version: string }>();
-  if (!installed?.version?.startsWith("2.")) return { reconciliation_reminders: 0, daily_reports: 0 };
-
-  const owners = await db.prepare(
-    `SELECT DISTINCT u.user_id,u.time_zone
-     FROM users u JOIN user_roles r ON r.tenant_id=u.tenant_id AND r.user_id=u.user_id
-     WHERE u.tenant_id=?1 AND u.enabled=1 AND r.role='Chủ xưởng'`,
-  ).bind(tenantId).all<{ user_id: string; time_zone: string }>();
-  let reconciliationReminders = 0;
-  let dailyReports = 0;
-  for (const owner of owners.results ?? []) {
-    const local = localClock(now, owner.time_zone || "Asia/Bangkok");
-    if (local.day === 1) {
-      reconciliationReminders += await insertNotification(db, {
-        tenantId,
-        name: `ALUMDOOR-RECON-MAIN-${local.year}-${two(local.month)}-${owner.user_id}`,
-        user: owner.user_id,
-        subject: `Đến lịch kiểm kê tháng ${two(local.month)}/${local.year}: kho chính`,
-        documentType: "Stock Reconciliation",
-        createdAt: now,
-      });
-      if ([1, 4, 7, 10].includes(local.month)) {
-        reconciliationReminders += await insertNotification(db, {
-          tenantId,
-          name: `ALUMDOOR-RECON-OFFCUT-${local.year}-Q${Math.ceil(local.month / 3)}-${owner.user_id}`,
-          user: owner.user_id,
-          subject: `Đến lịch kiểm kê quý ${Math.ceil(local.month / 3)}/${local.year}: kho đầu thừa`,
-          documentType: "Stock Reconciliation",
-          createdAt: now,
-        });
-      }
-    }
-    if (local.hour >= 17) {
-      const summary = await db.prepare(
-        `SELECT
-           COUNT(DISTINCT CASE WHEN actual_qty_micros>0 THEN voucher_type||':'||voucher_no END) AS inbound,
-           COUNT(DISTINCT CASE WHEN actual_qty_micros<0 THEN voucher_type||':'||voucher_no END) AS outbound,
-           COUNT(DISTINCT CASE WHEN voucher_type='Cut Order' THEN voucher_no END) AS cuts,
-           (
-             SELECT COUNT(*)
-             FROM documents receipt
-             JOIN document_children line
-               ON line.tenant_id=receipt.tenant_id
-              AND line.parent_key=receipt.doc_key
-              AND line.child_doctype='Purchase Receipt Item'
-             LEFT JOIN master_records profile
-               ON profile.tenant_id=receipt.tenant_id
-              AND profile.record_type='Measurement Profile'
-              AND profile.name=json_extract(line.payload_json,'$.measurement_profile')
-              AND profile.disabled=0
-             WHERE receipt.tenant_id=?1
-               AND receipt.doctype='Purchase Receipt'
-               AND receipt.docstatus=1
-               AND substr(COALESCE(json_extract(receipt.payload_json,'$.posting_at'),receipt.modified_at),1,10)=?2
-               AND ABS(CAST(json_extract(line.payload_json,'$.weight_variance_pct') AS REAL))
-                   > COALESCE(CAST(json_extract(profile.data_json,'$.weight_tolerance_pct') AS REAL),13)
-           ) AS weight_warnings
-         FROM stock_ledger_entries
-         WHERE tenant_id=?1 AND substr(posting_at,1,10)=?2`,
-      ).bind(tenantId, local.date).first<{
-        inbound: number;
-        outbound: number;
-        cuts: number;
-        weight_warnings: number;
-      }>();
-      dailyReports += await insertNotification(db, {
-        tenantId,
-        name: `ALUMDOOR-EOD-${local.date}-${owner.user_id}`,
-        user: owner.user_id,
-        subject: `Cuối ngày ${local.date}: nhập ${Number(summary?.inbound ?? 0)} · xuất ${Number(summary?.outbound ?? 0)} · cắt ${Number(summary?.cuts ?? 0)} · lệch cân ${Number(summary?.weight_warnings ?? 0)}`,
-        documentType: "Stock Ledger",
-        createdAt: now,
-      });
-    }
-  }
-  return { reconciliation_reminders: reconciliationReminders, daily_reports: dailyReports };
 }
 
 async function insertNotification(
@@ -1064,7 +901,7 @@ async function serveFrappeApiInner(
     // have real sessions enabled.
     actor = staticDevelopmentActor(env.DEV_ACTOR_JSON);
     fullName = actor.user_id;
-  } else if (isWebFormPath(url.pathname) || isPublicFilePath(url.pathname) || isStorefrontPath(url.pathname) || isPublicAttendanceMethodPath(url.pathname)) {
+  } else if (isWebFormPath(url.pathname) || isPublicFilePath(url.pathname) || isStorefrontPath(url.pathname)) {
     /**
      * The one surface a visitor with no session may reach.
      *
@@ -1094,52 +931,11 @@ async function serveFrappeApiInner(
    *
    * Cả hai đều CHỈ ĐỌC: chúng trả về đề xuất, người dùng soát rồi mới bấm lưu.
    */
-  if (request.method === "POST" && url.pathname === "/api/method/metaforge.ai.ask") {
-    return askAssistant(
-      env,
-      await readJson<JsonObject>(request, 64_000),
-      { tenantId, userId: actor.user_id },
-    );
-  }
-  if (request.method === "POST" && url.pathname === "/api/method/metaforge.ai.read_receipt") {
-    return readReceiptImage(env, tenantId, await readJson<JsonObject>(request, 12_000_000));
-  }
-
   const requestDb = readDatabaseForRequest(request, url, env.DB);
   const metadata = new D1MetadataStore(requestDb);
   const access = new D1DocumentAccessStore(requestDb);
   const permissions = new MetadataPermissionService(metadata, undefined, access);
   const documents = new D1MutationStore(requestDb);
-  const organizationSecurity = new D1OrganizationSecurityGuard(requestDb, metadata);
-
-  if (request.method === "GET" && url.pathname === "/api/method/metaforge.api.get_submit_preview") {
-    const doctype = requireShortText(url.searchParams.get("doctype"), "doctype", 160);
-    const name = requireShortText(url.searchParams.get("name"), "name", 320);
-    if (doctype !== "Purchase Receipt") return jsonResponse({ message: null });
-
-    const document = await documents.getDocument(tenantId, doctype, name);
-    if (!document) throw errors.notFound(`${doctype} ${name} was not found`);
-    if (document.docstatus !== 0) {
-      throw errors.lifecycle("Only a draft document can be previewed for submission");
-    }
-    await permissions.assert({
-      actor,
-      tenantId,
-      doctype,
-      name,
-      owner: document.owner,
-      data: document.data,
-      action: "submit",
-    });
-    const preview = await previewPurchaseReceiptSubmission({
-      tenantId,
-      actor,
-      document,
-      reader: new D1RolloutPurchaseAllocationDomainStore(requestDb),
-      now: now(),
-    });
-    return jsonResponse({ message: preview });
-  }
 
   if (request.method === "GET" && url.pathname === "/api/method/metaforge.api.get_purchase_allocation_timeline") {
     const requestedDoctype = requireShortText(url.searchParams.get("doctype"), "doctype", 160);
@@ -1199,7 +995,6 @@ async function serveFrappeApiInner(
     reports: new D1ReportService(requestDb),
     appReports: new AppReportService(requestDb),
     deskViews: new D1DeskViewStore(requestDb),
-    organizationSecurity,
     // Typed explicitly: the context is now a standalone object rather than an inline
     // argument, so it no longer inherits the parameter's contextual types.
     async runCommand(command: MutationCommand) {
@@ -1209,7 +1004,6 @@ async function serveFrappeApiInner(
       //
       // Before the Durable Object, deliberately. Inside it, a slow app would stall every
       // write to that aggregate and a timeout would leave "did it commit?" unanswerable.
-      await organizationSecurity.assertMutation(tenantId, actor, command);
       await runAppValidators({
         env: appMethodEnv,
         tenantId,
@@ -1227,47 +1021,6 @@ async function serveFrappeApiInner(
       const stub = env.AGGREGATES.getByName(`${tenantId}:${command.aggregate.doctype}:${command.aggregate.name}`) as AggregateStub;
       const result = typeof stub.mutate === "function" ? await stub.mutate(command) : await callDoFetch(stub, command);
       return result as MutationReceipt;
-    },
-    async commitAlumdoorAttendanceScan(input: {
-      station: string;
-      stationTokenHash: string;
-      requestId: string;
-      latitude: number;
-      longitude: number;
-      accuracy: number;
-      deviceId?: string;
-      credentialHash?: string;
-      employeeCode?: string;
-      newCredentialHash?: string;
-      deviceLabel?: string;
-    }): Promise<JsonObject> {
-      // One registered installation has one deterministic stream. Employee identity
-      // is resolved from the credential inside the coordinator, never from Guest.
-      const stub = env.AGGREGATES.getByName(
-        `attendance-device:${tenantId}:${encodeURIComponent(input.deviceId ?? input.requestId)}`,
-      ) as AggregateStub;
-      return stub.commitAlumDoorAttendanceScan({
-        tenantId,
-        actor,
-        ...input,
-      });
-    },
-    async submitAlumdoorAttendanceCorrection(input: {
-      workDate: string; segmentCode: string; requestedIn?: string; requestedOut?: string;
-      reason: string; attachment?: string;
-    }): Promise<JsonObject> {
-      const stub = env.AGGREGATES.getByName(`attendance-correction:${tenantId}:${encodeURIComponent(actor.user_id)}`) as AggregateStub;
-      return stub.submitAlumDoorAttendanceCorrection({ tenantId, actor, ...input });
-    },
-    async reviewAlumdoorAttendanceCorrection(input: {
-      request: string; action: "approve" | "reject"; note?: string;
-    }): Promise<JsonObject> {
-      const stub = env.AGGREGATES.getByName(`attendance-correction:${tenantId}:${encodeURIComponent(input.request)}`) as AggregateStub;
-      return stub.reviewAlumDoorAttendanceCorrection({ tenantId, actor, ...input });
-    },
-    async approveAlumdoorPayroll(input: { payrollEntry: string }): Promise<JsonObject> {
-      const stub = env.AGGREGATES.getByName(`payroll:${tenantId}:${encodeURIComponent(input.payrollEntry)}`) as AggregateStub;
-      return stub.approveAlumDoorPayroll({ tenantId, actor, payrollEntry: input.payrollEntry });
     },
     now,
     csrfToken,

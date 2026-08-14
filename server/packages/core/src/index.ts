@@ -1,4 +1,5 @@
 
+export * from "./crypto.js";
 export * from "./errors.js";
 export * from "./hash.js";
 export * from "./http.js";

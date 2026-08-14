@@ -1,4 +1,0 @@
-[
-  { "role": "Purchase User", "desk_access": true },
-  { "role": "Purchase Manager", "desk_access": true }
-]

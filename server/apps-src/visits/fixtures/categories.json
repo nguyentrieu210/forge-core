@@ -1,4 +1,0 @@
-[
-  { "record_type": "Visit Category", "name": "Routine", "data": { "label": "Định kỳ" } },
-  { "record_type": "Visit Category", "name": "Complaint", "data": { "label": "Khiếu nại" } }
-]

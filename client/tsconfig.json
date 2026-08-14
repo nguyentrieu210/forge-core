@@ -8,7 +8,6 @@
     { "path": "packages/views" },
     { "path": "packages/builder" },
     { "path": "packages/shell" },
-    { "path": "packages/stock-vn" },
     { "path": "apps/demo" }
   ]
 }

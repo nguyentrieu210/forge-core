@@ -31,11 +31,6 @@ const ScreenView = lazy(() => import("@metaforge/views/screen").then((module) =>
 const ApprovalInbox = lazy(() => import("./experiences/ApprovalInbox.js").then((module) => ({ default: module.ApprovalInbox })));
 const SocialCommerce = lazy(() => import("./experiences/SocialCommerce.js").then((module) => ({ default: module.SocialCommerce })));
 const DailyDetailedLedger = lazy(() => import("./experiences/DailyDetailedLedger.js").then((module) => ({ default: module.DailyDetailedLedger })));
-const AlumdoorOperationsCenter = lazy(() => import("./experiences/AlumdoorOperationsCenter.js").then((module) => ({ default: module.AlumdoorOperationsCenter })));
-const AlumdoorAttendanceKiosk = lazy(() => import("./experiences/AlumdoorAttendanceKiosk.js").then((module) => ({ default: module.AlumdoorAttendanceKiosk })));
-const AlumdoorAttendanceScanner = lazy(() => import("./experiences/AlumdoorAttendanceScanner.js").then((module) => ({ default: module.AlumdoorAttendanceScanner })));
-const AlumdoorAttendanceOperations = lazy(() => import("./experiences/AlumdoorAttendanceOperations.js").then((module) => ({ default: module.AlumdoorAttendanceOperations })));
-const AlumdoorMasterDataScreen = lazy(() => import("./experiences/AlumdoorMasterDataScreen.js").then((module) => ({ default: module.AlumdoorMasterDataScreen })));
 
 /**
  * The GENERIC runtime — one bundle that serves every app on the platform.
@@ -60,18 +55,6 @@ const AlumdoorMasterDataScreen = lazy(() => import("./experiences/AlumdoorMaster
 const adapter = new FrappeAdapterImpl({});
 const registry = createFullRegistry();
 
-/** Alumdoor does not expose accounting or costing defaults on item groups. */
-const ALUMDOOR_FORM_PROFILES: FormProfileMap = {
-  "Item Group": {
-    keep: [
-      "item_group_name",
-      "parent_item_group",
-      "is_group",
-      "default_measurement_profile",
-      "disabled",
-    ],
-  },
-};
 
 /** The app to render, when a tenant has several installed. */
 const REQUESTED_APP = new URLSearchParams(window.location.search).get("app") ?? undefined;
@@ -98,7 +81,7 @@ function isRenderableExperience(item: AppManifest["nav"][number], manifest: AppM
   if (separator < 1 || separator === item.key.length - 1) return false;
   const kind = item.key.slice(0, separator);
   const argument = item.key.slice(separator + 1);
-  if (kind === "approval" || kind === "calendar" || kind === "social-commerce" || kind === "alumdoor-attendance") return true;
+  if (kind === "approval" || kind === "calendar" || kind === "social-commerce") return true;
   if (kind === "action") return (manifest.actions ?? []).some((action) => action.name === argument);
   if (kind === "screen") return (manifest.screens ?? []).some((screen) => screen.name === argument);
   return false;
@@ -239,26 +222,6 @@ function buildNavigation(manifest: AppManifest, catalog: ApplicationCatalog | un
     if (!route || routes.has(route) || ["overview", "process"].includes(nav.kind ?? "")) continue;
     routes.add(route);
     items.push({ key: nav.key, label: nav.label, group: nav.group ?? "Ứng dụng", icon: resolveIcon(nav.icon), route, doctype: (nav.kind ?? "doctype") === "doctype" ? nav.key : undefined });
-  }
-  /**
-   * Older Alumdoor manifests predate the canonical selling configuration navigation
-   * contract even though their metadata and routes are already installed. Use the presence
-   * of a server-filtered Selling/Pricing entry as the permission-aware compatibility signal,
-   * then expose the two missing masters until those tenants receive the newer manifest.
-   */
-  const isAlumdoor = normalizeGroup(manifest.domain ?? manifest.id) === "alumdoor";
-  const canReadSellingMasters = manifest.nav.some((nav) => ["Sales Order", "Price List", "Pricing Rule"].includes(nav.key));
-  if (isAlumdoor && canReadSellingMasters) {
-    for (const master of [
-      { key: "Pricing Scope", label: "Phạm vi áp dụng chính sách", icon: "tags" },
-      { key: "Sales Option", label: "Phương án bán", icon: "settings" },
-      { key: "Sales Package", label: "Gói bán hàng", icon: "package-check" },
-    ]) {
-      const route = `/app/${encodeURIComponent(master.key)}`;
-      if (routes.has(route)) continue;
-      routes.add(route);
-      items.push({ ...master, group: "Danh mục", icon: resolveIcon(master.icon), route, doctype: master.key });
-    }
   }
   return items;
 }
@@ -419,9 +382,7 @@ function Runtime({ manifest, boot, logout }: { manifest: AppManifest; boot: Meta
 
   const nav = useMemo(() => buildNavigation(manifest, catalog, boot.roles), [manifest, catalog, boot.roles]);
   const scopeKey = `${createScopeKey(boot)}|${context.cacheSuffix || "global"}`;
-  const formProfiles = manifest.id === "alumdoor" || manifest.domain === "alumdoor"
-    ? ALUMDOOR_FORM_PROFILES
-    : undefined;
+  const formProfiles = undefined;
   if (context.loading && !context.dimensions.length) return <Splash>Đang xác định phạm vi dữ liệu…</Splash>;
 
   return <MetaForgeProvider adapter={adapter} registry={registry} roles={boot.roles} scopeKey={scopeKey} locale={mergeLocale(boot.sysdefaults, manifest.locale)} businessContext={context.selection} contextPolicies={context.policies} formProfiles={formProfiles}>
@@ -515,7 +476,7 @@ function Shell({ manifest, boot, logout, nav, active, breadcrumbs = [], children
         onOpenPalette={() => setPaletteOpen(true)}
         onOpenAI={() => setAssistantOpen(true)}
         aiConfigured
-        mobileAppHref={manifest.id === "alumdoor" ? "/mobile/warehouse/?tab=account" : undefined}
+        
         onLogout={logout}
         businessContext={<BusinessContextBar compact />}
       >
@@ -665,47 +626,6 @@ function ExperienceScreen({ manifest, boot, logout, nav }: ScreenProps) {
         <DailyDetailedLedger />
       </Shell>
     );
-  }
-  if (kind === "alumdoor-operations") {
-    return (
-      <Shell manifest={manifest} boot={boot} logout={logout} nav={nav} active={experienceKey} breadcrumbs={[{ label: "Trung tâm vận hành" }]}>
-        <AlumdoorOperationsCenter />
-      </Shell>
-    );
-  }
-  if (kind === "alumdoor-attendance") {
-    const mode = experienceKey.slice("alumdoor-attendance:".length);
-    const label = manifest.nav.find((item) => item.key === experienceKey)?.label ?? "Attendance & Payroll";
-    if (mode === "scan") {
-      return (
-        <Shell manifest={manifest} boot={boot} logout={logout} nav={nav} active={experienceKey} breadcrumbs={[{ label }]}>
-          <AlumdoorAttendanceScanner />
-        </Shell>
-      );
-    }
-    if (mode === "kiosk" || mode === "mobile") {
-      return (
-        <Shell manifest={manifest} boot={boot} logout={logout} nav={nav} active={experienceKey} breadcrumbs={[{ label }]}>
-          <AlumdoorAttendanceKiosk />
-        </Shell>
-      );
-    }
-    const operationsMode = mode === "today" ? "today"
-      : mode === "month" ? "month"
-      : mode === "exceptions" ? "exceptions"
-      : mode === "payroll-run" ? "payroll-run"
-      : mode === "payroll-my-slips" ? "payroll-my-slips"
-      : null;
-    if (operationsMode) {
-      return (
-        <Shell manifest={manifest} boot={boot} logout={logout} nav={nav} active={experienceKey} breadcrumbs={[{ label }]}>
-          <AlumdoorAttendanceOperations
-            mode={operationsMode}
-            onExit={() => navigate(`/overview/${encodeURIComponent(manifest.domain ?? manifest.id)}`)}
-          />
-        </Shell>
-      );
-    }
   }
   return <>{renderExperience(experienceKey, manifest, navigate)}</>;
 }
@@ -885,14 +805,10 @@ function MetaIndexScreen(props: ScreenProps & { kind: "reports" | "masters" }) {
   const items = props.nav.filter((item) => normalize(item.group) === target && !item.disabledReason);
   const groups = groupedIndexItems(items, props.kind);
   const activeReportGroup = groups.find((group) => group.id === selectedReportGroup) ?? groups[0];
-  const isAlumdoorMasterData = props.kind === "masters" && normalize(props.manifest.domain) === "alumdoor";
   const backFallback = resolveHomeRoute(props.manifest);
   return (
     <Shell {...props} active={active} breadcrumbs={[{ label: "Quay lại", onClick: () => navigateBack(navigate, backFallback) }, { label: title }]}>
       <div className="h-full overflow-auto bg-muted/20 p-3 md:p-4">
-        {isAlumdoorMasterData ? (
-          <AlumdoorMasterDataScreen items={items} onNavigate={navigate} />
-        ) : (
           <section className="w-full overflow-hidden rounded-lg border bg-card shadow-sm">
           <div className="border-b px-5 py-4">
             <h1 className="text-xl font-semibold">{title}</h1>
@@ -949,8 +865,7 @@ function MetaIndexScreen(props: ScreenProps & { kind: "reports" | "masters" }) {
             </div>
           )}
           {!items.length ? <div className="m-5 rounded-lg border border-dashed p-6 text-sm text-muted-foreground">Chưa có mục khả dụng theo quyền hiện tại.</div> : null}
-          </section>
-        )}
+        </section>
       </div>
     </Shell>
   );

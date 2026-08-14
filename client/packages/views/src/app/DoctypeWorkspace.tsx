@@ -27,10 +27,6 @@ import {
   V3_VIEW_SWITCHER_CLASS,
 } from "../data-surface/v3.js";
 
-const AlumdoorSalesOrderCreate = lazy(() => import("./vertical/alumdoor/AlumdoorSalesOrderCreate.js").then((module) => ({ default: module.AlumdoorSalesOrderCreate })));
-const AlumdoorProductionRequestDetail = lazy(() => import("./vertical/alumdoor/AlumdoorProductionRequestDetail.js").then((module) => ({ default: module.AlumdoorProductionRequestDetail })));
-const AlumdoorWorkOrderDetail = lazy(() => import("./vertical/alumdoor/AlumdoorWorkOrderDetail.js").then((module) => ({ default: module.AlumdoorWorkOrderDetail })));
-const AlumdoorManufacturingStockEntryCreate = lazy(() => import("./vertical/alumdoor/AlumdoorManufacturingStockEntryCreate.js").then((module) => ({ default: module.AlumdoorManufacturingStockEntryCreate })));
 
 export interface DoctypeWorkspaceProps {
   doctype: string;
@@ -64,16 +60,9 @@ export function DoctypeWorkspace(props: DoctypeWorkspaceProps) {
    * vertical này giữ `default_measurement_profile`; nhờ vậy generic workspace không chiếm
    * màn nghiệp vụ của app khác. Màn chuyên biệt vẫn lazy-load, nên app khác không tải code cửa.
    */
-  const isAlumdoorProfile = Boolean(formProfiles?.["Item Group"]?.keep?.includes("default_measurement_profile"));
-  const useAlumdoorSalesForm = doctype === "Sales Order" && isAlumdoorProfile;
-  const useAlumdoorSalesCreate = isNew && useAlumdoorSalesForm;
-  const useAlumdoorSalesDetail = Boolean(decoded) && useAlumdoorSalesForm;
-  const useAlumdoorProductionRequestDetail = Boolean(decoded) && doctype === "Production Request" && isAlumdoorProfile;
-  const useAlumdoorWorkOrderDetail = Boolean(decoded) && doctype === "Work Order" && isAlumdoorProfile;
   const manufacturingWorkOrder = bridge.get("f_work_order")?.trim() ?? "";
   const requestedStockPurpose = bridge.get("f_purpose");
   const manufacturingPurpose = requestedStockPurpose === "Material Transfer" || requestedStockPurpose === "Manufacture" ? requestedStockPurpose : undefined;
-  const useAlumdoorManufacturingStockEntryContext = !isNew && !decoded && doctype === "Stock Entry" && isAlumdoorProfile && Boolean(manufacturingWorkOrder && manufacturingPurpose);
   /**
    * Kích cỡ màn tạo mới đi theo PHẠM VI của chứng từ, không phải theo khai báo riêng của từng app.
    *
@@ -88,9 +77,9 @@ export function DoctypeWorkspace(props: DoctypeWorkspaceProps) {
   const bulkPolicy = useMemo(() => titleMeta.data ? resolveBulkRenderPolicy(titleMeta.data) : undefined, [titleMeta.data]);
   const bulkEnabled = Boolean(bulkPolicy?.enabled && !isTree);
   const bulkOnly = Boolean(bulkPolicy?.rowSource);
-  const bulkActive = !decoded && !isNew && !useAlumdoorManufacturingStockEntryContext && bulkEnabled && (bulkOnly || bridge.get("view") === "bulk");
+  const bulkActive = !decoded && !isNew && bulkEnabled && (bulkOnly || bridge.get("view") === "bulk");
 
-  const modeTabs = bulkEnabled && !bulkOnly && !decoded && !isNew && !useAlumdoorManufacturingStockEntryContext ? (
+  const modeTabs = bulkEnabled && !bulkOnly && !decoded && !isNew ? (
     <div className={V3_VIEW_SWITCHER_CLASS} role="navigation" aria-label={t("common.view", "Chế độ xem")}>
       <Button variant={bulkActive ? "ghost" : "secondary"} size="sm" className="h-8 rounded-md" onClick={() => {
         if (bulkActive && bulkDirty) { setConfirmBulkExit(true); return; }
@@ -100,40 +89,7 @@ export function DoctypeWorkspace(props: DoctypeWorkspaceProps) {
     </div>
   ) : null;
 
-  const detail = useAlumdoorManufacturingStockEntryContext && manufacturingPurpose ? (
-    <Suspense fallback={<div className="grid h-full place-items-center text-sm text-muted-foreground">Đang mở phiếu kho sản xuất…</div>}>
-      <AlumdoorManufacturingStockEntryCreate
-        key={`alumdoor-stock-entry/${manufacturingWorkOrder}/${manufacturingPurpose}`}
-        workOrder={manufacturingWorkOrder}
-        purpose={manufacturingPurpose}
-        onCreated={(newName) => onNavigate(`${listPath}/${encodeURIComponent(newName)}`)}
-        onCancel={() => onNavigate(`${base}/${encodeURIComponent("Work Order")}/${encodeURIComponent(manufacturingWorkOrder)}`)}
-        onNavigate={onNavigate}
-      />
-    </Suspense>
-  ) : decoded ? (
-    useAlumdoorSalesDetail ? (
-      <Suspense fallback={<div className="grid h-full place-items-center text-sm text-muted-foreground">Đang mở đơn hàng AlumDoor…</div>}>
-        <AlumdoorSalesOrderCreate
-          key={`${doctype}/${decoded}`}
-          name={decoded}
-          onCreated={(newName) => onNavigate(`${listPath}/${encodeURIComponent(newName)}`)}
-          onSaved={() => {}}
-          onPreviewCreated={(currentName) => onNavigate(printBase === "/print"
-            ? buildPrintPath(doctype, currentName)
-            : `${printBase}/${encodeURIComponent(doctype)}/${encodeURIComponent(currentName)}`)}
-          onCancel={() => onNavigate(listPath)}
-        />
-      </Suspense>
-    ) : useAlumdoorProductionRequestDetail ? (
-      <Suspense fallback={<div className="grid h-full place-items-center text-sm text-muted-foreground">Đang mở yêu cầu sản xuất…</div>}>
-        <AlumdoorProductionRequestDetail key={`alumdoor-production-request/${decoded}`} name={decoded} onNavigate={onNavigate} />
-      </Suspense>
-    ) : useAlumdoorWorkOrderDetail ? (
-      <Suspense fallback={<div className="grid h-full place-items-center text-sm text-muted-foreground">Đang mở phiếu sản xuất…</div>}>
-        <AlumdoorWorkOrderDetail key={`alumdoor-work-order/${decoded}`} name={decoded} onNavigate={onNavigate} />
-      </Suspense>
-    ) : (
+  const detail = decoded ? (
       <FormContainer
         key={`${doctype}/${decoded}`}
         doctype={doctype}
@@ -145,7 +101,6 @@ export function DoctypeWorkspace(props: DoctypeWorkspaceProps) {
         onPrint={() => onNavigate(printBase === "/print" ? buildPrintPath(doctype, decoded) : `${printBase}/${encodeURIComponent(doctype)}/${encodeURIComponent(decoded)}`)}
         onClose={() => onNavigate(listPath)}
       />
-    )
   ) : isTree ? (
     <div className="grid h-full place-items-center bg-card px-6 text-center text-sm text-muted-foreground">{t("common.choose_prefix")} {displayTitle.toLocaleLowerCase("vi")}</div>
   ) : null;
@@ -158,11 +113,9 @@ export function DoctypeWorkspace(props: DoctypeWorkspaceProps) {
           {bulkActive ? <BulkGridContainer doctype={doctype} bridge={bridge} title={displayTitle} onDirtyChange={setBulkDirty} /> : (
             <SplitView
               autoSaveId={`mf-split-v3-${doctype}`}
-              hasDetail={isTree || Boolean(decoded) || useAlumdoorManufacturingStockEntryContext}
-              contextTitle={decoded ?? (useAlumdoorManufacturingStockEntryContext ? manufacturingWorkOrder : undefined)}
-              onCloseDetail={() => useAlumdoorManufacturingStockEntryContext
-                ? onNavigate(`${base}/${encodeURIComponent("Work Order")}/${encodeURIComponent(manufacturingWorkOrder)}`)
-                : onNavigate(listPath)}
+              hasDetail={isTree || Boolean(decoded)}
+              contextTitle={decoded}
+              onCloseDetail={() => onNavigate(listPath)}
               list={isTree ? (
                 <TreeContainer doctype={doctype} title={displayTitle} selected={decoded} editable renameField={titleMeta.data?.title_field} onSelect={(nodeName) => onNavigate(`${listPath}/${encodeURIComponent(nodeName)}`)} />
               ) : (
@@ -191,7 +144,7 @@ export function DoctypeWorkspace(props: DoctypeWorkspaceProps) {
         <DialogContent
           className={hasChildTable ? V3_FULL_CREATE_DIALOG_CLASS : V3_QUICK_ENTRY_DIALOG_CLASS}
           data-ui-version="v3"
-          data-surface={useAlumdoorSalesCreate ? "alumdoor-sales-create" : hasChildTable ? "full-create" : "quick-entry"}
+          data-surface={hasChildTable ? "full-create" : "quick-entry"}
           onInteractOutside={(event) => {
             event.preventDefault();
             const target = event.detail?.originalEvent?.target;
@@ -202,13 +155,7 @@ export function DoctypeWorkspace(props: DoctypeWorkspaceProps) {
         >
           <DialogHeader className={cn("shrink-0 border-b border-border/70 px-5 py-4", chromeFill, chromeText)}><DialogTitle className="text-xl font-semibold tracking-tight">{t("form.create_title_prefix")} {displayTitle.toLocaleLowerCase("vi")}</DialogTitle></DialogHeader>
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
-            {useAlumdoorSalesCreate ? (
-              <Suspense fallback={<div className="grid h-full place-items-center text-sm text-muted-foreground">Đang mở màn bán hàng AlumDoor…</div>}>
-                <AlumdoorSalesOrderCreate closeRequest={closeRequest} onCreated={(newName) => onNavigate(`${listPath}/${encodeURIComponent(newName)}`)} onPreviewCreated={(newName) => onNavigate(printBase === "/print" ? buildPrintPath(doctype, newName) : `${printBase}/${encodeURIComponent(doctype)}/${encodeURIComponent(newName)}`)} onCancel={() => onNavigate(listPath)} />
-              </Suspense>
-            ) : (
               <NewFormContainer doctype={doctype} fullWidth={hasChildTable} closeRequest={closeRequest} onCreated={(newName) => onNavigate(`${listPath}/${encodeURIComponent(newName)}`)} onPreviewCreated={(newName) => onNavigate(printBase === "/print" ? buildPrintPath(doctype, newName) : `${printBase}/${encodeURIComponent(doctype)}/${encodeURIComponent(newName)}`)} onCancel={() => onNavigate(listPath)} />
-            )}
           </div>
         </DialogContent>
       </Dialog>

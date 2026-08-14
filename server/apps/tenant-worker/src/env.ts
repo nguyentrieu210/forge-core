@@ -1,5 +1,15 @@
 import type { DomainEvent } from "../../../packages/contracts/src/index.js";
-import type { ForgeAiBinding } from "../../../packages/ai-policy/src/index.js";
+/**
+ * Workers AI binding, nội tuyến tại đây.
+ *
+ * Trước kia kiểu này nhập từ `packages/ai-policy` — một gói nghiệp vụ đã bị gỡ khỏi bản lõi.
+ * Bản thân cái binding là hạ tầng Cloudflare nên vẫn giữ; chỉ phần chính sách model/cache/gateway
+ * là đi cùng gói kia.
+ */
+export interface ForgeAiBinding {
+  run(model: string, input: Record<string, unknown>, options?: { gateway?: Record<string, unknown> }): Promise<unknown>;
+  aiGatewayLogId?: string;
+}
 
 /**
  * Structural Browser Run binding used by the tenant entrypoint.
