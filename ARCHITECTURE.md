@@ -3,10 +3,10 @@
 ## Cây thư mục rút gọn
 
 ```text
-C:\Forge
+C:\Forge-r6
 ├─ client/
 │  ├─ apps/runtime/                 # SPA production chung
-│  ├─ apps/demo|sample-*|kho-vn/    # demo/sample apps
+│  ├─ apps/demo|sample-sales|sample-wms/  # demo/sample apps
 │  ├─ packages/
 │  │  ├─ adapter-frappe/            # API boundary
 │  │  ├─ core/                      # types, metadata resolver
@@ -20,9 +20,7 @@ C:\Forge
 │  │  ├─ tenant-worker/
 │  │  ├─ query-worker/
 │  │  ├─ jobs-worker/
-│  │  ├─ control-plane-worker/
-│  │  └─ social-ingress-worker/
-│  ├─ apps-src/                     # app Workers ngành dọc
+│  │  └─ control-plane-worker/
 │  ├─ packages/                     # kernel, API, model, services
 │  ├─ migrations/{tenant,control,jobs}/
 │  ├─ briefs/                       # app manifests/metadata
@@ -32,6 +30,10 @@ C:\Forge
 ├─ package.json
 └─ pnpm-workspace.yaml
 ```
+
+`server/apps-src` và `server/apps/social-ingress-worker` từng chứa app nghiệp vụ riêng của khách
+(Alumdoor) và social commerce — đã gỡ khi bóc lõi. Nếu thấy tài liệu cũ nhắc tới chúng, đó là
+tàn dư trước lúc bóc.
 
 Các thư mục `node_modules`, `dist`, `build`, `.git`, `coverage`, `server/work` và `tmp` là dependency/generated/cache, không phải nguồn kiến trúc.
 
@@ -46,7 +48,6 @@ Các thư mục `node_modules`, `dist`, `build`, `.git`, `coverage`, `server/wor
 | Query | `server/apps/query-worker/src/index.ts` | Prepared/report query workload |
 | Jobs | `server/apps/jobs-worker/src/index.ts` | Queue và scheduled maintenance |
 | Control plane | `server/apps/control-plane-worker/src/index.ts` | Tenant routing/provisioning state |
-| Social ingress | `server/apps/social-ingress-worker/src/index.ts` | OAuth/webhook/social event ingress |
 
 Frontend routes được khai báo trực tiếp trong `client/apps/runtime/src/main.tsx`, gồm list/form/new/print/report/workspace/overview/catalog/permissions/import/action screen. Bản in dùng `/print/:doctype/:name?format=<tên mẫu>`; runtime tải danh sách mẫu đã bật cho chứng từ, chọn mẫu mặc định khi URL không chỉ định và giữ mẫu phụ trong query string.
 
@@ -79,19 +80,21 @@ flowchart LR
 
 Migration là nguồn sự thật:
 
-- Tenant: `server/migrations/tenant/0001_core.sql` đến `0026_supplier_receipt_tolerance.sql`.
+- Tenant: `server/migrations/tenant/0001_core.sql` đến `0124_core_maintenance_and_period_lock_events.sql`.
 - Control plane: `server/migrations/control/`.
 - Jobs: `server/migrations/jobs/`.
 
-Nhóm bảng chính:
+Nhóm bảng chính còn lại sau khi bóc lõi:
 
 - Documents/lifecycle: `documents`, `document_children`, `versions`, mutation guard/receipts.
 - Metadata: doctype definitions, custom fields, property setters, workflows, print formats.
 - Auth/permission: users, roles, user roles, user permissions, shares.
-- ERP ledger: GL, stock ledger, payment ledger, order fulfillment và các reporting views.
 - Platform: installed apps, app objects/hooks, files, imports, notifications, auto-repeat.
-- Social commerce, maintenance, AI logs và Alumdoor-specific views/tolerance.
+- Bảo trì: `maintenance_runs`, `accounting_period_lock_events` (dựng lại ở `0124` sau khi bóc,
+  xem ghi chú trong chính migration đó).
 
+Chuỗi 85 migration giữ nguyên số thứ tự vì chúng phụ thuộc nhau; một số bảng thuộc ERP domain
+đã gỡ vẫn còn được `CREATE TABLE` bởi migration cũ và nằm im, không code lõi nào đọc chúng.
 Không sửa migration cũ đã có khả năng chạy production; thêm migration mới và test upgrade path.
 
 ## Authentication flow

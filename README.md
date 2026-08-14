@@ -1,87 +1,54 @@
-# Forge — nền ERP tương thích Frappe chạy trên Cloudflare
+# Forge Core — lõi doctype tương thích Frappe, chạy trên Cloudflare
 
-**Forge product baseline: `0.2.0` — Enterprise Parallel Baseline.** Version source không đồng nghĩa production deploy.
-
-Forge hợp nhất CloudForge backend và MetaForge frontend thành một nền ERP/enterprise operating platform metadata-driven, multi-tenant trên Cloudflare, với app package/domain authority và vertical apps như Alumdoor.
+Đây là bản đã bóc lõi khỏi `nguyentrieu210/forge` tại mốc R6 (`b9b325cb`). Toàn bộ nghiệp vụ
+ngành — ERPNext (bán hàng, kho, mua hàng, giá), Alumdoor, social commerce, nhân sự — đã gỡ.
+Còn lại là engine doctype: khai một DocType là có list/form/report/quyền/quy trình duyệt,
+không cần viết UI riêng.
 
 | Thư mục | Vai trò |
 |---|---|
-| `server/` | Kernel/backend, Workers, D1/DO/Queues/R2, ERP domains và Frappe-shaped API |
-| `client/` | MetaForge React runtime/builder, metadata-driven list/form/report/app surfaces |
-| `docs/` | architecture, product contracts, capability truth, evidence và operations docs |
-| `skills/` | execution policy cho agent |
+| `server/` | Document Kernel, Frappe-shaped REST API, App Registry, Durable Object aggregate |
+| `client/` | React Desk meta-driven (list/form/tree/kanban/report/builder) |
+| `docs/` | ba tài liệu còn sống: bề mặt API, app factory, gate kiểm tra |
 
-## Đọc trước khi làm
+## Nó làm được gì
 
-**README không phải live status.** Thứ tự canonical:
+- **90 API method tương thích Frappe** — `frappe.client.*`, `frappe.desk.*`, `frappe.model.*` —
+  client Frappe thật gọi thẳng được. Xem `docs/API_SURFACE.md`.
+- **Khai DocType là có màn hình.** `GenericMetadataController` lo list/form/tree/kanban/report/
+  print/web form từ metadata, không cần controller riêng.
+- **Phân quyền tới từng dòng, từng trường.** DocPerm, User Permission, row-level, che trường —
+  `server/packages/frappe-model` + `frappe-api`.
+- **Quy trình duyệt nhiều tầng.** `AppFactoryApprovalRuntime` chạy trên Durable Object: kế
+  hoạch duyệt theo giai đoạn, hẹn giờ, uỷ quyền, kiểm phân tách nhiệm vụ (SoD).
+- **Ghi có thứ tự, chống ghi đè.** Mọi mutation qua `MutationCommand` với `expected_version`;
+  Durable Object xếp hàng theo khoá tài liệu.
+- **App Factory.** `forge.apps.install` cài app từ brief JSON; `capability profile` bật/tắt
+  năng lực theo tenant. Xem `docs/APP_FACTORY.md`.
 
-1. `CURRENT_STATUS.md` — trạng thái verified gần nhất.
-2. `NEXT_TASKS.md` — active queue.
-3. `PROJECT_CONTEXT.md` — architecture/source-of-truth hiện hành.
-4. `AI_HANDOFF.md` — handoff cô đọng.
-5. `docs/README.md` — documentation index + retention policy.
-6. `RUNBOOK.md` và `DELIVERY_POLICY.md` — operational/merge/deploy boundary.
-7. `skills/forge-enterprise-completion/SKILL.md` — cách audit/implement/verify.
-8. `docs/FORGE_ENTERPRISE_NORTH_STAR.md` + capability map/status — strategic target và maturity truth.
-9. `docs/agents/PARALLEL_EXECUTION_PROTOCOL.md` khi task cần multi-agent/program execution.
+## Nó KHÔNG làm được gì
 
-Exact GitHub state, code, migrations và tests luôn thắng snapshot prose cũ.
+Không kế toán, không kho, không mua bán, không sản xuất, không nhân sự — không `Sales Order`,
+không `Item`, không `Stock Entry`. Muốn có thì viết app riêng cắm vào lõi này qua App Registry,
+đừng trộn thẳng vào `server/packages` hay `client/packages/views` như bản gốc đã làm với
+Alumdoor (đó chính là lý do phải bóc).
 
-## Current checkpoint
-
-RC4 integrated engineering/evidence closure đã merge qua PR `#627`. Canonical final record:
-
-`docs/agents/rc4/RC4_POST_INTEGRATION_FINAL.md`
-
-Current capability materialization sau RC4:
-
-- Hardened: 0
-- RC: 66
-- Wired: 406
-- Foundation: 327
-- Missing: 157
-- Total: 956
-
-RC4 closure không đồng nghĩa exact next candidate đã production-certified. Active direction nằm trong `NEXT_TASKS.md`.
-
-## Kiến trúc chính
-
-Forge giữ các nguyên tắc:
-
-- authoritative business writes đi qua Document Kernel / aggregate serialization;
-- server-side tenant/permission enforcement là security authority;
-- GL/Payment Ledger và Stock Ledger không bị fork theo app/vertical;
-- migrations append-only và applied-state-aware;
-- frontend dùng shared metadata-driven runtime;
-- first-party apps được install/upgrade qua App Registry/App Factory;
-- vertical apps compose domain capabilities thay vì copy domain code.
-
-Tài liệu nền:
-
-- `docs/ARCHITECTURE.md`
-- `docs/API_SURFACE.md`
-- `docs/APP_FACTORY.md`
-- `docs/FORGE_ENTERPRISE_NORTH_STAR.md`
-- `docs/FORGE_ENTERPRISE_CAPABILITY_MAP.md`
-- `docs/FORGE_ENTERPRISE_CAPABILITY_STATUS.md`
-- `docs/VERSIONING.md`
-- `docs/VALIDATION_GATES.md`
+85 migration D1 cũ (`server/migrations/tenant/`) vẫn giữ nguyên số thứ tự vì chúng phụ thuộc
+nhau theo chuỗi — một số bảng ERP còn sót nằm im, không migration nào của app còn đọc chúng.
 
 ## Chạy local
 
 ```bash
 corepack enable
 pnpm install
-pnpm run typecheck
-pnpm run test
+pnpm run build
+pnpm run server:test
 ```
 
-Chạy gate theo blast radius; không suy PASS từ việc source tồn tại hoặc PR merge.
+Chi tiết dựng backend + Desk trên máy, không đụng Cloudflare: `server/RUNBOOK_LOCAL.md`.
 
-## Production boundary
+## Nguồn gốc
 
-Không tự hiểu yêu cầu sửa code là authorization deploy production. Production migration, restore/PITR, secrets/DNS/provider mutation, customer-data mutation và non-UI deploy chỉ thực hiện khi có authorization rõ theo `RUNBOOK.md` và `DELIVERY_POLICY.md`.
-
-## Compatibility source
-
-Frappe/ERPNext upstream được source-lock trong repo cho compatibility/parity audit. Forge là implementation riêng; benchmark không thay thế current code/evidence.
+Lịch sử git giữ nguyên tới tận `nguyentrieu210/forge`, nên `git log`/`git blame` vẫn tra được
+quyết định cũ. Ba commit đầu trên nhánh `main` ghi lại đúng việc đã bóc gì và vì sao:
+`741caeb7`, `27d2fb90`, `5a980c91`.

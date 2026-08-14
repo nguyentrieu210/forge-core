@@ -21,7 +21,7 @@ Stack cục bộ: `wrangler dev` (workerd thật) + D1 file cục bộ + Vite de
 File nằm trong `.gitignore` (`server/.gitignore` dòng 23: `apps/*/.dev.vars`) nên không bao giờ bị commit.
 
 ```bat
-cd C:\alumdoor\server
+cd C:\Forge-r6\server
 copy .dev.vars.example apps\tenant-worker\.dev.vars
 ```
 
@@ -50,13 +50,13 @@ AUTH_MODE=development
 ## 2. Build server
 
 ```bat
-cd C:\alumdoor\server
+cd C:\Forge-r6\server
 pnpm run build
 ```
 
 Bắt buộc: `seed-local.mjs` import `dist/packages/frappe-api` để băm mật khẩu.
 
-## 3. Tạo D1 cục bộ + chạy 81 migration
+## 3. Tạo D1 cục bộ + chạy migration
 
 ```bat
 npx wrangler d1 migrations apply cloudforge-demo --local --config apps/tenant-worker/wrangler.jsonc
@@ -81,7 +81,7 @@ node scripts/seed-local.mjs --user ban@noi-bo.test --password mot-mat-khau-du-da
 Cửa sổ terminal **thứ nhất**, để nguyên:
 
 ```bat
-cd C:\alumdoor\server
+cd C:\Forge-r6\server
 npx wrangler dev --config apps/tenant-worker/wrangler.jsonc --port 8799 --local
 ```
 
@@ -90,32 +90,23 @@ npx wrangler dev --config apps/tenant-worker/wrangler.jsonc --port 8799 --local
 Cửa sổ **thứ hai**:
 
 ```bat
-cd C:\alumdoor\server
+cd C:\Forge-r6\server
 pnpm run smoke:http
 ```
 
 Mong đợi `HTTP_SMOKE_PASS checks=26 failures=0`. Nếu đỏ ở đây thì đừng mở UI vội — sửa backend trước.
 
-## 7. Cài app Alumdoor vào tenant cục bộ
+## 7. Cài một app (tuỳ chọn)
 
-```bat
-cd C:\alumdoor\server
-node scripts/build-alumdoor-v2-brief.mjs
-```
-
-> **Cảnh báo đã biết:** script này sinh ra brief version `2.0.35`, trong khi `briefs/alumdoor-v2.json`
-> đã commit là `2.2.1` và lớn hơn 26 KB. **Script không tái tạo được artifact đã commit.** Đừng chạy
-> nó rồi commit đè — sẽ rollback metadata. Chỉ chạy khi bạn thực sự muốn brief sinh mới.
-> Để dùng brief đã commit thì bỏ qua bước này.
-
-Cài package qua đường App Factory theo `docs/APP_FACTORY.md`.
+Bản lõi không kèm app nghiệp vụ nào. Muốn có DocType/màn hình để thử thì viết brief JSON và cài
+qua App Factory theo `docs/APP_FACTORY.md` — không có bước bắt buộc ở đây nữa.
 
 ## 8. Chạy Desk
 
 Cửa sổ **thứ ba**:
 
 ```bat
-cd C:\alumdoor\client\apps\runtime
+cd C:\Forge-r6\client\apps\runtime
 pnpm run dev
 ```
 
@@ -129,7 +120,7 @@ Mở `http://localhost:5173`. Vite proxy `/api` sang `http://localhost:8799` (kh
 ## Làm lại từ đầu
 
 ```bat
-cd C:\alumdoor\server
+cd C:\Forge-r6\server
 rmdir /s /q apps\tenant-worker\.wrangler
 npx wrangler d1 migrations apply cloudforge-demo --local --config apps/tenant-worker/wrangler.jsonc
 pnpm run dev:seed
@@ -137,8 +128,6 @@ pnpm run dev:seed
 
 State D1 cục bộ nằm cạnh **wrangler config**, không phải gốc `server/`:
 `server/apps/tenant-worker/.wrangler/state/v3/d1`.
-
-`docs/VERIFICATION.md` xác nhận vòng migrate → seed → smoke từ D1 trắng đã PASS.
 
 ---
 
@@ -149,7 +138,7 @@ State D1 cục bộ nằm cạnh **wrangler config**, không phải gốc `serve
 | **Mọi request 401 `Missing trusted identity context`** | `.dev.vars` sai vị trí, hoặc thiếu `AUTH_MODE=development` — xem ô bên dưới |
 | `wrangler dev` chạy nhưng không nạp biến | `.dev.vars` phải ở `server/apps/tenant-worker/`, không phải `server/` |
 | `dev:seed` báo không tìm thấy module | chưa `pnpm run build` (bước 2) |
-| Mọi lệnh ghi trả 417 | wrangler quá cũ hạ compat date; cần `wrangler@4.114.0+`, xem `docs/VERIFICATION.md` |
+| Mọi lệnh ghi trả 417 | wrangler quá cũ hạ compat date; cần `wrangler@4.114.0+` |
 | UI gọi API ra 404 | worker chưa chạy, hoặc `VITE_FORGE_BACKEND` sai cổng |
 | `pnpm install` chết ở `xlsx` | `client/packages/views` pin `xlsx` vào `cdn.sheetjs.com` thay vì npm registry; cần mạng ra được CDN đó |
 
@@ -162,7 +151,7 @@ Hai lỗi cộng dồn, cùng cho một triệu chứng là **mọi request 401*
 nhưng **không nạp biến nào**.
 
 **2. `AUTH_MODE=production`.** `wrangler.jsonc` đặt vậy. Ở chế độ đó
-`apps/tenant-worker/src/index-base.ts:493` gọi `verifyTrustedIdentity`, đòi header identity do
+`apps/tenant-worker/src/index-base.ts:295` gọi `verifyTrustedIdentity`, đòi header identity do
 gateway ký. Chạy tenant-worker đơn lẻ thì không có → `packages/auth/src/index.ts:201` ném
 `Missing trusted identity context`.
 
@@ -173,8 +162,8 @@ Bằng chứng đo được:
 | `.dev.vars` ở `server/` | `401 AUTHENTICATION_REQUIRED` — `"Missing trusted identity context"` |
 | `.dev.vars` ở `apps/tenant-worker/` + `AUTH_MODE=development` | `403 PermissionError` — `"Login to access this resource"` |
 
-`403` mới là đáp án đúng: `scripts/http-smoke.mjs:99` kiểm chính xác giá trị đó. Với cấu hình đúng,
-smoke test cho **`HTTP_SMOKE_PASS checks=26 failures=0`**.
+`403` mới là đáp án đúng: `scripts/http-smoke.mjs` kiểm chính xác giá trị đó (dòng 99–100). Với
+cấu hình đúng, smoke test cho **`HTTP_SMOKE_PASS checks=26 failures=0`**.
 
 Nếu muốn giữ `AUTH_MODE=production` cho giống thật thì phải chạy thêm `pnpm run dev:gateway` và gọi
 vào qua gateway — không cần thiết chỉ để xem UI.
@@ -183,10 +172,10 @@ vào qua gateway — không cần thiết chỉ để xem UI.
 
 ## Điều KHÔNG làm được ở local
 
-- `d1-migrate-remote.mjs`, `bootstrap-remote-secrets.mjs`, `wrangler deploy` — production, cần
-  authorization tường minh theo `RUNBOOK.md` và `DELIVERY_POLICY.md`.
-- Local PASS **không** là bằng chứng release. `docs/VERIFICATION.md` ghi rõ một trường hợp local
-  24/24 xanh mà login vẫn hỏng sau deploy.
+- `d1-migrate-remote.mjs`, `bootstrap-remote-secrets.mjs`, `wrangler deploy` — chạm production,
+  chỉ chạy khi có yêu cầu rõ ràng từ người vận hành thật.
+- Local PASS không tự động là bằng chứng đã deploy đúng. Config sai (secret, route, binding)
+  chỉ lộ ra sau khi deploy thật — luôn kiểm health-check sau khi lên production.
 
 ---
 
@@ -195,7 +184,7 @@ vào qua gateway — không cần thiết chỉ để xem UI.
 Use this when the local machine must follow the exact `main` commit on GitHub:
 
 ```bat
-cd C:\alumdoor
+cd C:\Forge-r6
 sync-local.bat
 ```
 
@@ -209,7 +198,7 @@ metadata and starting the local servers again.
 To keep watching GitHub `main` every minute, leave this running:
 
 ```bat
-cd C:\alumdoor
+cd C:\Forge-r6
 watch-github-local.bat 60
 ```
 

@@ -1,51 +1,35 @@
-# CloudForge v1.0.0 — ERPNext Business Suite RC
+# Server — lõi doctype tương thích Frappe
 
-CloudForge is a Cloudflare-native ERP platform built on Workers for Platforms, Durable Objects, tenant D1, Queues/R2 and a metadata-driven React Desk. v1.0.0 is a broad **source-ready release candidate**, not a drop-in Frappe/ERPNext replacement and not production-approved from this environment.
+Backend Cloudflare-native: Workers, Durable Objects, D1 mỗi tenant, Queues/R2, và một router
+API hình dạng Frappe. Không còn nghiệp vụ ERP (bán hàng, kho, mua hàng, sản xuất, nhân sự) —
+xem `../README.md` để biết vì sao và bóc từ đâu.
 
-## Implemented suite
+## Có gì
 
-- Frappe Core subset: tenant DocType metadata, generic form/list, workflow subset, Permission V2, versions, collaboration, files, print and CSV import/export.
-- Selling/O2C and Buying/P2P transaction chains.
-- Journal Entry, Expense Claim, receivable/payable ledgers and bounded financial reports.
-- Stock Entry, FIFO/Moving Average, serial/batch, returns, pricing and valuation adjustment preview.
-- BOM, Work Order, Production Plan, Job Card and Manufacture.
-- Asset depreciation, movement, maintenance and disposal.
-- Project Timesheet costing/profitability, Quality Inspection, Support Issue/SLA and cash POS sessions.
-- Bounded Bank Transaction/Reconciliation engine with reversible partial matching and commit guards.
-- Salary Slip accounting and Payroll Entry grouping.
-- Subscription schedule calculation from server-owned plans.
-- Source-bound E-Invoice Submission provider queue with uniqueness and role guards.
-- Lead, Opportunity and Portal User metadata foundations.
+- **`packages/document-kernel`** — engine ghi tài liệu: `MutationCommand` với `expected_version`,
+  thực thi tuần tự qua Durable Object theo khoá tài liệu.
+- **`packages/frappe-api`** — router 90 method tương thích Frappe (`frappe.client.*`,
+  `frappe.desk.*`, `frappe.model.*`), phiên đăng nhập, MFA, CSRF.
+- **`packages/frappe-model`** — metadata DocType, quyền (DocPerm/User Permission/row-level/che
+  trường), tra cứu link/tree.
+- **`packages/app-registry`** — cài app từ brief JSON, `AppFactoryApprovalRuntime` (quy trình
+  duyệt nhiều tầng, hẹn giờ, uỷ quyền, kiểm SoD).
+- **`packages/query`** — report builder, count/list có phân trang.
+- **`packages/auth`** — user store, MFA, phiên, giới hạn tần suất đăng nhập.
+- Các Worker trong `apps/`: `tenant-worker` (route chính), `gateway-worker` (định tuyến theo
+  tenant), `query-worker`, `jobs-worker`, `control-plane-worker`.
 
-## Verify
+## Chạy local
+
+Xem `RUNBOOK_LOCAL.md` — dựng đủ backend + Desk trên máy, không đụng Cloudflare thật.
 
 ```bash
-npm run verify:manifest
-npm ci
-npm run check:business-suite
-npm run typecheck:web
-npm run test:workers
-npm --prefix apps/web run build
+pnpm run server:build
+pnpm run server:typecheck
+pnpm run server:test
 ```
 
-The packaged environment did not provide target-OS web/Workerd dependencies, so those executions remain mandatory promotion evidence.
-
-## Read before use
-
-- `FEATURE_MATRIX_v1.0.0.md`
-- `RELEASE_NOTES_v1.0.0.md`
-- `RUNBOOK_BUSINESS_SUITE_RC.md`
-- `COMMERCIAL_COMPATIBILITY.md`
-- `COMMERCIAL_RELEASE_GATE.md`
-- `STATUS.md`
-
-## Boundary
-
-Do not market this artifact as “complete ERPNext on Cloudflare.” It does not provide Python/Frappe app compatibility, full HR lifecycle/statutory payroll, automatic subscription invoicing, complete bank statement connectors/auto-matching, complete fiscal consolidation, full MRP/subcontracting, full customer/supplier portal parity or certified country statutory packs.
-
-E-invoice support is an audited provider queue seam. It is not legal certification in any jurisdiction.
-
-## Authenticated command example
+## Ví dụ lệnh có xác thực
 
 ```http
 POST /api/v1/commands
@@ -54,12 +38,20 @@ Content-Type: application/json
 
 {
   "command_id": "client-generated-idempotency-key",
-  "doctype": "Sales Order",
-  "name": "SO-00001",
+  "doctype": "<Tên DocType do app khai>",
+  "name": "<tên tài liệu>",
   "action": "create",
   "expected_version": null,
   "document": {}
 }
 ```
 
-Tenant, actor, roles, exchange rates, valuation, payroll accounts, subscription rates and authoritative accounting fields are resolved by the server, never from client identity headers.
+Tenant, actor, roles là do server phân giải từ chữ ký phiên/JWT — không bao giờ tin theo header
+client tự khai.
+
+## Ranh giới
+
+Đây là engine, không phải app. Không có `Sales Order`, `Item`, `Stock Entry` — khai DocType và
+viết controller riêng nếu cần hành vi ngoài CRUD/quyền/quy trình duyệt mặc định. Đừng import
+thẳng code app vào `packages/` hay router lõi — đó chính là lỗi kiến trúc đã phải mổ khi bóc
+Alumdoor ra khỏi bản này (xem `741caeb7`, `27d2fb90` trong git log).
