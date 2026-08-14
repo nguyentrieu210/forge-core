@@ -1,14 +1,6 @@
 #!/usr/bin/env node
 /**
  * Sinh `server/apps/tenant-worker/.dev.vars` cho `wrangler dev` cục bộ.
- *
- * Vì sao là file riêng chứ không phải `node -e` trong .bat: chuỗi JS chứa `!`, mà cmd.exe bật
- * `EnableDelayedExpansion` sẽ NUỐT ký tự đó và làm hỏng lệnh — script đứng im không rõ lý do.
- *
- * Hai điều bắt buộc, thiếu là mọi request trả 401:
- *   1. file phải nằm CẠNH wrangler config (`apps/tenant-worker/`), không phải ở `server/`;
- *   2. `AUTH_MODE=development` — mặc định `production` đòi trusted-identity header do gateway ký,
- *      mà chạy tenant-worker đơn lẻ thì không có ai ký.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
@@ -33,9 +25,11 @@ if (!/^SESSION_SECRET=/m.test(text)) text += `\nSESSION_SECRET=${secret()}\n`;
 
 text = text
   .replace(/^AUTH_MODE=.*$/gm, "")
+  .replace(/^PUBLIC_ORIGIN=.*$/gm, "")
   .replace(/\n{3,}/g, "\n\n")
   .trimEnd();
 text += "\n\n# Tenant-worker chạy đơn lẻ (không qua gateway) BẮT BUỘC development.\nAUTH_MODE=development\n";
+text += "# App method dispatcher dùng service binding local khi origin là loopback.\nPUBLIC_ORIGIN=http://127.0.0.1:8799\n";
 
 mkdirSync(path.dirname(target), { recursive: true });
 writeFileSync(target, text);
