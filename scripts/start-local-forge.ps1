@@ -112,7 +112,9 @@ try {
     }
     $backendProcess = Start-Process @backendStart
 
-    if (-not (Wait-Http "http://127.0.0.1:$BackendPort/api/method/metaforge.api.get_boot" 90 @(200,401,403))) {
+    # Wrangler root may intentionally return 404. Any normal HTTP response means
+    # the local worker is listening; API semantics are checked by the app itself.
+    if (-not (Wait-Http "http://127.0.0.1:$BackendPort/" 45 @(200,400,401,403,404,405))) {
         Get-Content $backendOut -Tail 100 -ErrorAction SilentlyContinue | Out-Host
         Get-Content $backendErr -Tail 100 -ErrorAction SilentlyContinue | Out-Host
         throw "Backend failed to become ready on port $BackendPort"
@@ -132,7 +134,7 @@ try {
     }
     $uiProcess = Start-Process @uiStart
 
-    if (-not (Wait-Http "http://127.0.0.1:$UiPort/" 90 @(200))) {
+    if (-not (Wait-Http "http://127.0.0.1:$UiPort/" 45 @(200))) {
         Get-Content $uiOut -Tail 100 -ErrorAction SilentlyContinue | Out-Host
         Get-Content $uiErr -Tail 100 -ErrorAction SilentlyContinue | Out-Host
         throw "Desk failed to become ready on port $UiPort"
