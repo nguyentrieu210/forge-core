@@ -23,7 +23,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm, cache-dependency-path: pnpm-lock.yaml }
 
-      - name: Patch canonical production authority and regression gate
+      - name: Patch canonical production authority and regression test
         shell: bash
         run: |
           python3 <<'PY'
@@ -45,18 +45,7 @@ jobs:
               text = text.replace(loop, guarded, 1)
           core.write_text(text)
 
-          test = Path('server/tests/alumdoor-sales-production-package-convergence.test.mjs')
-          test.write_text('''import test from "node:test";\nimport assert from "node:assert/strict";\n\nimport { isCanonicalProductionObligationRow } from "../dist/apps-src/alumdoor-worker/src/sales-production-core.js";\n\ntest("SELECTABLE package children are commercial-only production projections", () => {\n  const parent = {\n    item_code: "DOOR-FULL",\n    sales_mode: "Tách món",\n    sales_package_group_key: "PKG-ROW-1",\n  };\n  const selectedChildren = [\n    { item_code: "MOTOR", sales_package_parent_key: "PKG-ROW-1", sales_package_component_key: "motor" },\n    { item_code: "SLAT", sales_package_parent_key: "PKG-ROW-1", sales_package_component_key: "slat" },\n  ];\n\n  const obligations = [parent, ...selectedChildren].filter(isCanonicalProductionObligationRow);\n  assert.deepEqual(obligations, [parent]);\n});\n\ntest("legacy direct split rows remain valid physical production sources", () => {\n  assert.equal(isCanonicalProductionObligationRow({ item_code: "DOOR", sales_mode: "Tách món" }), true);\n});\n''')
-
-          r6 = Path('.github/workflows/r6-pass-convergence.yml')
-          workflow = r6.read_text()
-          needle = '''      - name: Verify Alumdoor package composition\n        working-directory: server\n        shell: bash\n        run: |\n          set -euo pipefail\n          node scripts/forge-app.mjs briefs/alumdoor-v2.json --dry-run | tee /tmp/r6-alumdoor-package.log\n'''
-          replacement = '''      - name: Verify Alumdoor package composition\n        working-directory: server\n        shell: bash\n        run: |\n          set -euo pipefail\n          node --test tests/alumdoor-sales-production-package-convergence.test.mjs\n          node scripts/forge-app.mjs briefs/alumdoor-v2.json --dry-run | tee /tmp/r6-alumdoor-package.log\n'''
-          if 'node --test tests/alumdoor-sales-production-package-convergence.test.mjs' not in workflow:
-              if needle not in workflow:
-                  raise SystemExit('R6 package gate marker not found')
-              workflow = workflow.replace(needle, replacement, 1)
-              r6.write_text(workflow)
+          Path('server/tests/alumdoor-sales-production-package-convergence.test.mjs').write_text('''import test from "node:test";\nimport assert from "node:assert/strict";\n\nimport { isCanonicalProductionObligationRow } from "../dist/apps-src/alumdoor-worker/src/sales-production-core.js";\n\ntest("SELECTABLE package children are commercial-only production projections", () => {\n  const parent = { item_code: "DOOR-FULL", sales_mode: "Tách món", sales_package_group_key: "PKG-ROW-1" };\n  const selectedChildren = [\n    { item_code: "MOTOR", sales_package_parent_key: "PKG-ROW-1", sales_package_component_key: "motor" },\n    { item_code: "SLAT", sales_package_parent_key: "PKG-ROW-1", sales_package_component_key: "slat" },\n  ];\n  assert.deepEqual([parent, ...selectedChildren].filter(isCanonicalProductionObligationRow), [parent]);\n});\n\ntest("legacy direct split rows remain valid physical production sources", () => {\n  assert.equal(isCanonicalProductionObligationRow({ item_code: "DOOR", sales_mode: "Tách món" }), true);\n});\n''')
           PY
 
       - name: Install locked dependencies
@@ -80,12 +69,13 @@ jobs:
       - name: Commit final semantic convergence and remove one-shot workflow
         shell: bash
         run: |
-          git diff --check
+          set -euxo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git rm .github/workflows/convergence-finalize-selectable-production.yml
           git add server/apps-src/alumdoor-worker/src/sales-production-core.ts \
-                  server/tests/alumdoor-sales-production-package-convergence.test.mjs \
-                  .github/workflows/r6-pass-convergence.yml
+                  server/tests/alumdoor-sales-production-package-convergence.test.mjs
+          git diff --cached --check
+          git status --short
           git commit -m "fix(convergence): keep selectable package production on parent"
           git push origin HEAD:converge/main-tsx-20260814
