@@ -84,6 +84,9 @@ try {
     Invoke-Checked $RepoRoot "pnpm" @("--dir", "server", "run", "dev:seed")
 } catch { Write-Warning $_.Exception.Message }
 
+Write-Host "Building client workspace packages..."
+Invoke-Checked $RepoRoot "pnpm" @("--dir", "client", "exec", "tsc", "-b")
+
 $backendOut = Join-Path $LogRoot "backend.out.log"
 $backendErr = Join-Path $LogRoot "backend.err.log"
 $uiOut = Join-Path $LogRoot "ui.out.log"
@@ -114,6 +117,7 @@ try {
     }
 
     $env:VITE_FORGE_BACKEND = "http://127.0.0.1:$BackendPort"
+    $env:VITE_FORGE_RELEASE_SHA = if ($env:GITHUB_SHA) { $env:GITHUB_SHA } else { (& git -C $RepoRoot rev-parse HEAD).Trim() }
     Write-Host "Starting Desk on :$UiPort..."
     $uiStart = @{
         FilePath = "cmd.exe"
