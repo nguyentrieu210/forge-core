@@ -1,0 +1,93 @@
+{
+  "name": "Production Specification",
+  "module": "AlumDoor",
+  "is_submittable": true,
+  "autoname": "APS-.YYYY.-####",
+  "title_field": "sales_order",
+  "search_fields": ["sales_order", "material_code", "product_group"],
+  "fields": [
+    {
+      "fieldname": "sales_order",
+      "label": "Đơn bán hàng",
+      "fieldtype": "Link",
+      "options": "AlumDoor Sales Order",
+      "required": true,
+      "in_list_view": true
+    },
+    {
+      "fieldname": "item_index",
+      "label": "Dòng đơn hàng",
+      "fieldtype": "Int",
+      "required": true
+    },
+    {
+      "fieldname": "product_group",
+      "label": "Nhóm sản phẩm",
+      "fieldtype": "Data",
+      "required": true,
+      "in_list_view": true
+    },
+    {
+      "fieldname": "material_code",
+      "label": "Tên vật tư / SP",
+      "fieldtype": "Data",
+      "required": true,
+      "in_list_view": true
+    },
+    {
+      "fieldname": "rule_code",
+      "label": "Mã công thức",
+      "fieldtype": "Data",
+      "required": true
+    },
+    {
+      "fieldname": "rule_version",
+      "label": "Phiên bản công thức",
+      "fieldtype": "Data",
+      "required": true
+    },
+    {
+      "fieldname": "cut_width",
+      "label": "Rộng cắt lá (m)",
+      "fieldtype": "Float",
+      "in_list_view": true
+    },
+    {
+      "fieldname": "leaf_qty",
+      "label": "Số lá ruột",
+      "fieldtype": "Int",
+      "in_list_view": true
+    },
+    {
+      "fieldname": "requires_paint",
+      "label": "Cần sơn",
+      "fieldtype": "Check",
+      "in_list_view": true
+    },
+    {
+      "fieldname": "inputs_json",
+      "label": "Snapshot đầu vào",
+      "fieldtype": "Small Text"
+    },
+    {
+      "fieldname": "results_json",
+      "label": "Snapshot kết quả",
+      "fieldtype": "Small Text"
+    }
+  ],
+  "permissions": [
+    {
+      "role": "System Manager",
+      "read": true,
+      "write": true,
+      "create": true,
+      "delete": true,
+      "submit": true,
+      "cancel": true,
+      "amend": true,
+      "report": true,
+      "export": true,
+      "print": true
+    }
+  ]
+}

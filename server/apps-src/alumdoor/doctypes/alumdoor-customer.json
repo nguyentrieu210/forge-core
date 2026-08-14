@@ -1,0 +1,49 @@
+{
+  "name": "AlumDoor Customer",
+  "module": "AlumDoor",
+  "is_submittable": false,
+  "autoname": "ADC-.#####",
+  "title_field": "customer_name",
+  "search_fields": ["customer_name", "phone"],
+  "fields": [
+    {
+      "fieldname": "customer_name",
+      "label": "Tên khách hàng",
+      "fieldtype": "Data",
+      "required": true,
+      "in_list_view": true
+    },
+    {
+      "fieldname": "customer_type",
+      "label": "Loại khách",
+      "fieldtype": "Select",
+      "options": "ĐẠI LÝ\nKHÁCH LẺ",
+      "required": true,
+      "default": "ĐẠI LÝ",
+      "in_list_view": true
+    },
+    {
+      "fieldname": "phone",
+      "label": "Điện thoại",
+      "fieldtype": "Data",
+      "in_list_view": true
+    },
+    {
+      "fieldname": "address",
+      "label": "Địa chỉ",
+      "fieldtype": "Small Text"
+    }
+  ],
+  "permissions": [
+    {
+      "role": "System Manager",
+      "read": true,
+      "write": true,
+      "create": true,
+      "delete": true,
+      "report": true,
+      "export": true,
+      "print": true
+    }
+  ]
+}

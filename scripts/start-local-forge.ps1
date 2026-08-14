@@ -79,10 +79,8 @@ try {
     )
 } catch { Write-Warning $_.Exception.Message }
 
-Write-Host "Seeding local dev account (best effort)..."
-try {
-    Invoke-Checked $RepoRoot "pnpm" @("--dir", "server", "run", "dev:seed")
-} catch { Write-Warning $_.Exception.Message }
+Write-Host "Seeding local dev account only..."
+Invoke-Checked $RepoRoot "pnpm" @("--dir", "server", "run", "dev:seed", "--", "--auth-only")
 
 Write-Host "Building Desk packages that publish dist entrypoints..."
 Invoke-Checked $RepoRoot "pnpm" @("--dir", "client", "--filter", "@metaforge/charts", "run", "build")
@@ -97,6 +95,7 @@ Remove-Item $backendOut, $backendErr, $uiOut, $uiErr -Force -ErrorAction Silentl
 $previousTrackingId = $env:RUNNER_TRACKING_ID
 $previousBackend = $env:VITE_FORGE_BACKEND
 $previousReleaseSha = $env:VITE_FORGE_RELEASE_SHA
+$previousAdminPassword = $env:FORGE_ADMIN_PASSWORD
 $env:RUNNER_TRACKING_ID = ""
 
 try {
@@ -117,6 +116,14 @@ try {
         Get-Content $backendErr -Tail 100 -ErrorAction SilentlyContinue | Out-Host
         throw "Backend failed to become ready on port $BackendPort"
     }
+
+    Write-Host "Installing/upgrading AlumDoor app metadata..."
+    $env:FORGE_ADMIN_PASSWORD = "local-dev-password-1"
+    Invoke-Checked $ServerRoot "node" @(
+        "scripts/forge-app.mjs", "apps-src/alumdoor",
+        "--origin", "http://127.0.0.1:$BackendPort",
+        "--admin", "dev@example.com"
+    )
 
     $env:VITE_FORGE_BACKEND = "http://127.0.0.1:$BackendPort"
     $env:VITE_FORGE_RELEASE_SHA = if ($env:GITHUB_SHA) { $env:GITHUB_SHA } else { (& git -C $RepoRoot rev-parse HEAD).Trim() }
@@ -139,11 +146,12 @@ try {
     }
 
     $sha = if ($env:GITHUB_SHA) { $env:GITHUB_SHA } else { (& git -C $RepoRoot rev-parse HEAD).Trim() }
+    $deskUrl = "http://localhost:$UiPort/?app=alumdoor"
     @(
         "FORGE_LOCAL_READY",
         "commit=$sha",
         "backend=http://localhost:$BackendPort",
-        "desk=http://localhost:$UiPort",
+        "desk=$deskUrl",
         "login=dev@example.com",
         "password=local-dev-password-1",
         "backend_pid=$($backendProcess.Id)",
@@ -154,11 +162,12 @@ try {
     ) | Set-Content -Path (Join-Path $LocalRoot "status.txt") -Encoding UTF8
 
     Write-Host "FORGE_LOCAL_READY"
-    Write-Host "Desk    : http://localhost:$UiPort"
+    Write-Host "Desk    : $deskUrl"
     Write-Host "Backend : http://localhost:$BackendPort"
     Write-Host "Login   : dev@example.com / local-dev-password-1"
 } finally {
     $env:RUNNER_TRACKING_ID = $previousTrackingId
     $env:VITE_FORGE_BACKEND = $previousBackend
     $env:VITE_FORGE_RELEASE_SHA = $previousReleaseSha
+    $env:FORGE_ADMIN_PASSWORD = $previousAdminPassword
 }

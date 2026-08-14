@@ -1,0 +1,75 @@
+{
+  "name": "AlumDoor Sales Order Item",
+  "module": "AlumDoor",
+  "is_child": true,
+  "is_submittable": false,
+  "fields": [
+    {
+      "fieldname": "product_group",
+      "label": "Nhóm sản phẩm",
+      "fieldtype": "Select",
+      "options": "ĐỨC\nÚC\nĐÀI LOAN\nLƯỚI\nSIÊU TRƯỜNG",
+      "required": true,
+      "default": "ĐỨC",
+      "in_list_view": true
+    },
+    {
+      "fieldname": "material_code",
+      "label": "Tên vật tư / SP",
+      "fieldtype": "Data",
+      "required": true,
+      "in_list_view": true
+    },
+    {
+      "fieldname": "order_mode",
+      "label": "Kiểu đặt",
+      "fieldtype": "Select",
+      "options": "FULL_SET\nINNER_SLAT\nHEAD_SLAT\nBOTTOM_SET\nACCESSORY",
+      "required": true,
+      "default": "FULL_SET",
+      "in_list_view": true
+    },
+    {
+      "fieldname": "height_pb",
+      "label": "Cao PB (m)",
+      "fieldtype": "Float",
+      "required": true,
+      "in_list_view": true
+    },
+    {
+      "fieldname": "width_pb_ray",
+      "label": "Rộng PB ray (m)",
+      "fieldtype": "Float",
+      "in_list_view": true
+    },
+    {
+      "fieldname": "width_pb_plastic",
+      "label": "Rộng PB nhựa (m)",
+      "fieldtype": "Float"
+    },
+    {
+      "fieldname": "color",
+      "label": "Màu",
+      "fieldtype": "Select",
+      "options": "THÔ\nCAFÉ\nXANH NGỌC\nMIDNIGHT BLUE\nTRẮNG\nXÁM MỜ\nVÀNG KEM\nGHI SẦN\nNÂU XINGFA\nXÁM XINGFA\nĐEN XINGFA",
+      "required": true,
+      "default": "THÔ",
+      "in_list_view": true
+    },
+    {
+      "fieldname": "auto_stop",
+      "label": "Hệ thống tự dừng",
+      "fieldtype": "Check",
+      "default": 0
+    },
+    {
+      "fieldname": "qty",
+      "label": "Số lượng",
+      "fieldtype": "Float",
+      "required": true,
+      "default": 1,
+      "in_list_view": true
+    }
+  ],
+  "permissions": []
+}
