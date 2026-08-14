@@ -1,4 +1,4 @@
-name: Local Self-Hosted Validation
+name: Local Self-Hosted Build and Run
 
 on:
   push:
@@ -14,18 +14,34 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  validate-local:
-    name: Validate Forge on local Windows runner
+  build-run-local:
+    name: Build and run Forge on local Windows runner
     runs-on: [self-hosted, windows, x64, forge-local]
-    timeout-minutes: 45
+    timeout-minutes: 60
 
     steps:
+      - name: Stop previous local Forge before checkout
+        shell: pwsh
+        run: |
+          foreach ($port in @(8799, 5173)) {
+            $owners = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue |
+              Select-Object -ExpandProperty OwningProcess -Unique
+            foreach ($ownerPid in $owners) {
+              if ($ownerPid -and $ownerPid -ne $PID) {
+                Write-Host "Stopping process tree PID=$ownerPid on port $port"
+                taskkill.exe /PID $ownerPid /T /F | Out-Host
+              }
+            }
+          }
+
       - name: Checkout exact main revision
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           persist-credentials: false
-          clean: true
+          # Keep ignored local Wrangler/D1 state between runs. The workflow never
+          # writes tracked source files, so a destructive git clean is unnecessary.
+          clean: false
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
@@ -44,6 +60,22 @@ jobs:
         shell: pwsh
         run: pnpm install --frozen-lockfile --prefer-offline
 
+      - name: Build backend, migrate local D1, seed and start Desk
+        shell: pwsh
+        run: powershell -ExecutionPolicy Bypass -File .\scripts\start-local-forge.ps1
+
       - name: Run Forge fast validation gate
         shell: pwsh
         run: pnpm run validate:fast
+
+      - name: Show local endpoints
+        if: always()
+        shell: pwsh
+        run: |
+          $runnerRoot = Split-Path (Split-Path $env:RUNNER_TEMP -Parent) -Parent
+          $status = Join-Path $runnerRoot "_local\status.txt"
+          if (Test-Path $status) {
+            Get-Content $status
+          } else {
+            Write-Host "Local status file has not been created yet."
+          }
