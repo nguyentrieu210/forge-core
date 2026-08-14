@@ -70,9 +70,7 @@ $headers = @{
 }
 
 Write-Host "Finding the latest official GitHub Actions runner for Windows x64..."
-$release = Invoke-RestMethod \
-    -Uri "https://api.github.com/repos/actions/runner/releases/latest" \
-    -Headers $headers
+$release = Invoke-RestMethod -Uri "https://api.github.com/repos/actions/runner/releases/latest" -Headers $headers
 
 $asset = $release.assets |
     Where-Object { $_.name -match '^actions-runner-win-x64-.*\.zip$' } |
@@ -93,14 +91,18 @@ Remove-Item $zipPath -Force -ErrorAction SilentlyContinue
 Push-Location $RunnerRoot
 try {
     Write-Host "Registering runner '$RunnerName' with label 'forge-local'..."
-    & .\config.cmd \
-        --unattended \
-        --url $repoUrl \
-        --token $RegistrationToken \
-        --name $RunnerName \
-        --labels "forge-local" \
-        --work "_work" \
-        --runasservice
+    $configArgs = @(
+        '--unattended',
+        '--url', $repoUrl,
+        '--token', $RegistrationToken,
+        '--name', $RunnerName,
+        '--labels', 'forge-local',
+        '--work', '_work',
+        '--runasservice',
+        '--replace'
+    )
+
+    & .\config.cmd @configArgs
 
     if ($LASTEXITCODE -ne 0) {
         throw "GitHub runner configuration failed with exit code $LASTEXITCODE."
