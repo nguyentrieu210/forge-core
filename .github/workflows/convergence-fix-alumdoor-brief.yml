@@ -1,0 +1,55 @@
+name: Convergence Fix Alumdoor Brief
+
+on:
+  push:
+    branches:
+      - converge/main-tsx-20260814
+    paths:
+      - .github/workflows/convergence-fix-alumdoor-brief.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix-brief:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: converge/main-tsx-20260814
+
+      - name: Normalize Batch custom field schema
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = 'server/briefs/alumdoor-v2.json';
+          const brief = JSON.parse(fs.readFileSync(path, 'utf8'));
+          const batch = brief.customFields?.Batch;
+          if (!Array.isArray(batch)) throw new Error('customFields.Batch missing');
+          const current = batch[5];
+          if (!current || typeof current !== 'object' || current.field?.fieldname !== 'received_warehouse') {
+            throw new Error(`unexpected Batch[5]: ${JSON.stringify(current)}`);
+          }
+          batch[5] = 'received_warehouse:Link(Warehouse) Kho nhập ban đầu';
+          fs.writeFileSync(path, `${JSON.stringify(brief, null, 2)}\n`, 'utf8');
+          NODE
+
+      - name: Validate brief
+        shell: bash
+        working-directory: server
+        run: |
+          node scripts/forge-app.mjs briefs/alumdoor-v2.json --dry-run | tee /tmp/convergence-alumdoor-brief.log
+          grep -q 'DRY_RUN_PASS alumdoor' /tmp/convergence-alumdoor-brief.log
+
+      - name: Commit fix and remove one-shot workflow
+        shell: bash
+        run: |
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/convergence-fix-alumdoor-brief.yml
+          git add server/briefs/alumdoor-v2.json
+          git commit -m "fix(convergence): normalize Alumdoor Batch custom field brief"
+          git push origin HEAD:converge/main-tsx-20260814
