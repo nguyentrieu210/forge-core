@@ -1,0 +1,63 @@
+{
+  "name": "AlumDoor Sales Order",
+  "module": "AlumDoor",
+  "is_submittable": true,
+  "autoname": "ADO-.YYYY.-####",
+  "title_field": "customer",
+  "search_fields": ["customer", "note"],
+  "fields": [
+    {
+      "fieldname": "order_date",
+      "label": "Ngày đặt hàng",
+      "fieldtype": "Date",
+      "required": true,
+      "in_list_view": true
+    },
+    {
+      "fieldname": "delivery_date",
+      "label": "Ngày giao hàng",
+      "fieldtype": "Date",
+      "in_list_view": true
+    },
+    {
+      "fieldname": "customer",
+      "label": "Khách hàng",
+      "fieldtype": "Link",
+      "options": "AlumDoor Customer",
+      "required": true,
+      "in_list_view": true
+    },
+    {
+      "fieldname": "responsible_person",
+      "label": "Người phụ trách",
+      "fieldtype": "Data"
+    },
+    {
+      "fieldname": "note",
+      "label": "Ghi chú",
+      "fieldtype": "Small Text"
+    },
+    {
+      "fieldname": "items",
+      "label": "Sản phẩm / vật tư",
+      "fieldtype": "Table",
+      "options": "AlumDoor Sales Order Item",
+      "required": true
+    }
+  ],
+  "permissions": [
+    {
+      "role": "System Manager",
+      "read": true,
+      "write": true,
+      "create": true,
+      "delete": true,
+      "submit": true,
+      "cancel": true,
+      "amend": true,
+      "report": true,
+      "export": true,
+      "print": true
+    }
+  ]
+}
