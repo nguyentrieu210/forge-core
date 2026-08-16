@@ -41,20 +41,88 @@ jobs:
           echo Synced hardcode preview to:
           git -C "%TARGET%" log -1 --oneline
 
-      - name: Apply canonical Item Group seed to local D1
-        shell: cmd
+      - name: Apply canonical Item Group seed to active local D1
+        shell: powershell
         run: |
-          @echo off
-          cd /d C:\alumdoor-hardcode-preview\server || exit /b 1
+          $ErrorActionPreference = 'Stop'
 
-          if exist "node_modules\wrangler\bin\wrangler.js" (
-            echo Using repository Wrangler.
-            node node_modules\wrangler\bin\wrangler.js d1 execute cloudforge-demo --local --config apps\tenant-worker\wrangler.alumdoor-local.jsonc --file scripts\seed-alumdoor-item-groups-local.sql || exit /b 1
-            node node_modules\wrangler\bin\wrangler.js d1 execute cloudforge-demo --local --config apps\tenant-worker\wrangler.alumdoor-local.jsonc --command "SELECT COUNT(*) AS active_item_groups FROM master_records WHERE tenant_id='demo' AND record_type='Item Group' AND disabled=0;" || exit /b 1
-          ) else (
-            echo server\node_modules is absent; bootstrapping pinned Wrangler 4.114.0 with npx.
-            call npx --yes wrangler@4.114.0 d1 execute cloudforge-demo --local --config apps\tenant-worker\wrangler.alumdoor-local.jsonc --file scripts\seed-alumdoor-item-groups-local.sql || exit /b 1
-            call npx --yes wrangler@4.114.0 d1 execute cloudforge-demo --local --config apps\tenant-worker\wrangler.alumdoor-local.jsonc --command "SELECT COUNT(*) AS active_item_groups FROM master_records WHERE tenant_id='demo' AND record_type='Item Group' AND disabled=0;" || exit /b 1
-          )
+          $previewRoot = 'C:\alumdoor-hardcode-preview'
+          $candidateRoots = @('C:\alumdoor', $previewRoot)
+          $seedFile = Join-Path $previewRoot 'server\scripts\seed-alumdoor-item-groups-local.sql'
+          if (-not (Test-Path $seedFile)) { throw "Seed file not found: $seedFile" }
 
-          echo Canonical Item Group seed applied and verified in local D1 cloudforge-demo.
+          $wrangler = $null
+          foreach ($root in $candidateRoots) {
+            $candidate = Join-Path $root 'server\node_modules\wrangler\bin\wrangler.js'
+            if (Test-Path $candidate) {
+              $wrangler = $candidate
+              break
+            }
+          }
+          if (-not $wrangler) {
+            throw 'Wrangler is not installed in C:\alumdoor or C:\alumdoor-hardcode-preview. Run pnpm install in the active Alumdoor checkout.'
+          }
+
+          $stateCandidates = @()
+          foreach ($root in $candidateRoots) {
+            $stateDir = Join-Path $root 'server\.wrangler\state'
+            if (Test-Path $stateDir) {
+              $sqlite = Get-ChildItem -Path $stateDir -Recurse -File -Filter '*.sqlite' -ErrorAction SilentlyContinue |
+                Sort-Object LastWriteTime -Descending |
+                Select-Object -First 1
+              if ($sqlite) {
+                $stateCandidates += [pscustomobject]@{
+                  Root = $root
+                  Sqlite = $sqlite.FullName
+                  LastWriteTime = $sqlite.LastWriteTime
+                }
+              }
+            }
+          }
+
+          if ($stateCandidates.Count -gt 0) {
+            $active = $stateCandidates | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+            $activeRoot = $active.Root
+            Write-Host "Using most recently active D1 state: $($active.Sqlite)"
+          } elseif (Test-Path 'C:\alumdoor\server') {
+            $activeRoot = 'C:\alumdoor'
+            Write-Host 'No existing SQLite state found; defaulting to C:\alumdoor.'
+          } else {
+            $activeRoot = $previewRoot
+            Write-Host 'No existing SQLite state found; defaulting to preview checkout.'
+          }
+
+          $serverRoot = Join-Path $activeRoot 'server'
+          $config = Join-Path $serverRoot 'apps\tenant-worker\wrangler.alumdoor-local.jsonc'
+          if (-not (Test-Path $config)) {
+            $config = Join-Path $previewRoot 'server\apps\tenant-worker\wrangler.alumdoor-local.jsonc'
+          }
+          Set-Location $serverRoot
+
+          Write-Host "Wrangler: $wrangler"
+          Write-Host "D1 working root: $serverRoot"
+          Write-Host "Config: $config"
+          & node $wrangler d1 execute cloudforge-demo --local --config $config --file $seedFile
+          if ($LASTEXITCODE -ne 0) { throw "Item Group seed failed with exit code $LASTEXITCODE" }
+
+          $verifySql = @"
+          SELECT
+            SUM(CASE WHEN disabled=0 THEN 1 ELSE 0 END) AS active_item_groups,
+            SUM(CASE WHEN disabled=1 THEN 1 ELSE 0 END) AS disabled_item_groups
+          FROM master_records
+          WHERE tenant_id='demo' AND record_type='Item Group';
+          "@
+          & node $wrangler d1 execute cloudforge-demo --local --config $config --command $verifySql
+          if ($LASTEXITCODE -ne 0) { throw "Item Group verification query failed with exit code $LASTEXITCODE" }
+
+          $legacySql = @"
+          SELECT name, disabled
+          FROM master_records
+          WHERE tenant_id='demo' AND record_type='Item Group'
+            AND name IN ('Bộ lưu điện','Cửa cuốn','Cửa nhôm kính','Dịch vụ','Linh kiện & thiết bị','Mô tơ','Nguyên vật liệu','Phụ kiện','Remote và điều khiển','Thành phẩm','Cửa siêu trường')
+          ORDER BY name;
+          "@
+          & node $wrangler d1 execute cloudforge-demo --local --config $config --command $legacySql
+          if ($LASTEXITCODE -ne 0) { throw "Legacy Item Group verification query failed with exit code $LASTEXITCODE" }
+
+          Write-Host 'Canonical Item Group seed applied to the active local D1.'
