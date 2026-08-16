@@ -1,0 +1,23 @@
+name: Temporary Audit Alumdoor Surface Finish Local
+
+on:
+  push:
+    paths:
+      - '.github/workflows/_tmp-audit-surface-finish-local.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: [self-hosted]
+    timeout-minutes: 2
+    steps:
+      - name: Audit Anode and Khac references in active local D1
+        shell: cmd
+        run: |
+          @echo off
+          cd /d C:\alumdoor\server || exit /b 1
+          node node_modules\wrangler\bin\wrangler.js d1 execute cloudforge-demo --local --config apps\tenant-worker\wrangler.alumdoor-local.jsonc --command "SELECT doctype,name,json_extract(payload_json,'$.finish') AS finish,json_extract(payload_json,'$.surface_finish') AS surface_finish,json_extract(payload_json,'$.item_group') AS item_group FROM documents WHERE tenant_id='demo' AND (json_extract(payload_json,'$.finish') IN ('Anode','Khác') OR json_extract(payload_json,'$.surface_finish') IN ('Anode','Khác') OR payload_json LIKE '%Anode%' OR payload_json LIKE '%Khác%') ORDER BY doctype,name;" || exit /b 1
+          node node_modules\wrangler\bin\wrangler.js d1 execute cloudforge-demo --local --config apps\tenant-worker\wrangler.alumdoor-local.jsonc --command "SELECT record_type,COUNT(*) AS refs FROM master_records WHERE tenant_id='demo' AND (data_json LIKE '%Anode%' OR data_json LIKE '%Khác%') GROUP BY record_type ORDER BY record_type;" || exit /b 1
