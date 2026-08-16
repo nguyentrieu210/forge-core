@@ -42,7 +42,7 @@ jobs:
           git -C "%TARGET%" log -1 --oneline
 
       - name: Apply canonical Item Group seed to active local D1
-        shell: powershell
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -command ". '{0}'"
         run: |
           $ErrorActionPreference = 'Stop'
 
