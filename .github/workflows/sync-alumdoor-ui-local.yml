@@ -5,6 +5,7 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Triggered from ChatGPT to run the existing local sync runner.
 concurrency:
   group: sync-alumdoor-hardcode-preview
   cancel-in-progress: true
