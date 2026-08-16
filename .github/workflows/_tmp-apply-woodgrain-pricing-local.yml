@@ -1,0 +1,45 @@
+name: Temporary Apply Alumdoor Woodgrain Pricing Local
+
+on:
+  push:
+    paths:
+      - '.github/workflows/_tmp-apply-woodgrain-pricing-local.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  apply:
+    runs-on: [self-hosted]
+    timeout-minutes: 4
+    steps:
+      - name: Sync forge main preview
+        shell: cmd
+        run: |
+          @echo off
+          set "TARGET=C:\alumdoor-hardcode-preview"
+          git config --global --add safe.directory C:/alumdoor-hardcode-preview || exit /b 1
+          git -C "%TARGET%" fetch origin main --prune || exit /b 1
+          git -C "%TARGET%" checkout -B main origin/main || exit /b 1
+          git -C "%TARGET%" reset --hard origin/main || exit /b 1
+          git -C "%TARGET%" log -1 --oneline
+
+      - name: Generate canonical finish and pricing SQL
+        shell: cmd
+        run: |
+          @echo off
+          node C:\alumdoor-hardcode-preview\server\scripts\build-alumdoor-color-correction.mjs --tenant demo --sql "%RUNNER_TEMP%\alumdoor-color.sql" || exit /b 1
+          node C:\alumdoor-hardcode-preview\server\scripts\seed-alumdoor-pricing-surcharges-local.mjs demo "%RUNNER_TEMP%\alumdoor-pricing.sql" || exit /b 1
+
+      - name: Apply and verify active local D1
+        shell: cmd
+        run: |
+          @echo off
+          cd /d C:\alumdoor\server || exit /b 1
+          node node_modules\wrangler\bin\wrangler.js d1 execute cloudforge-demo --local --config apps\tenant-worker\wrangler.alumdoor-local.jsonc --file "%RUNNER_TEMP%\alumdoor-color.sql" || exit /b 1
+          node node_modules\wrangler\bin\wrangler.js d1 execute cloudforge-demo --local --config apps\tenant-worker\wrangler.alumdoor-local.jsonc --file "%RUNNER_TEMP%\alumdoor-pricing.sql" || exit /b 1
+          node node_modules\wrangler\bin\wrangler.js d1 execute cloudforge-demo --local --config apps\tenant-worker\wrangler.alumdoor-local.jsonc --command "SELECT name,json_extract(payload_json,'$.finish_name') AS finish_name,json_array_length(json_extract(payload_json,'$.applies_to_groups')) AS scope_count,json_extract(payload_json,'$.applies_to_groups') AS groups_json FROM documents WHERE tenant_id='demo' AND doctype='Surface Finish' AND name='SON_VAN_GO';" || exit /b 1
+          node node_modules\wrangler\bin\wrangler.js d1 execute cloudforge-demo --local --config apps\tenant-worker\wrangler.alumdoor-local.jsonc --command "SELECT name,json_extract(payload_json,'$.color_name') AS color_name,json_extract(payload_json,'$.surface_finish') AS surface_finish FROM documents WHERE tenant_id='demo' AND doctype='Item Color' AND name='VAN_GO';" || exit /b 1
+          node node_modules\wrangler\bin\wrangler.js d1 execute cloudforge-demo --local --config apps\tenant-worker\wrangler.alumdoor-local.jsonc --command "SELECT name,json_array_length(json_extract(payload_json,'$.members')) AS members_count,json_extract(payload_json,'$.members') AS members_json FROM documents WHERE tenant_id='demo' AND doctype='Pricing Scope' AND name='CỬA ÁP DỤNG SƠN VÂN GỖ';" || exit /b 1
+          node node_modules\wrangler\bin\wrangler.js d1 execute cloudforge-demo --local --config apps\tenant-worker\wrangler.alumdoor-local.jsonc --command "SELECT name,json_extract(payload_json,'$.adjustment_rate') AS rate,json_extract(payload_json,'$.adjustment_basis') AS basis,json_extract(payload_json,'$.conditions') AS conditions_json FROM documents WHERE tenant_id='demo' AND doctype='Pricing Rule' AND name IN ('PHỤ THU SƠN VÂN GỖ CỬA','PHỤ THU RAY VÂN GỖ','PHỤ THU RAY MÀU KHÁC','PHỤ THU V4 V5 SƠN TĨNH ĐIỆN','PHỤ THU CỬA ÚC 4-7M2') ORDER BY name;" || exit /b 1
