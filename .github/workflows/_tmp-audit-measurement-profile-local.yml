@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Audit local D1 and current V2 schema
-        shell: powershell
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -command ". '{0}'"
         run: |
           $ErrorActionPreference = 'Stop'
           @'
