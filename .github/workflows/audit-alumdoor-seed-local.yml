@@ -1,0 +1,38 @@
+name: Audit Alumdoor Seed Local
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: audit-alumdoor-seed-local
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: [self-hosted]
+    timeout-minutes: 5
+    steps:
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Audit Alumdoor v2 seed
+        shell: cmd
+        run: |
+          @echo off
+          set "TARGET=C:\alumdoor-hardcode-preview"
+          git config --global --add safe.directory C:/alumdoor-hardcode-preview
+          if not exist "%TARGET%\server\briefs\alumdoor-v2.json" (
+            echo Missing synced Alumdoor brief
+            exit /b 1
+          )
+          cd /d "%TARGET%\server"
+          node scripts\forge-app.mjs briefs\alumdoor-v2.json --dry-run || exit /b 1
+          node scripts\verify-alumdoor-meta-completeness.mjs || exit /b 1
+          node scripts\audit-alumdoor-catalog.mjs --brief briefs\alumdoor-v2.json --include-names --output "%TEMP%\alumdoor-seed-audit.json"
+          set "AUDIT_RC=%ERRORLEVEL%"
+          echo ===== ALUMDOOR SEED AUDIT REPORT =====
+          type "%TEMP%\alumdoor-seed-audit.json"
+          exit /b %AUDIT_RC%
