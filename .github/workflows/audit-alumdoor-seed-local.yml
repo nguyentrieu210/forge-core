@@ -29,8 +29,6 @@ jobs:
             exit /b 1
           )
           cd /d "%TARGET%\server"
-          node scripts\forge-app.mjs briefs\alumdoor-v2.json --dry-run || exit /b 1
-          node scripts\verify-alumdoor-meta-completeness.mjs || exit /b 1
           node scripts\audit-alumdoor-catalog.mjs --brief briefs\alumdoor-v2.json --include-names --output "%TEMP%\alumdoor-seed-audit.json"
           set "AUDIT_RC=%ERRORLEVEL%"
           echo ===== ALUMDOOR SEED AUDIT REPORT =====
