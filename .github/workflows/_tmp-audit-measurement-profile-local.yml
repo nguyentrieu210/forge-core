@@ -1,0 +1,74 @@
+name: Temporary Audit Measurement Profile Local
+
+on:
+  push:
+    branches: [tmp/audit-measurement-profile-local]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: [self-hosted, Windows, X64]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit local D1 and current V2 schema
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          @'
+          import glob, json, sqlite3
+          from pathlib import Path
+
+          dbs = glob.glob(r'C:\alumdoor\server\apps\tenant-worker\.wrangler\state\v3\d1\miniflare-D1DatabaseObject\*.sqlite')
+          if not dbs:
+              raise SystemExit('NO_D1_SQLITE')
+          db = max(dbs, key=lambda p: Path(p).stat().st_mtime)
+          con = sqlite3.connect(db)
+          con.row_factory = sqlite3.Row
+          print('D1_SQLITE', db)
+
+          profiles = con.execute("""
+            SELECT name, payload_json
+            FROM documents
+            WHERE tenant_id='demo' AND doctype='Measurement Profile'
+            ORDER BY name
+          """).fetchall()
+          print('MEASUREMENT_PROFILE_COUNT', len(profiles))
+          for row in profiles:
+              p = json.loads(row['payload_json'] or '{}')
+              keys = ['profile_name','inventory_mode','stock_uom','track_dimension_lot','require_color','require_condition','require_length','require_width','require_piece_qty','track_bundle_qty','weight_tolerance_pct','theoretical_kg_per_m','effective_width_m','scrap_threshold_m','kerf_mm','disabled','_migration_source']
+              print('PROFILE', row['name'], json.dumps({k:p.get(k) for k in keys if k in p}, ensure_ascii=False, sort_keys=True))
+
+          items = con.execute("""
+            SELECT name, payload_json
+            FROM documents
+            WHERE tenant_id='demo' AND doctype='Item'
+            ORDER BY name
+          """).fetchall()
+          print('ITEM_COUNT', len(items))
+          combos = {}
+          for row in items:
+              p = json.loads(row['payload_json'] or '{}')
+              key = (p.get('measurement_profile'), p.get('inventory_mode'), p.get('stock_uom'), p.get('default_purchase_uom'))
+              combos[key] = combos.get(key, 0) + 1
+          for key, count in sorted(combos.items(), key=lambda kv: str(kv[0])):
+              print('ITEM_COMBO', count, json.dumps({'measurement_profile':key[0],'inventory_mode':key[1],'stock_uom':key[2],'default_purchase_uom':key[3]}, ensure_ascii=False))
+
+          app = con.execute("SELECT installed_version, revision, content_hash FROM installed_apps WHERE tenant_id='demo' AND app_id='alumdoor'").fetchone()
+          print('INSTALLED_APP', dict(app) if app else None)
+
+          brief_path = Path(r'C:\alumdoor-hardcode-preview\server\briefs\alumdoor-v2.json')
+          brief = json.loads(brief_path.read_text(encoding='utf-8'))
+          dt = next(x for x in brief['doctypes'] if x.get('name') == 'Measurement Profile')
+          print('V2_VERSION', brief.get('version'))
+          print('V2_MP_LABEL', dt.get('label'))
+          for raw in dt.get('fields', []):
+              if isinstance(raw, str):
+                  print('V2_FIELD', raw)
+              else:
+                  print('V2_FIELD', json.dumps(raw, ensure_ascii=False, sort_keys=True))
+          '@ | Set-Content -Encoding utf8 "$env:RUNNER_TEMP\audit_measurement_profile.py"
+          python "$env:RUNNER_TEMP\audit_measurement_profile.py"
