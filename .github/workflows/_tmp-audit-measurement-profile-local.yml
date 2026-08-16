@@ -68,10 +68,9 @@ jobs:
             console.log('ITEM_COMBO', count, key);
           }
 
-          const app = db.prepare(`
-            SELECT installed_version, revision, content_hash FROM installed_apps
-            WHERE tenant_id='demo' AND app_id='alumdoor'
-          `).get();
+          const installedColumns = db.prepare(`PRAGMA table_info(installed_apps)`).all().map((x) => x.name);
+          console.log('INSTALLED_APP_COLUMNS', JSON.stringify(installedColumns));
+          const app = db.prepare(`SELECT * FROM installed_apps WHERE tenant_id='demo' AND app_id='alumdoor'`).get();
           console.log('INSTALLED_APP', JSON.stringify(app ?? null));
 
           const briefPath = String.raw`C:\alumdoor-hardcode-preview\server\briefs\alumdoor-v2.json`;
