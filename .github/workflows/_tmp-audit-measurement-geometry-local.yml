@@ -31,11 +31,8 @@ jobs:
           @echo off
           cd /d C:\alumdoor\server || exit /b 1
           set "W=node node_modules\wrangler\bin\wrangler.js d1 execute cloudforge-demo --local --config apps\tenant-worker\wrangler.alumdoor-local.jsonc"
-          %W% --command "PRAGMA table_info(doctype_definitions);" || exit /b 1
-          %W% --command "PRAGMA table_info(installed_apps);" || exit /b 1
-          %W% --command "PRAGMA table_info(app_owned_doctypes);" || exit /b 1
-          %W% --command "SELECT app_id,version,length(manifest_json) AS manifest_bytes FROM installed_apps WHERE tenant_id='demo' AND app_id='alumdoor';" || exit /b 1
+          %W% --command "SELECT name,sql FROM sqlite_master WHERE type='table' AND (name LIKE '%%owned%%' OR name LIKE '%%app%%') ORDER BY name;" || exit /b 1
+          %W% --command "SELECT app_id,version,length(manifest_json) AS manifest_bytes,json_type(manifest_json,'$.doctypes') AS doctypes_type,json_type(manifest_json,'$.fixtures') AS fixtures_type FROM installed_apps WHERE tenant_id='demo' AND app_id='alumdoor';" || exit /b 1
+          %W% --command "SELECT doctype,module,is_child,revision,length(metadata_json) AS bytes,substr(metadata_json,1,800) AS sample FROM doctype_definitions WHERE tenant_id='demo' AND doctype IN ('Measurement Profile','Surface Finish','Surface Finish Scope','Item') ORDER BY doctype;" || exit /b 1
           %W% --command "SELECT doctype,count(*) AS n FROM documents WHERE tenant_id='demo' AND doctype IN ('Measurement Profile','Geometry Field','Geometry Profile') GROUP BY doctype ORDER BY doctype;" || exit /b 1
           %W% --command "SELECT name,payload_json FROM documents WHERE tenant_id='demo' AND doctype='Measurement Profile' ORDER BY name;" || exit /b 1
-          %W% --command "SELECT doctype,length(definition_json) AS bytes FROM doctype_definitions WHERE tenant_id='demo' AND doctype IN ('Measurement Profile','Surface Finish','Surface Finish Scope') ORDER BY doctype;" || exit /b 1
-          %W% --command "SELECT doctype FROM app_owned_doctypes WHERE tenant_id='demo' AND app_id='alumdoor' AND doctype IN ('Measurement Profile','Surface Finish','Surface Finish Scope') ORDER BY doctype;" || exit /b 1
