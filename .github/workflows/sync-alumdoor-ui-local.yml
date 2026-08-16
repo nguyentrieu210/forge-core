@@ -13,7 +13,7 @@ concurrency:
 jobs:
   sync:
     runs-on: [self-hosted]
-    timeout-minutes: 2
+    timeout-minutes: 3
     steps:
       - name: Sync main to C:\alumdoor-hardcode-preview
         shell: cmd
@@ -40,3 +40,15 @@ jobs:
 
           echo Synced hardcode preview to:
           git -C "%TARGET%" log -1 --oneline
+
+      - name: Apply canonical Item Group seed to local D1
+        shell: cmd
+        run: |
+          @echo off
+          cd /d C:\alumdoor-hardcode-preview\server || exit /b 1
+          if not exist "node_modules\wrangler\bin\wrangler.js" (
+            echo Wrangler is not installed under server\node_modules.
+            exit /b 1
+          )
+          node node_modules\wrangler\bin\wrangler.js d1 execute cloudforge-demo --local --config apps\tenant-worker\wrangler.alumdoor-local.jsonc --file scripts\seed-alumdoor-item-groups-local.sql || exit /b 1
+          echo Canonical Item Group seed applied to local D1 cloudforge-demo.
