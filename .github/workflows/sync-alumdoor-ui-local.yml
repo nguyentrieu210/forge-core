@@ -16,30 +16,25 @@ jobs:
     timeout-minutes: 2
     steps:
       - name: Sync main to C:\alumdoor-hardcode-preview
-        shell: powershell
+        shell: cmd
         run: |
-          $ErrorActionPreference = 'Stop'
-          $path = 'C:\alumdoor-hardcode-preview'
-          $repo = 'https://github.com/nguyentrieu210/forge.git'
+          @echo off
+          set "TARGET=C:\alumdoor-hardcode-preview"
+          set "REPO=https://github.com/nguyentrieu210/forge.git"
 
-          if (-not (Test-Path $path)) {
-            New-Item -ItemType Directory -Path $path | Out-Null
-          }
+          if not exist "%TARGET%" mkdir "%TARGET%"
+          if not exist "%TARGET%\.git" git -C "%TARGET%" init || exit /b 1
 
-          if (-not (Test-Path (Join-Path $path '.git'))) {
-            git -C $path init
-          }
+          git -C "%TARGET%" remote get-url origin >nul 2>&1
+          if errorlevel 1 (
+            git -C "%TARGET%" remote add origin "%REPO%" || exit /b 1
+          ) else (
+            git -C "%TARGET%" remote set-url origin "%REPO%" || exit /b 1
+          )
 
-          $hasOrigin = git -C $path remote 2>$null | Where-Object { $_ -eq 'origin' }
-          if ($hasOrigin) {
-            git -C $path remote set-url origin $repo
-          } else {
-            git -C $path remote add origin $repo
-          }
+          git -C "%TARGET%" fetch origin main --prune || exit /b 1
+          git -C "%TARGET%" checkout -B main origin/main || exit /b 1
+          git -C "%TARGET%" reset --hard origin/main || exit /b 1
 
-          git -C $path fetch origin main --prune
-          git -C $path checkout -B main origin/main
-          git -C $path reset --hard origin/main
-
-          Write-Host "Synced hardcode preview to:"
-          git -C $path log -1 --oneline
+          echo Synced hardcode preview to:
+          git -C "%TARGET%" log -1 --oneline
