@@ -60,21 +60,23 @@ jobs:
             }
           }
           if (-not $wrangler) {
-            throw 'Wrangler is not installed in C:\alumdoor or C:\alumdoor-hardcode-preview. Run pnpm install in the active Alumdoor checkout.'
+            throw 'Wrangler is not installed in C:\alumdoor or C:\alumdoor-hardcode-preview.'
           }
 
           $stateCandidates = @()
           foreach ($root in $candidateRoots) {
-            $stateDir = Join-Path $root 'server\.wrangler\state'
-            if (Test-Path $stateDir) {
-              $sqlite = Get-ChildItem -Path $stateDir -Recurse -File -Filter '*.sqlite' -ErrorAction SilentlyContinue |
-                Sort-Object LastWriteTime -Descending |
-                Select-Object -First 1
-              if ($sqlite) {
-                $stateCandidates += [pscustomobject]@{
-                  Root = $root
-                  Sqlite = $sqlite.FullName
-                  LastWriteTime = $sqlite.LastWriteTime
+            foreach ($relativeState in @('server\apps\tenant-worker\.wrangler\state','server\.wrangler\state')) {
+              $stateDir = Join-Path $root $relativeState
+              if (Test-Path $stateDir) {
+                $sqlite = Get-ChildItem -Path $stateDir -Recurse -File -Filter '*.sqlite' -ErrorAction SilentlyContinue |
+                  Sort-Object LastWriteTime -Descending |
+                  Select-Object -First 1
+                if ($sqlite) {
+                  $stateCandidates += [pscustomobject]@{
+                    Root = $root
+                    Sqlite = $sqlite.FullName
+                    LastWriteTime = $sqlite.LastWriteTime
+                  }
                 }
               }
             }
@@ -99,10 +101,18 @@ jobs:
           }
           Set-Location $serverRoot
 
+          # D1 rejects manual BEGIN/COMMIT statements. Keep the canonical seed source intact,
+          # but strip only its outer transaction wrapper for Wrangler local execution.
+          $d1Seed = Join-Path $env:TEMP 'alumdoor-item-groups-d1.sql'
+          $seedText = Get-Content -Raw -LiteralPath $seedFile
+          $seedText = $seedText -replace '(?m)^BEGIN TRANSACTION;\s*\r?\n', ''
+          $seedText = $seedText -replace '(?m)^COMMIT;\s*\r?\n?', ''
+          [System.IO.File]::WriteAllText($d1Seed, $seedText, [System.Text.UTF8Encoding]::new($false))
+
           Write-Host "Wrangler: $wrangler"
           Write-Host "D1 working root: $serverRoot"
           Write-Host "Config: $config"
-          & node $wrangler d1 execute cloudforge-demo --local --config $config --file $seedFile
+          & node $wrangler d1 execute cloudforge-demo --local --config $config --file $d1Seed
           if ($LASTEXITCODE -ne 0) { throw "Item Group seed failed with exit code $LASTEXITCODE" }
 
           $verifySql = @"
