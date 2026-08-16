@@ -13,7 +13,7 @@ concurrency:
 jobs:
   sync:
     runs-on: [self-hosted]
-    timeout-minutes: 3
+    timeout-minutes: 5
     steps:
       - name: Sync main to C:\alumdoor-hardcode-preview
         shell: cmd
@@ -46,9 +46,15 @@ jobs:
         run: |
           @echo off
           cd /d C:\alumdoor-hardcode-preview\server || exit /b 1
-          if not exist "node_modules\wrangler\bin\wrangler.js" (
-            echo Wrangler is not installed under server\node_modules.
-            exit /b 1
+
+          if exist "node_modules\wrangler\bin\wrangler.js" (
+            echo Using repository Wrangler.
+            node node_modules\wrangler\bin\wrangler.js d1 execute cloudforge-demo --local --config apps\tenant-worker\wrangler.alumdoor-local.jsonc --file scripts\seed-alumdoor-item-groups-local.sql || exit /b 1
+            node node_modules\wrangler\bin\wrangler.js d1 execute cloudforge-demo --local --config apps\tenant-worker\wrangler.alumdoor-local.jsonc --command "SELECT COUNT(*) AS active_item_groups FROM master_records WHERE tenant_id='demo' AND record_type='Item Group' AND disabled=0;" || exit /b 1
+          ) else (
+            echo server\node_modules is absent; bootstrapping pinned Wrangler 4.114.0 with npx.
+            call npx --yes wrangler@4.114.0 d1 execute cloudforge-demo --local --config apps\tenant-worker\wrangler.alumdoor-local.jsonc --file scripts\seed-alumdoor-item-groups-local.sql || exit /b 1
+            call npx --yes wrangler@4.114.0 d1 execute cloudforge-demo --local --config apps\tenant-worker\wrangler.alumdoor-local.jsonc --command "SELECT COUNT(*) AS active_item_groups FROM master_records WHERE tenant_id='demo' AND record_type='Item Group' AND disabled=0;" || exit /b 1
           )
-          node node_modules\wrangler\bin\wrangler.js d1 execute cloudforge-demo --local --config apps\tenant-worker\wrangler.alumdoor-local.jsonc --file scripts\seed-alumdoor-item-groups-local.sql || exit /b 1
-          echo Canonical Item Group seed applied to local D1 cloudforge-demo.
+
+          echo Canonical Item Group seed applied and verified in local D1 cloudforge-demo.
