@@ -101,18 +101,25 @@ jobs:
           }
           Set-Location $serverRoot
 
-          # D1 rejects manual BEGIN/COMMIT statements. Keep the canonical seed source intact,
-          # but strip only its outer transaction wrapper for Wrangler local execution.
-          $d1Seed = Join-Path $env:TEMP 'alumdoor-item-groups-d1.sql'
-          $seedText = Get-Content -Raw -LiteralPath $seedFile
-          $seedText = $seedText -replace '(?m)^BEGIN TRANSACTION;\s*\r?\n', ''
-          $seedText = $seedText -replace '(?m)^COMMIT;\s*\r?\n?', ''
-          [System.IO.File]::WriteAllText($d1Seed, $seedText, [System.Text.UTF8Encoding]::new($false))
-
           Write-Host "Wrangler: $wrangler"
           Write-Host "D1 working root: $serverRoot"
           Write-Host "Config: $config"
-          & node $wrangler d1 execute cloudforge-demo --local --config $config --file $d1Seed
+
+          # Repair only mojibake Item Group rows created by the earlier Windows PowerShell
+          # UTF-8 decoding bug. These marker code points do not occur in normal Vietnamese names.
+          $mojibake = "(name LIKE '%'||char(195)||'%' OR name LIKE '%'||char(196)||'%' OR name LIKE '%'||char(198)||'%' OR name LIKE '%'||char(187)||'%' OR name LIKE '%'||char(186)||'%')"
+          foreach ($cleanupSql in @(
+            "DELETE FROM document_search WHERE tenant_id='demo' AND doctype='Item Group' AND $mojibake;",
+            "DELETE FROM documents WHERE tenant_id='demo' AND doctype='Item Group' AND $mojibake;",
+            "DELETE FROM master_records WHERE tenant_id='demo' AND record_type='Item Group' AND $mojibake;"
+          )) {
+            & node $wrangler d1 execute cloudforge-demo --local --config $config --command $cleanupSql
+            if ($LASTEXITCODE -ne 0) { throw "Mojibake cleanup failed with exit code $LASTEXITCODE" }
+          }
+
+          # Pass the UTF-8 file straight to Wrangler. Do NOT round-trip it through Windows
+          # PowerShell Get-Content, which caused the mojibake records above.
+          & node $wrangler d1 execute cloudforge-demo --local --config $config --file $seedFile
           if ($LASTEXITCODE -ne 0) { throw "Item Group seed failed with exit code $LASTEXITCODE" }
 
           $verifySql = @"
@@ -125,14 +132,13 @@ jobs:
           & node $wrangler d1 execute cloudforge-demo --local --config $config --command $verifySql
           if ($LASTEXITCODE -ne 0) { throw "Item Group verification query failed with exit code $LASTEXITCODE" }
 
-          $legacySql = @"
-          SELECT name, disabled
+          $allGroupsSql = @"
+          SELECT name, disabled, json_extract(data_json,'$.parent_item_group') AS parent_item_group
           FROM master_records
           WHERE tenant_id='demo' AND record_type='Item Group'
-            AND name IN ('Bộ lưu điện','Cửa cuốn','Cửa nhôm kính','Dịch vụ','Linh kiện & thiết bị','Mô tơ','Nguyên vật liệu','Phụ kiện','Remote và điều khiển','Thành phẩm','Cửa siêu trường')
-          ORDER BY name;
+          ORDER BY disabled, name;
           "@
-          & node $wrangler d1 execute cloudforge-demo --local --config $config --command $legacySql
-          if ($LASTEXITCODE -ne 0) { throw "Legacy Item Group verification query failed with exit code $LASTEXITCODE" }
+          & node $wrangler d1 execute cloudforge-demo --local --config $config --command $allGroupsSql
+          if ($LASTEXITCODE -ne 0) { throw "Item Group listing verification failed with exit code $LASTEXITCODE" }
 
           Write-Host 'Canonical Item Group seed applied to the active local D1.'
