@@ -29,14 +29,14 @@ jobs:
         shell: cmd
         run: |
           @echo off
-          node C:\alumdoor-hardcode-preview\server\scripts\build-alumdoor-color-correction.mjs --tenant demo --sql C:\alumdoor-surface-finish-local.sql || exit /b 1
+          node C:\alumdoor-hardcode-preview\server\scripts\build-alumdoor-color-correction.mjs --tenant demo --sql "%RUNNER_TEMP%\alumdoor-surface-finish-local.sql" || exit /b 1
 
       - name: Apply to active local D1 and verify
         shell: cmd
         run: |
           @echo off
           cd /d C:\alumdoor\server || exit /b 1
-          node node_modules\wrangler\bin\wrangler.js d1 execute cloudforge-demo --local --config apps\tenant-worker\wrangler.alumdoor-local.jsonc --file C:\alumdoor-surface-finish-local.sql || exit /b 1
+          node node_modules\wrangler\bin\wrangler.js d1 execute cloudforge-demo --local --config apps\tenant-worker\wrangler.alumdoor-local.jsonc --file "%RUNNER_TEMP%\alumdoor-surface-finish-local.sql" || exit /b 1
           node node_modules\wrangler\bin\wrangler.js d1 execute cloudforge-demo --local --config apps\tenant-worker\wrangler.alumdoor-local.jsonc --command "SELECT name,json_extract(payload_json,'$.finish_name') AS finish_name,json_array_length(json_extract(payload_json,'$.applies_to_groups')) AS scope_count,json_extract(payload_json,'$.applies_to_all_groups') AS all_groups FROM documents WHERE tenant_id='demo' AND doctype='Surface Finish' ORDER BY name;" || exit /b 1
           node node_modules\wrangler\bin\wrangler.js d1 execute cloudforge-demo --local --config apps\tenant-worker\wrangler.alumdoor-local.jsonc --command "SELECT json_extract(payload_json,'$.applies_to_groups') AS std_scope FROM documents WHERE tenant_id='demo' AND doctype='Surface Finish' AND name='SON_TINH_DIEN';" || exit /b 1
           node node_modules\wrangler\bin\wrangler.js d1 execute cloudforge-demo --local --config apps\tenant-worker\wrangler.alumdoor-local.jsonc --command "SELECT COUNT(*) AS canonical_colors FROM documents WHERE tenant_id='demo' AND doctype='Item Color' AND COALESCE(json_extract(payload_json,'$.disabled'),0) IN (0,'0',false);" || exit /b 1
